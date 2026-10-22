@@ -66,12 +66,13 @@ function fix(){var a=window.__asset;if(!a)return;C.forEach(function(c){
  var cw=c[7]||407;o.style.cssText='position:absolute;left:'+(c[2]/cw*100)+'%;top:'+(c[3]/c[5]*100)+'%;width:'+(c[4]/cw*100)+'%;height:auto;max-width:none;pointer-events:none;z-index:1';
  card.appendChild(o)})}
 new MutationObserver(fix).observe(document.documentElement,{childList:true,subtree:true});fix()})();</script><script>/* teum-widget-shadow: 위젯 카드 SVG(6초 반복: 대기 1s → 펼침 1.2s(우리 규칙 카드 +480 단위, 나머지 카드 오른쪽으로) → 유지 2.6s → 접힘 1.2s) 아래 깔린 흐린 그림자 이미지가
- 고정돼 있어 카드만 움직였음 → SVG가 시작(load)할 때 그림자도 같은 시간표로 오른쪽으로 늘었다 줄게(왼쪽 기준 scaleX). 늘어나는 폭 = 480 단위 × (SVG 표시 폭 / 2968) */
+ 고정돼 있어 카드만 움직였음 → SVG가 시작(load)할 때 그림자도 같은 시간표로 오른쪽으로 늘었다 줄게(왼쪽 기준 scaleX).
+ 그림자 길이: 원본 그림자 이미지가 UI(카드 줄)보다 훨씬 길어서(약 18%), 접힌 상태엔 마지막 카드 오른쪽 끝(SVG 폭의 2377.7/2968)+여유, 펼친 상태엔 2966/2968+여유에 그림자 오른쪽 끝이 오도록 scaleX 를 맞춤. 색은 opacity 로 살짝 옅게 */
 window.teumShadowSync=function(o){var R=o.getBoundingClientRect(),root=o.parentElement;for(var i=0;i<4&&root.parentElement;i++)root=root.parentElement;
  var sh=[].filter.call(root.querySelectorAll('img'),function(e){if(e===o)return false;var q=e.getBoundingClientRect();return q.width>q.height*6&&q.width>R.width*0.5&&Math.abs(q.top-(R.bottom-60))<160})[0];
- if(!sh)return;if(sh.__teumShadow)sh.__teumShadow.cancel();var w=sh.getBoundingClientRect().width,S=(w+480*R.width/2968)/w,E='cubic-bezier(0,0,.58,1)';
- sh.style.transformOrigin='left center';
- sh.__teumShadow=sh.animate([{transform:'scaleX(1)',offset:0},{transform:'scaleX(1)',offset:1/6,easing:E},{transform:'scaleX('+S+')',offset:.3667},{transform:'scaleX('+S+')',offset:.8,easing:E},{transform:'scaleX(1)',offset:1}],{duration:6000,iterations:Infinity})};</script><script>/* teum-cover-align: 페이지마다 표지(맨 위) 글·폰 이미지 위치가 달라 플래닝(=메인) 표지에 맞춤. 피그마 데이터는 그대로, translate/scale 속성으로만 이동(원래 transform과 안 겹침).
+ if(!sh)return;if(sh.__teumShadow)sh.__teumShadow.cancel();var q=sh.getBoundingClientRect(),w=q.width,m=R.width*0.013,S0=(R.left+R.width*2377.7/2968+m-q.left)/w,S1=(R.left+R.width*2966/2968+m-q.left)/w,E='cubic-bezier(0,0,.58,1)';
+ sh.style.transformOrigin='left center';sh.style.opacity='0.65';
+ sh.__teumShadow=sh.animate([{transform:'scaleX('+S0+')',offset:0},{transform:'scaleX('+S0+')',offset:1/6,easing:E},{transform:'scaleX('+S1+')',offset:.3667},{transform:'scaleX('+S1+')',offset:.8,easing:E},{transform:'scaleX('+S0+')',offset:1}],{duration:6000,iterations:Infinity})};</script><script>/* teum-cover-align: 페이지마다 표지(맨 위) 글·폰 이미지 위치가 달라 플래닝(=메인) 표지에 맞춤. 피그마 데이터는 그대로, translate/scale 속성으로만 이동(원래 transform과 안 겹침).
  디자인 시스템: 표지 글·폰 이미지·꽃 장식·로고·오른쪽 아래 글이 모두 87px 아래 → 87px 위로(반원 초록 배경은 그대로).
  서비스: 폰 이미지 479,120 / 1216x912 → 437,139 / 1248x936, 아래쪽 글(Digital Media Design·TEUM·Service System) 30px 아래로. 값은 1920 기준 CSS px */
 (function(){
