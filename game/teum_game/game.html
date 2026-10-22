@@ -1,0 +1,3433 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>틈새살이</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" />
+<link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet" />
+<!-- 대화창·말풍선 글꼴 (세미볼드 600 등 굵기별로 있음. 없으면 맑은 고딕으로 대체돼 600도 굵게 보인다) -->
+<link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css" rel="stylesheet" />
+<link rel="stylesheet" href="teum-cursor.css">
+<style>
+  :root{
+    --point:#499963;
+    --point-dark:#3a7d51;
+    --point-deep:#2c5f3d;
+    --point-light:#e7f4ec;
+    --ink:#1f2822;
+    --ink-dim:#75827a;
+    --line:rgba(31,40,34,0.08);
+    --warn:#e0664a;
+    --warn-light:#fbeae5;
+  }
+
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    min-height:100dvh;
+    display:flex; align-items:center; justify-content:center;
+    background:#F7F8FA;
+    font-family:'Jua', 'Apple SD Gothic Neo', sans-serif;
+    color:var(--ink);
+    word-break:keep-all;
+    overflow-wrap:break-word;
+    padding:40px 20px;
+  }
+  body.cohabit-active{ padding:0; align-items:stretch; overflow:hidden; } /* 게임 화면은 한 화면에 맞추고 스크롤바는 띄우지 않는다 */
+
+  .clay{
+    background:#ffffff;
+    box-shadow:
+      0 14px 28px -12px rgba(31,58,40,0.16),
+      0 2px 6px rgba(31,58,40,0.05),
+      inset 0 2px 0 rgba(255,255,255,0.9),
+      inset 0 -3px 7px rgba(31,58,40,0.05);
+    border:1px solid rgba(31,58,40,0.04);
+  }
+  .clay-point{
+    background:linear-gradient(160deg, #5fb17c, var(--point) 65%, var(--point-dark));
+    box-shadow:
+      0 16px 28px -10px rgba(44,95,61,0.45),
+      inset 0 2px 0 rgba(255,255,255,0.35),
+      inset 0 -5px 10px rgba(20,45,28,0.22);
+    border:none;
+  }
+
+  .stage{
+    width:100%;
+    max-width:640px;
+    display:flex; flex-direction:column; align-items:center;
+    text-align:center;
+  }
+  .stage.hide{ display:none; }
+
+  .kicker{
+    font-size:13px; font-weight:400; letter-spacing:.18em; text-transform:uppercase;
+    color:var(--point-dark);
+    background:var(--point-light);
+    padding:9px 18px;
+    border-radius:999px;
+  }
+  .avatar-badge{
+    margin:28px auto 0;
+    width:120px; height:120px; border-radius:40px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:60px;
+  }
+
+  .title{
+    margin-top:26px;
+    font-size:clamp(28px, 4vw, 40px);
+    color:var(--ink);
+    line-height:1.4;
+  }
+  .subtitle{
+    margin-top:14px;
+    font-size:16px; line-height:1.75; color:var(--ink-dim);
+  }
+
+  /* ---------- code entry ---------- */
+  .code-panel{ width:100%; }
+  .otp-row{
+    margin-top:40px;
+    display:flex; justify-content:center; gap:16px;
+  }
+  .otp-box{
+    width:76px; height:92px;
+    border-radius:22px;
+    border:none;
+    text-align:center;
+    font-family:'Jua', sans-serif;
+    font-size:38px;
+    color:var(--point-dark);
+    background:#ffffff;
+    caret-color:var(--point);
+  }
+  .otp-box:focus{ outline:2px solid var(--point); outline-offset:2px; }
+  .otp-row.shake{ animation:shake .4s ease; }
+  @keyframes shake{
+    0%,100%{ transform:translateX(0); }
+    20%{ transform:translateX(-10px); }
+    40%{ transform:translateX(9px); }
+    60%{ transform:translateX(-6px); }
+    80%{ transform:translateX(4px); }
+  }
+
+  .error-msg{
+    margin-top:22px;
+    font-size:14.5px;
+    color:var(--warn);
+    background:var(--warn-light);
+    padding:12px 18px;
+    border-radius:14px;
+    /* 자리는 항상 차지해두고 보이기만 토글 - 문구가 떠도 화면 전체가 위로 밀리지 않게 */
+    display:inline-block;
+    visibility:hidden;
+  }
+  .error-msg.show{ visibility:visible; }
+
+  .btn-primary{
+    appearance:none; border:none; cursor:var(--cur-hand);
+    margin-top:34px;
+    padding:20px 48px;
+    border-radius:999px;
+    color:#ffffff;
+    font-family:'Jua', sans-serif;
+    font-size:18px;
+    letter-spacing:.01em;
+    transition:transform .2s ease, box-shadow .2s ease, opacity .2s ease;
+  }
+  .btn-primary:active{ transform:translateY(2px) scale(.98); }
+  .btn-primary:disabled{ opacity:.4; pointer-events:none; }
+
+  .hint{
+    margin-top:22px;
+    font-size:13px; color:var(--ink-dim); opacity:.75;
+  }
+
+  /* ---------- success reveal ---------- */
+  .reveal-panel{ display:none; width:100%; flex-direction:column; align-items:center; }
+  .reveal-panel.show{ display:flex; }
+  .code-panel.hide{ display:none; }
+
+  .reveal-emoji{
+    margin-top:8px;
+    width:150px; height:150px; border-radius:50px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:76px;
+    animation:pop .5s cubic-bezier(.34,1.56,.64,1);
+  }
+  @keyframes pop{
+    0%{ transform:scale(.4); opacity:0; }
+    100%{ transform:scale(1); opacity:1; }
+  }
+  .reveal-name{
+    margin-top:24px;
+    font-size:28px; color:var(--point);
+  }
+  .reveal-type{
+    margin-top:6px;
+    font-size:14.5px; color:var(--ink-dim);
+  }
+  .reveal-desc{
+    margin-top:18px;
+    max-width:440px;
+    font-size:14.5px; line-height:1.85; color:var(--ink);
+    padding:20px 24px;
+    border-radius:20px;
+  }
+
+  .gender-select-area{
+    margin-top:30px;
+    width:100%;
+    max-width:340px;
+    display:flex; flex-direction:column; gap:10px;
+  }
+  .gender-btn-row{
+    display:flex; gap:12px;
+  }
+  .gender-btn{
+    flex:1;
+    appearance:none; cursor:var(--cur-hand);
+    display:flex; flex-direction:column; align-items:center; gap:8px;
+    padding:14px 0 16px;
+    border-radius:18px;
+    color:var(--ink-dim);
+    font-family:'Jua', sans-serif;
+    font-size:16px;
+    transition:transform .15s ease, box-shadow .15s ease, background .15s ease, color .15s ease;
+  }
+  .gender-btn-img{
+    width:64px; height:64px;
+    border-radius:50%;
+    object-fit:cover;
+    background:#f3f6f4;
+    box-shadow:0 2px 6px rgba(31,58,40,0.12);
+    pointer-events:none;
+  }
+  .gender-btn:active{ transform:translateY(2px) scale(.98); }
+  .gender-btn.active{
+    background:linear-gradient(160deg, #5fb17c, var(--point) 65%, var(--point-dark));
+    color:#fff;
+    border-color:transparent;
+    box-shadow:
+      0 14px 24px -10px rgba(44,95,61,0.45),
+      inset 0 2px 0 rgba(255,255,255,0.35);
+  }
+  .gender-btn.active .gender-btn-img{
+    box-shadow:0 0 0 3px rgba(255,255,255,0.85), 0 2px 6px rgba(31,58,40,0.12);
+  }
+
+  /* 모든 유형 공통 - 성별 선택 시 해당 캐릭터 전신을 화면 좌(여성)/우(남성)에 띄운다 */
+  /* 확대해서 하반신은 화면 아래로 잘리게 둔다 (bottom 음수) */
+  /* --u: 그림 크기 단위. 기본 1vh지만 가로가 좁으면 줄인다 - 원(76u)의 안쪽 끝(2vw + 63u)이
+     가운데 내용(폭 440px) 옆 16px 앞에서 멈추게. 원이 그림보다 넓어서 원 기준. */
+  :root{ --u:clamp(0px, calc((48vw - 236px) / 63), 1vh); }
+  .gender-preview{
+    position:fixed; bottom:calc(-55 * var(--u)); height:calc(140 * var(--u));
+    display:none; pointer-events:none;
+  }
+  .gender-preview.left{ display:block; left:2vw; }
+  .gender-preview.right{ display:block; right:2vw; }
+  .gender-preview-img{
+    position:relative; height:100%; display:block;
+    animation:genderPreviewIn .7s cubic-bezier(.22,1,.36,1) both;
+  }
+  /* 캐릭터 뒤 초록 원 - 시안(768x1200 프레임, r455 원)을 화면 높이 기준으로 옮긴 비율:
+     지름 ≈ 화면 높이 76%, 원 윗변 ≈ 화면 위에서 40% (컨테이너 top이 화면 15vh 지점이라 25vh) */
+  .gender-preview-circle{
+    position:absolute; top:calc(25 * var(--u)); left:50%;
+    width:calc(76 * var(--u)); height:calc(76 * var(--u)); margin-left:calc(-38 * var(--u));
+    border-radius:50%; background:#BBF2B7;
+    animation:genderCircleIn .6s cubic-bezier(.34,1.4,.64,1) both;
+  }
+  #matePreview .gender-preview-circle{ background:#FFD3D7; } /* 메이트 쪽 원은 분홍 */
+  @keyframes genderPreviewIn{
+    from{ transform:translateY(60px); }
+    to{ transform:translateY(0); }
+  }
+  @keyframes genderCircleIn{
+    from{ opacity:0; transform:scale(.6); }
+    to{ opacity:1; transform:scale(1); }
+  }
+
+  /* 금전형(S) 전용 매칭 화면 - mate-test(틈 화면/mate-test) 매칭 로딩과 같은 연출:
+     나 ↔ 메이트가 양쪽에서 다가와 선으로 이어지고 하트가 뜬다. 로딩(.loading)이 끝나면
+     같은 나 ♥ 메이트 줄이 그대로 위로 올라가고(JS FLIP) 그 아래 정보가 나타난다. */
+  .match-me, .match-mate{
+    width:72px; height:72px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center; font-size:30px;
+  }
+  .match-me{ font-family:'Jua', sans-serif; font-size:20px; color:#fff; }
+  .match-link{ position:relative; width:80px; height:4px; border-radius:2px; background:linear-gradient(90deg, #71D369, #FF9696);
+               transform-origin:left; margin-top:34px; }
+  .match-link span{ position:absolute; left:50%; top:50%; width:32px; height:32px; margin:-16px 0 0 -16px;
+                    border-radius:50%; background:#fff; color:#FF9696; font-size:18px;
+                    display:flex; align-items:center; justify-content:center; }
+  .match-result{ display:none; align-items:flex-start; margin-top:8px; }
+  #revealPanel.is-match .match-result{ display:flex; }
+  #revealPanel.is-match #revealEmoji,
+  #revealPanel.is-match #revealName,
+  #revealPanel.is-match #revealType{ display:none; }
+  .match-card{ width:150px; display:flex; flex-direction:column; align-items:center; }
+  .match-card .reveal-name{ margin-top:14px; font-size:24px; }
+  #revealPanel.show .match-card-me{ animation:matchInL .6s cubic-bezier(.2,.8,.2,1) both; }
+  #revealPanel.show .match-card-mate{ animation:matchInR .6s cubic-bezier(.2,.8,.2,1) both; }
+  #revealPanel.show .match-link{ animation:matchLink .3s .55s ease-out both; }
+  #revealPanel.show .match-link span{ animation:matchPop .4s .8s cubic-bezier(.3,1.6,.5,1) both; }
+  @keyframes matchInL{ from{ transform:translateX(-56px); opacity:0; } }
+  @keyframes matchInR{ from{ transform:translateX(56px); opacity:0; } }
+  @keyframes matchLink{ from{ transform:scaleX(0); } }
+  @keyframes matchPop{ from{ transform:scale(0); } }
+  /* 로딩 중: 나 ♥ 메이트 원과 '찾고 있어요' 문구만 */
+  .match-loading-text{ display:none; flex-direction:column; align-items:center; gap:14px; }
+  #revealPanel.is-match.loading .match-loading-text{ display:flex; }
+  #revealPanel.is-match.loading .gender-preview,
+  #revealPanel.is-match.loading .match-card .reveal-name,
+  #revealPanel.is-match.loading #revealDesc,
+  #revealPanel.is-match.loading #startCohabitBtn,
+  #revealPanel.is-match.loading #resetLink{ display:none !important; }
+  /* 로딩 끝: 줄이 올라가는 동안 아래 정보가 살짝 늦게 떠오른다 */
+  #revealPanel.is-match.show:not(.loading) .match-card .reveal-name,
+  #revealPanel.is-match.show:not(.loading) #revealDesc,
+  #revealPanel.is-match.show:not(.loading) #startCohabitBtn,
+  #revealPanel.is-match.show:not(.loading) #resetLink{ animation:matchInfoIn .6s .5s ease-out both; }
+  /* 양쪽 큰 그림(나/메이트)도 나 ♥ 메이트 줄과 같은 시간·곡선으로 화면 아래에서 함께 올라온다 (JS FLIP 1000ms와 맞춤) */
+  #revealPanel.is-match .gender-preview-img,
+  #revealPanel.is-match .gender-preview-circle{ animation:none; }
+  #revealPanel.is-match.show:not(.loading) .gender-preview{ animation:matchSideRise 1s cubic-bezier(.45,0,.25,1) both; }
+  @keyframes matchSideRise{ from{ transform:translateY(85vh); } }
+  /* 금전형(S): 매칭 화면에서 '다음' → 같은 화면 가운데에 합의서(폰 크기 412x892)를 띄운다.
+     양쪽 캐릭터 그림은 그대로 두고 가운데 내용만 합의서로 바꾼다. 축소 비율은 JS(fitStageAgreement). */
+  .stage-agreement{ display:none; position:relative; }
+  /* 폰 테두리 (Figma 폰 프레임 참고: 회색 테두리 + 검은 베젤 19px + 둥근 화면 + 오른쪽 버튼 + 펀치홀 카메라).
+     원본 크기 450x930(화면 412x892)으로 그리고 통째로 scale - 축소 비율은 JS(fitStageAgreement) */
+  .phone{ position:absolute; left:0; top:0; width:450px; height:930px; transform-origin:0 0;
+          border-radius:56px; background:#2A2A2A;
+          box-shadow:0 0 0 1.5px #828282, inset 0 0 0 2px #595959, inset 0 0 0 4px #1a1a1a, 0 24px 48px -16px rgba(31,58,40,0.35); }
+  .phone-screen{ position:absolute; left:19px; top:19px; width:412px; height:892px; border-radius:31px; overflow:hidden; background:#fff; }
+  .phone-screen iframe{ display:block; width:412px; height:892px; border:0; border-radius:31px; /* 폰 화면 둥글기와 같게 */ }
+  /* 베젤 덮개 (게임 폰 프레임 덮개와 같은 이유) - 화면 모서리가 네모로 삐져나와도 베젤 색으로 덮는다 */
+  .phone-mask{ position:absolute; inset:0; border-radius:56px; border:19px solid #2A2A2A; pointer-events:none; }
+  .phone-mask::after{ content:''; position:absolute; inset:-19px; border-radius:56px; box-shadow:inset 0 0 0 2px #595959, inset 0 0 0 4px #1a1a1a; }
+  .phone-cam{ position:absolute; left:50%; top:24px; width:22px; height:22px; margin-left:-11px; border-radius:50%;
+              background:radial-gradient(circle at 40% 38%, #3a3550 0 2px, #000 3px); pointer-events:none; }
+  .phone::before, .phone::after{ content:''; position:absolute; right:-5px; width:4px; border-radius:0 3px 3px 0;
+                                 background:linear-gradient(90deg, #A6A6A6, #C9C9C9 40%, #7F7F7F); }
+  .phone::before{ top:160px; height:118px; }
+  .phone::after{ top:333px; height:64px; }
+  #revealPanel.agreeing > :not(.gender-preview):not(.stage-agreement-wrap){ display:none !important; }
+  .stage-agreement-wrap{ display:none; position:relative; }
+  #revealPanel.agreeing .stage-agreement-wrap{ display:block; }
+  /* 매칭 로딩 중 미리 그려 두는 합의서(agree-prep, app-tablet.js prepStageAgreement): 실제 크기로 화면 바로 아래(밖)에 깔아 둔다
+     (화면 안에 거의 투명하게 두는 건 폰 테두리가 희미하게 비쳐서 안 됨) */
+  #revealPanel.agree-prep:not(.agreeing) .stage-agreement-wrap{ display:block; position:fixed; left:0; top:100vh; pointer-events:none; }
+  #revealPanel.agree-prep:not(.agreeing) .stage-agreement{ display:block; animation:none; }
+  /* 합의서 폰은 화면 아래에서 위로 올라온다 */
+  #revealPanel.agreeing .stage-agreement{ display:block; animation:agreeRise .8s cubic-bezier(.2,.8,.2,1) both; }
+  @keyframes agreeRise{ from{ transform:translateY(100vh); } }
+  /* 올라오는 동안 폰이 화면 밖(아래)에 있어서 페이지 스크롤바가 생겼다 사라지며 화면이 흔들렸다 → 합의서 중엔 페이지 스크롤 막기.
+     폰은 GPU 레이어로 따로 그려서 움직임을 매끄럽게 */
+  body:has(#revealPanel.agreeing){ overflow:hidden; }
+  .stage-agreement{ will-change:transform; }
+  /* 메이트 매칭 화면 글: 수동 줄바꿈 없이 자동으로, 바꿀 땐 단어(띄어쓰기) 단위로만 */
+  #revealPanel{ word-break:keep-all; overflow-wrap:break-word; }
+  #revealPanel .title{ text-wrap:balance; }
+  #revealPanel .reveal-desc, #revealPanel .match-sub{ text-wrap:pretty; }
+  .reveal-desc .desc-seg{ display:inline-block; max-width:100%; }
+  /* 합의서 진행 중 말풍선 (Figma: 흰 바탕, 높이 64, 캐릭터 쪽 아래 모서리만 각짐).
+     합의서 상자 바깥 양옆에 붙여 둔다 - 화면 비율이 바뀌어도 합의서(앱) 위로 겹치지 않는다.
+     폭은 상자 옆 남은 공간까지만 (--agree-w = 합의서 상자 폭, JS fitStageAgreement) */
+  .talk-bubble{
+    position:absolute; top:4%; z-index:5; display:none; /* 상자 위쪽 - 조금 내리되 양쪽 캐릭터 머리는 가리지 않게 */
+    width:max-content; max-width:min(320px, calc((100vw - var(--agree-w, 412px)) / 2 - 56px));
+    padding:16px 28px;
+    min-height:calc(2 * 1.35em + 32px); /* 한 줄짜리도 두 줄 말풍선과 같은 높이로 - 글은 세로 가운데 */
+    background:#fff; border-radius:36px;
+    box-shadow:0 8px 20px -12px rgba(31,58,40,0.12);
+    font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif;
+    font-size:16px; font-weight:600; line-height:1.35; color:#000; text-align:left;
+    word-break:keep-all; text-wrap:balance; pointer-events:none;
+    white-space:pre-line; /* 문구 안 \n 에서 줄을 바꾼다 - 버튼 이름이 중간에 잘리지 않게 */
+  }
+  .talk-bubble.me{ right:calc(100% + 28px); border-bottom-left-radius:0; transform-origin:0 100%; }
+  .talk-bubble.mate{ left:calc(100% + 28px); border-bottom-right-radius:0; transform-origin:100% 100%; }
+  .talk-bubble.show{ display:flex; align-items:center; animation:talkPop .35s cubic-bezier(.3,1.5,.5,1) both; }
+  @keyframes talkPop{ from{ opacity:0; transform:scale(.7); } }
+  @keyframes matchInfoIn{ from{ opacity:0; transform:translateY(12px); } }
+  .match-sub{ font-size:14px; color:var(--ink-dim); margin:0; }
+  .match-dots span{ display:inline-block; animation:matchBlink 1.4s infinite; opacity:0; color:var(--point-dark); }
+  .match-dots span:nth-child(2){ animation-delay:.2s; }
+  .match-dots span:nth-child(3){ animation-delay:.4s; }
+  @keyframes matchBlink{ 0%,100%{opacity:0;} 40%{opacity:1;} }
+  @media (prefers-reduced-motion: reduce){ #revealPanel.is-match *{ animation:none !important; } }
+
+  .visitor-name-area{
+    margin-top:30px;
+    width:100%;
+    max-width:340px;
+    display:flex; flex-direction:column; gap:10px;
+  }
+  .name-label{ font-size:13px; color:var(--ink-dim); }
+  .name-input{
+    width:100%;
+    padding:16px 20px;
+    border-radius:18px;
+    border:none;
+    text-align:center;
+    font-family:'Jua', sans-serif;
+    font-size:18px;
+    color:var(--ink);
+    caret-color:var(--point);
+  }
+  .name-input:focus{ outline:2px solid var(--point); outline-offset:2px; }
+  .name-input::placeholder{ color:#c2cac4; }
+
+  .reset-link{
+    margin-top:22px;
+    appearance:none; border:none; cursor:var(--cur-hand);
+    background:transparent;
+    color:var(--ink-dim);
+    font-family:'Jua', sans-serif;
+    font-size:13px;
+    text-decoration:underline;
+  }
+
+  /* ---------- COHABIT SPLIT SCREEN ---------- */
+  .cohabit{
+    display:none;
+    width:100%; height:100dvh;
+    flex-direction:column;
+  }
+  .cohabit.show{ display:flex; }
+  /* 게임 화면에서 끌어도 글자 선택(파란 칠)·그림 끌어 옮기기(복사 모양)가 안 생기게 - JS dragstart 차단과 짝 */
+  .cohabit{ user-select:none; -webkit-user-select:none; }
+  .cohabit img{ -webkit-user-drag:none; }
+  /* 금전형: 매칭 화면에서 합의 완료 → 매칭 화면이 서서히 사라지고 게임 화면이 서서히 나타난다.
+     opacity만 쓴다(transform을 주면 안의 position:fixed 그림 기준이 틀어진다) */
+  .stage.fading-out{ opacity:0; transition:opacity .7s ease; }
+  .cohabit.fade-in{ animation:cohabitFadeIn 1.2s ease both; }
+  /* [다시하기]: 감췄다가 처음 진입처럼 다시 띄운다. transition은 직전 fade-in 애니메이션을 떼는 순간 끊겨 바로 사라져서 애니메이션으로 */
+  .cohabit.fading-out{ animation:cohabitFadeOut .6s ease both; pointer-events:none; }
+  @keyframes cohabitFadeOut{ from{ opacity:1; } to{ opacity:0; } }
+  /* 헤더 유형 탭으로 바꿀 때: 헤더는 그대로, 아래 게임 화면만 감췄다가 다시 띄운다 */
+  .cohabit-body.type-out{ animation:cohabitFadeOut .35s ease both; pointer-events:none; }
+  .cohabit-body.type-in{ animation:cohabitFadeIn .5s ease both; }
+  @keyframes cohabitFadeIn{ from{ opacity:0; } }
+
+  .cohabit-topbar{
+    flex:none;
+    display:flex; align-items:center; justify-content:space-between;
+    padding:16px 28px;
+    background:#ffffff;
+    border-bottom:1px solid var(--line);
+  }
+  .cohabit-title{
+    font-size:16px; color:var(--ink);
+    display:flex; align-items:center; gap:8px;
+  }
+  .cohabit-title b{ color:var(--point); font-weight:400; }
+  /* 제목 옆 폴더 탭 - 같은 이름·성별·합의서 상태로 다른 메이트 유형으로 바로 이동 */
+  .cohabit-topbar-left{ display:flex; align-items:flex-end; gap:20px; align-self:stretch; }
+  .cohabit-topbar-left .cohabit-title{ align-self:center; }
+  /* 탭 높이 = 헤더 높이: 헤더 위아래 여백(16px)까지 덮고, 밑변은 헤더 아래 테두리 위에 겹친다 */
+  .mate-tabs{ display:flex; gap:4px; align-self:stretch; margin:-16px 0 -18px; padding-top:8px; } /* 위아래 여백 16px + 아래 테두리 1px까지 덮는다 */
+  .mate-tab{
+    appearance:none; cursor:var(--cur-hand);
+    display:flex; align-items:center;
+    font-family:'Jua', sans-serif; font-size:14px; color:var(--ink-dim);
+    padding:0 30px;
+    background:#eef1ee; border:1px solid var(--line); border-bottom:none;
+    border-radius:12px 12px 0 0;
+  }
+  /* 선택된 탭 = 아래 게임 화면(.cohabit-left)과 같은 화면 기준 그라데이션으로, 헤더 아래 테두리를 덮어 끊김 없이 이어진다 */
+  /* 미션 중 (syncGameLock): 게임 화면 잠금(검정 50% 덮개)과 똑같은 어둡기로 - 밝기 50% = 검정 50%를 덮은 색 */
+  .mate-tab{ transition:filter .3s ease; }
+  .mate-tabs.locked .mate-tab{ filter:brightness(.5); cursor:var(--cur-arrow); }
+  .mate-tab.active{ background:linear-gradient(165deg, #cfe4f5, #a9cbe6) fixed; border-color:transparent; color:var(--point-deep); position:relative; z-index:16; }
+  /* 선택 탭은 게임 화면 쪽으로 1px 더 내려와(margin -18) 경계 틈을 덮고, 게임 잠금 덮개(z 15)보다 위에 둔다 -
+     안 그러면 화면 배율(150% 등)에서 탭과 덮개가 겹친 한 줄이 두 번 어두워져 선처럼 보였다 */
+  /* 선택된 탭 밑 양옆을 오목하게 굴려 게임 화면으로 부드럽게 이어지게 (폴더 탭 모양).
+     같은 fixed 그라데이션을 물려받고, 둥근 구멍 mask로 깎는다 */
+  .mate-tab.active::before, .mate-tab.active::after{
+    content:''; position:absolute; bottom:0; width:14px; height:14px; background:inherit;
+  }
+  .mate-tab.active::before{ right:100%; -webkit-mask:radial-gradient(circle at 0 0, transparent 14px, #000 14.5px); mask:radial-gradient(circle at 0 0, transparent 14px, #000 14.5px); }
+  .mate-tab.active::after{ left:100%; -webkit-mask:radial-gradient(circle at 100% 0, transparent 14px, #000 14.5px); mask:radial-gradient(circle at 100% 0, transparent 14px, #000 14.5px); }
+  .cohabit-reset{
+    appearance:none; cursor:var(--cur-hand);
+    border:1.5px solid var(--line);
+    background:#fff;
+    color:var(--ink-dim);
+    font-family:'Jua', sans-serif;
+    font-size:12.5px;
+    padding:9px 16px;
+    border-radius:999px;
+  }
+
+  /* ---------- 게임 시작 전 사용법 안내 팝업 ---------- */
+  .onboarding-overlay{
+    position:fixed; inset:0;
+    z-index:200;
+    display:none;
+    align-items:center; justify-content:center;
+    background:rgba(20,30,25,0.55);
+    padding:24px;
+  }
+  .onboarding-overlay.show{ display:flex; }
+
+  .onboarding-card{
+    position:relative;
+    width:min(460px, 100%);
+    max-height:88vh;
+    overflow-y:auto;
+    border-radius:28px;
+    padding:40px 30px 28px;
+    display:flex; flex-direction:column; align-items:center;
+    text-align:center;
+  }
+
+  .onboarding-skip{
+    position:absolute; top:18px; right:20px;
+    appearance:none; border:none; background:none; cursor:var(--cur-hand);
+    color:var(--ink-dim);
+    font-family:'Jua', sans-serif;
+    font-size:12px;
+    text-decoration:underline;
+  }
+
+  .onboarding-step{ display:none; flex-direction:column; align-items:center; width:100%; }
+  /* 설명 팝업 페이지가 바뀔 때 새 페이지가 오른쪽에서 살짝 밀려 들어오며 서서히 나타난다 */
+  .onboarding-step.active{ display:flex; animation:onboardingStepIn .9s cubic-bezier(.22,1,.36,1) both; }
+  @keyframes onboardingStepIn{ from{ opacity:0; transform:translateX(28px); } }
+
+  .onboarding-icon{
+    width:74px; height:74px;
+    border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    font-size:34px;
+    margin-bottom:18px;
+  }
+
+  .onboarding-title{
+    font-size:17px; line-height:1.55;
+    color:var(--ink);
+    margin:0 0 12px;
+  }
+  .onboarding-title b{ color:var(--point); font-weight:400; }
+
+  .onboarding-desc{
+    font-size:13.5px; line-height:1.75;
+    color:var(--ink-dim);
+    margin:0;
+  }
+
+  .onboarding-dots{
+    display:flex; gap:7px;
+    margin:26px 0 18px;
+  }
+  .onboarding-dot{
+    width:7px; height:7px;
+    border-radius:50%;
+    background:var(--line);
+    transition:width .2s ease, background .2s ease;
+  }
+  .onboarding-dot.active{ background:var(--point); width:20px; border-radius:999px; }
+
+  .onboarding-next{
+    appearance:none; border:none; cursor:var(--cur-hand);
+    width:100%;
+    padding:15px;
+    border-radius:999px;
+    font-family:'Jua', sans-serif;
+    font-size:15px;
+    color:#fff;
+  }
+
+  /* ---------- 미션2(마지막 미션) 완료 후 게임 종료 연출 ----------
+     1) 메이트-관람객이 화기애애해진 모습을 보여주는 에필로그
+     2) 실제 '틈' 앱 이용을 유도하는 안내
+     3) 별점+의견 피드백 설문 -> 감사 인사로 마무리
+     onboarding-overlay와 동일한 시각 언어(clay 카드, 점 인디케이터)를 재사용하되,
+     onboarding-step을 querySelectorAll하는 기존 스크립트와 겹치지 않도록 클래스명은
+     전부 ending- 접두어로 새로 둔다. */
+  .ending-overlay{
+    position:fixed; inset:0;
+    z-index:300;
+    display:none;
+    align-items:center; justify-content:center;
+    background:rgba(20,30,25,0.55);
+    padding:24px;
+  }
+  .ending-overlay.show{ display:flex; }
+
+  .ending-card{
+    position:relative;
+    width:min(460px, 100%);
+    max-height:calc(100dvh - 48px); /* 오버레이 위아래 여백(24px씩) 안에 딱 맞게 */
+    overflow-y:auto;
+    scrollbar-width:none; /* 혹시 넘쳐도 스크롤바는 안 보이게 (아래 낮은 화면용 축소로 보통은 안 넘친다) */
+    border-radius:28px;
+    padding:36px 30px 28px;
+    display:flex; flex-direction:column; align-items:center;
+    text-align:center;
+  }
+
+  .ending-step{ display:none; flex-direction:column; align-items:center; width:100%; }
+  .ending-step.active{ display:flex; }
+
+  .ending-illustration-wrap{
+    position:relative;
+    width:100%; max-width:300px;
+    aspect-ratio:1 / 1;
+    margin-bottom:18px;
+    border-radius:20px;
+    overflow:hidden;
+    background:var(--point-light);
+    display:flex; align-items:center; justify-content:center;
+  }
+  .ending-illustration-img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .ending-illustration-fallback{
+    display:none;
+    flex-direction:column; align-items:center; gap:8px;
+    padding:20px;
+    color:var(--ink-dim);
+  }
+  .ending-fallback-emoji{ font-size:38px; }
+  .ending-illustration-fallback span{ font-size:12.5px; }
+
+  .ending-icon{
+    width:74px; height:74px;
+    border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    font-size:34px;
+    margin-bottom:18px;
+  }
+
+  .ending-title{
+    font-size:17px; line-height:1.55;
+    color:var(--ink);
+    margin:0 0 12px;
+  }
+  .ending-title b{ color:var(--point); font-weight:400; }
+
+  .ending-desc{
+    font-size:13.5px; line-height:1.75;
+    color:var(--ink-dim);
+    margin:0;
+  }
+
+  .ending-star-row{ display:flex; justify-content:center; gap:8px; margin:18px 0 16px; }
+  #endingFeedbackForm .ending-icon, .ending-step .ending-icon{ margin-left:auto; margin-right:auto; }
+  #endingFeedbackForm{ width:100%; } /* 의견 칸을 아래 [의견 제출하기] 버튼과 같은 폭으로 (예전엔 내용만큼 줄어 버튼보다 좁았다) */
+  .ending-star{
+    appearance:none; border:none; background:none; cursor:var(--cur-hand);
+    font-size:32px; line-height:1;
+    color:var(--line);
+    padding:0;
+    transition:color .15s ease, transform .15s ease;
+  }
+  .ending-star.active{ color:#f5b942; transform:scale(1.08); }
+
+  .ending-feedback-textarea{
+    width:100%; min-height:76px; resize:vertical;
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:12px 14px;
+    font-family:'Jua', sans-serif;
+    font-size:13px;
+    color:var(--ink);
+    background:var(--point-light);
+    margin-bottom:4px;
+  }
+  .ending-feedback-textarea::placeholder{ color:var(--ink-dim); }
+
+  .ending-dots{
+    display:flex; gap:7px;
+    margin:26px 0 18px;
+  }
+  .ending-dot{
+    width:7px; height:7px;
+    border-radius:50%;
+    background:var(--line);
+    transition:width .2s ease, background .2s ease;
+  }
+  .ending-dot.active{ background:var(--point); width:20px; border-radius:999px; }
+
+  .ending-next{
+    appearance:none; border:none; cursor:var(--cur-hand);
+    width:100%;
+    padding:15px;
+    border-radius:999px;
+    font-family:'Jua', sans-serif;
+    font-size:15px;
+    color:#fff;
+  }
+  /* 게임 시작 안내 (gpt-kitchen-game.js showStartCoach) - 앱 가이드 말풍선(.app-guide-bubble)과 같은 모양 */
+  .start-coach{ position:fixed; inset:0; z-index:140; opacity:0; transition:opacity .25s ease; }
+  .start-coach.show{ opacity:1; }
+  .start-coach .sc-spot{ position:fixed; border-radius:18px; box-shadow:0 0 0 9999px rgba(15,20,18,.5), 0 0 0 3px #71D369;
+                         transition:left .35s ease, top .35s ease, width .35s ease, height .35s ease; pointer-events:none; }
+  .start-coach .sc-spot.center{ box-shadow:0 0 0 9999px rgba(15,20,18,.5); } /* 마무리 인사 - 가리킬 곳 없이 어둡게만 */
+  /* 크기는 '오늘의 미션' 카드(.mission-card, 폭 247 · 목록 글자 17.5px)와 비슷하게 - 글자는 카드 목록과 같은 크기 */
+  .start-coach .sc-card{ position:fixed; width:300px; box-sizing:border-box; padding:26px 28px 24px; border-radius:16px; background:#fff;
+                         border:1px solid #C6DCC5; box-shadow:0 4px 16px #2030240D; font-family:'Pretendard',sans-serif;
+                         transition:left .35s ease, top .35s ease; }
+  .start-coach .sc-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; }
+  .start-coach .sc-chip{ padding:5px 11px; border-radius:6px; background:#E9F7E8; color:#2E7D32; font-size:14px; font-weight:700; }
+  .start-coach .sc-step{ color:#8A938C; font-size:14px; }
+  .start-coach .sc-text{ margin:0 0 20px; color:#242424; font-size:17.5px; line-height:1.6; white-space:pre-line; word-break:keep-all; }
+  .start-coach .sc-text b{ color:#2E7D32; }
+  .start-coach .sc-next{ width:100%; padding:14px; border:0; border-radius:999px; background:#71D369; color:#203D24;
+                         font-family:inherit; font-size:17px; font-weight:700; cursor:var(--cur-hand); }
+  .ending-next:disabled{ opacity:.4; pointer-events:none; } /* 별점을 고르기 전 (gpt-kitchen-game.js) */
+  .ending-card::-webkit-scrollbar{ display:none; }
+  /* 낮은 화면(노트북 배율 125~150% 등): 설문 카드 여백·별·의견 칸을 줄여 스크롤 없이 한 화면에 */
+  @media (max-height:760px){
+    .ending-overlay{ padding:16px; }
+    .ending-card{ max-height:calc(100dvh - 32px); padding:24px 26px 20px; }
+    .ending-icon{ width:56px; height:56px; font-size:26px; margin-bottom:10px; }
+    .ending-title{ margin-bottom:8px; }
+    .ending-star-row{ margin:10px 0 12px; }
+    .ending-star{ font-size:28px; }
+    .ending-feedback-textarea{ min-height:56px; }
+    #endingOtherTypes{ margin-top:14px; }
+    .allclear-member img{ height:90px; }
+  }
+  @media (max-height:600px){
+    .ending-card{ padding:18px 22px 16px; }
+    .ending-icon{ display:none; }
+    .ending-title{ font-size:15.5px; }
+    .ending-desc{ font-size:12.5px; line-height:1.6; }
+    .ending-star-row{ margin:6px 0 8px; }
+    .ending-star{ font-size:24px; }
+    .ending-feedback-textarea{ min-height:44px; padding:8px 12px; }
+    .ending-next, .ending-restart{ padding:12px; }
+    .allclear-member img{ height:70px; }
+  }
+  /* 엔딩 '다른 메이트와 플레이하기' 버튼들: 한 줄에 나란히, 전체 폭은 아래 [처음으로 돌아가기]와 같고 높이도 같게 */
+  #endingOtherTypes{ gap:10px; margin-top:22px; }
+  #endingOtherTypes .ending-other-item{ flex:1 1 0; min-width:0; display:flex; flex-direction:column; align-items:center; }
+  #endingOtherTypes .ending-other-item img{ height:110px; width:100%; object-fit:contain; object-position:bottom; margin-bottom:8px; }
+  @media (max-height:760px){ #endingOtherTypes .ending-other-item img{ height:84px; } }
+  @media (max-height:600px){ #endingOtherTypes .ending-other-item img{ height:64px; } }
+  /* 호버 말풍선: 게임 속 머리 위 말풍선(.kitchen-player-bubble)과 같은 모양(흰 상자 + 둥근 꼬리). 그림 위에 떠서 자리를 차지하지 않는다 */
+  #endingOtherTypes .ending-other-item{ position:relative; padding-top:46px; } /* 말풍선 두 줄 자리 - 위 문구를 가리지 않게 */
+  #endingOtherTypes .ending-other-say{ position:absolute; left:50%; top:0; z-index:2; width:max-content; white-space:pre; text-align:center; /* 인사말 \n 뒷말 두 줄 */
+    transform:translateX(-50%); opacity:0; transition:opacity .2s; pointer-events:none;
+    background:#fff; color:#000; font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif; font-size:13px; font-weight:700;
+    line-height:1.3; padding:5px 12px; border-radius:8px;
+    filter:drop-shadow(0 2px 4px rgba(20,30,25,0.18)); }
+  #endingOtherTypes .ending-other-say::after{ content:''; position:absolute; left:50%; top:calc(100% - 2px); width:15px; height:13px; transform:translateX(-50%);
+    background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 55.5 47'%3E%3Cpath d='M43.415 0C51.113 0 55.924 8.333 52.075 15L36.625 41.76C32.776 48.426 23.154 48.426 19.305 41.76L3.855 15C.006 8.333 4.817 0 12.515 0Z' fill='%23fff'/%3E%3C/svg%3E") no-repeat center / 100% 100%; }
+  #endingOtherTypes .ending-other-item.hover .ending-other-say{ opacity:1; }
+  #endingOtherTypes .ending-next{ width:100%; min-width:0; padding:15px 8px; font-size:14px; white-space:nowrap; letter-spacing:-.02em; }
+  /* 이미 끝낸 유형(플레이 완료) - 흐리게 하는 대신 연한 초록 바탕 + 옅은 초록 테두리 + 초록 글자 (디자인 시안) */
+  #endingOtherTypes .ending-next:disabled{ opacity:1; background:#F2F7EA; border:1px solid rgba(113,211,105,.15); color:#499963; }
+  /* 세 유형 모두 완료 - 나 + 메이트 셋이 차례로 통통 튀어 오르며 말풍선으로 인사 */
+  .allclear-cast{ display:flex; justify-content:center; align-items:flex-end; gap:6px; width:100%; margin:4px 0 16px; }
+  .allclear-member{ flex:1 1 0; min-width:0; display:flex; flex-direction:column; align-items:center;
+                    opacity:0; animation:allclear-in .5s ease forwards, allclear-hop 1.6s ease-in-out infinite; animation-delay:var(--d), calc(var(--d) + .5s); }
+  .allclear-say{ position:relative; margin-bottom:8px; padding:6px 8px; border-radius:10px; background:var(--point-light);
+                 border:1px solid var(--line); font-size:11.5px; line-height:1.35; color:var(--ink); word-break:keep-all;
+                 box-sizing:border-box; min-height:52px; display:flex; align-items:center; justify-content:center; }
+  .allclear-say::after{ content:''; position:absolute; left:50%; bottom:-5px; width:8px; height:8px; transform:translateX(-50%) rotate(45deg);
+                        background:var(--point-light); border-right:1px solid var(--line); border-bottom:1px solid var(--line); }
+  .allclear-member img{ width:100%; height:120px; object-fit:contain; object-position:bottom; display:block; } /* 그림마다 여백이 달라 높이를 고정해 발끝·이름 줄을 맞춘다 */
+  .allclear-name{ margin-top:4px; font-size:12px; color:var(--ink-dim); }
+  .allclear-member.me .allclear-say{ background:#fff3c9; }
+  .allclear-member.me .allclear-say::after{ background:#fff3c9; }
+  @keyframes allclear-in{ from{ opacity:0; transform:translateY(14px); } to{ opacity:1; transform:none; } }
+  @keyframes allclear-hop{ 0%,70%,100%{ translate:0 0; } 35%{ translate:0 -6px; } }
+  .ending-restart{
+    appearance:none; cursor:var(--cur-hand);
+    width:100%;
+    padding:15px;
+    border-radius:999px;
+    font-family:'Jua', sans-serif;
+    font-size:15px;
+    margin-top:10px;
+    background:#fff;
+    color:var(--point);
+    border:1px solid var(--line);
+  }
+
+  /* ---------- 캐릭터 말풍선 → 앱 사용법 가이드 투어 ---------- */
+  .guide-spotlight{
+    position:fixed;
+    z-index:150;
+    border-radius:18px;
+    box-shadow:0 0 0 9999px rgba(15,20,18,0.55);
+    pointer-events:none;
+    opacity:0;
+    transition:top .35s ease, left .35s ease, width .35s ease, height .35s ease, opacity .25s ease;
+  }
+  .guide-spotlight.show{ opacity:1; }
+
+  .guide-tooltip{
+    position:fixed;
+    z-index:151;
+    width:230px;
+    background:#fff;
+    border-radius:18px;
+    padding:16px 18px;
+    box-shadow:0 14px 28px -10px rgba(20,30,25,0.35);
+    opacity:0;
+    transform:translateY(6px);
+    pointer-events:none;
+    transition:top .35s ease, left .35s ease, opacity .25s ease, transform .25s ease;
+  }
+  .guide-tooltip.show{ opacity:1; transform:translateY(0); pointer-events:auto; }
+
+  .guide-tooltip-step{
+    display:inline-block;
+    background:var(--point);
+    color:#fff;
+    font-family:'Jua', sans-serif;
+    font-size:11px;
+    padding:3px 10px;
+    border-radius:999px;
+    margin-bottom:8px;
+  }
+  .guide-tooltip-text{
+    font-family:'Jua', sans-serif;
+    font-size:13px;
+    line-height:1.6;
+    color:var(--ink);
+    margin:0;
+  }
+  .guide-tooltip-close{
+    position:absolute; top:8px; right:10px;
+    appearance:none; border:none; background:none; cursor:var(--cur-hand);
+    color:var(--ink-dim);
+    font-size:14px;
+    line-height:1;
+  }
+
+  .cohabit-body{
+    flex:1;
+    display:flex;
+    min-height:0;
+  }
+  .cohabit-left, .cohabit-right{
+    display:flex; align-items:center; justify-content:center;
+    min-width:0;
+  }
+  .cohabit-left{
+    flex:1.6;
+    /* fixed: 그라데이션을 화면 기준으로 깔아 헤더의 선택된 유형 탭과 색이 정확히 이어지게 한다 */
+    background:linear-gradient(165deg, #cfe4f5, #a9cbe6) fixed;
+    position:relative;
+    overflow:hidden;
+  }
+  /* 합의서 화면일 때 왼쪽 아이소메트릭 룸을 검정 50% 오버레이로 살짝 가려서
+     오른쪽 합의서(태블릿) 쪽에 시선이 쏠리도록 강조한다. */
+  .cohabit-left-dim{
+    position:absolute; inset:0; z-index:15;
+    background:rgba(0,0,0,0.5);
+    opacity:0; pointer-events:none;
+    transition:opacity .3s ease;
+  }
+  .cohabit-left-dim.show{ opacity:1; }
+  /* 오늘의 미션 카드 (Figma 183x183 기준 단위 --mc). 끝낸 미션은 회색 취소선 + 초록 체크 */
+  .mission-card{ --mc:1.35px; position:absolute; left:24px; top:24px; z-index:5; width:calc(183 * var(--mc)); box-sizing:border-box;
+    padding:calc(20 * var(--mc)) calc(21 * var(--mc)) calc(13 * var(--mc)); background:#fff; border:1px solid #F0F0F0; border-radius:calc(12 * var(--mc));
+    font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif; color:#000; box-shadow:0 8px 20px -12px rgba(31,58,40,0.18); }
+  /* 나타나는 모션 = 틈_게임_v.8 금전형: 환영 대화가 끝나면 접힌 카드(제목만)가 0.35초에 걸쳐 살짝 내려오며 나타나고(.show),
+     이어서 0.7초에 걸쳐 아래로 펼쳐진다(.open). 힌트는 펼쳐진 뒤 0.5초 늦게 나타난다 */
+  .mission-card{ display:none; }
+  .mission-card.show{ display:block; animation:missionCardIn .35s cubic-bezier(.22,1,.36,1) both; }
+  @keyframes missionCardIn{ from{ opacity:0; transform:translateY(-10px); } }
+  .mc-list li{ transition:color .5s ease; }
+  .mc-list li::after{ transition:background-color .5s ease; }
+  .mc-body{ display:grid; grid-template-rows:0fr; transition:grid-template-rows .7s cubic-bezier(.65,0,.35,1); }
+  .mc-body > div{ overflow:hidden; min-height:0; opacity:0; transition:opacity .6s ease; }
+  .mc-body .mc-list{ margin-top:calc(16 * var(--mc)); } /* 제목 아래 간격을 margin으로 - 접혔을 때 높이에 안 들어가게 */
+  .mission-card.open .mc-body{ grid-template-rows:1fr; }
+  .mission-card.open .mc-body > div{ opacity:1; transition:opacity .4s ease .1s; }
+  .mc-title{ font-size:calc(16 * var(--mc)); font-weight:700; line-height:1; }
+  .mc-list{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:calc(7 * var(--mc)); }
+  .mc-list li{ display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:calc(13 * var(--mc)); font-weight:500; min-height:calc(19 * var(--mc)); }
+  .mc-list li::after{ content:''; flex:none; width:calc(19 * var(--mc)); height:calc(19 * var(--mc)); box-sizing:border-box; border-radius:50%; border:1px solid #A6C673; }
+  .mc-list li.done{ color:#B3B3B3; text-decoration:line-through; }
+  .mc-list li.done::after{ background:#A6C673 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 19 19'%3E%3Cpath d='M4.3 9.6l3.1 2.8c.4.4 1 .3 1.4-.0l5.3-5.5' fill='none' stroke='white' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") center/100% no-repeat; }
+  .mc-rate{ display:flex; justify-content:space-between; margin-top:calc(28 * var(--mc)); font-size:calc(8 * var(--mc)); color:#999; }
+  .mc-bar{ margin-top:calc(5 * var(--mc)); height:calc(6 * var(--mc)); border-radius:99px; background:#EEEEEE; overflow:hidden; }
+  .mc-bar i{ display:block; height:100%; width:0; background:#A6C673; border-radius:99px; transition:width .6s ease; }
+  /* 미션 중(앱 조작 중)엔 게임 화면을 어둡게 덮고 클릭도 막는다 - 앱 쪽에 집중하게 (syncGameLock) */
+  .cohabit-left-dim.lock{ opacity:1; pointer-events:auto; cursor:var(--cur-arrow); }
+  /* 서랍(앱 미션) 중에는 룸이 보이도록 옅게 덮는다 */
+  .cohabit-left-dim.light{ background:rgba(0,0,0,0.22); }
+  .cohabit-right{
+    flex:1;
+    background:#f3f5f2;
+    padding:32px;
+    transition:flex-grow .6s ease, padding .6s ease, opacity .4s ease;
+  }
+  /* 금전형(S): 미션(냉장고/세탁물) 중이 아닐 땐 오른쪽 앱을 접어 집만 가운데에 보여준다 */
+  .cohabit-body.house-only .cohabit-right{ flex-grow:0; padding:0; opacity:0; overflow:hidden; }
+
+  /* room illustration (static reference image) + avatars */
+  /* 아이소메트릭 게임(Phaser)으로 교체하면서 기존 SVG/아바타는 JS(textContent 갱신)가
+     계속 참조하므로 DOM에는 남겨두고 화면에서만 숨긴다. */
+  .room-stage{
+    position:relative;
+    /* 집 크기: 왼쪽 게임 영역 폭을 꽉 채우되, 높이(헤더 ≈70px + 위아래 여백 60px씩 뺀 값)를 넘지 않게 (1.2135 = 2046/1686) */
+    width:min(100%, calc((100dvh - 190px) * 1.2135));
+    aspect-ratio:2046/1686; /* 부엌 배경(kitchen_bg22.png) 원본 비율과 맞춰서 레터박스(위아래 빈공간) 없이 꽉 차게 */
+  }
+  .room-svg{
+    display:none;
+    width:100%;
+    height:auto;
+    filter:drop-shadow(0 18px 24px rgba(20,30,25,0.18));
+  }
+  .room-avatar{
+    display:none;
+    position:absolute;
+    flex-direction:column; align-items:center; gap:6px;
+    transform:translate(-50%, -50%);
+  }
+  #cohabit-game-container{
+    position:relative;
+    width:100%;
+    height:100%;
+    /* 네모 칸(둥근 모서리·그림자) 없이 집 그림만 파란 배경 위에 바로 놓는다 */
+    display:none; /* 아이소메트릭 부엌 게임은 강은지(S) 메이트일 때만 표시 */
+  }
+  #cohabit-game-container.kitchen-active{ display:block; }
+  #cohabit-game-container canvas{
+    display:block;
+    margin:0 auto;
+  }
+  .room-avatar-badge{
+    width:15%; aspect-ratio:1;
+    min-width:52px; max-width:78px;
+    border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    font-size:min(6vw, 32px);
+    border:3px solid #fff;
+    box-shadow:0 8px 16px -4px rgba(20,30,25,0.35);
+  }
+  .room-avatar-name{
+    font-size:12px;
+    color:#2c3430;
+    background:rgba(255,255,255,0.85);
+    padding:3px 10px;
+    border-radius:999px;
+    white-space:nowrap;
+  }
+
+  /* right side: temporary app mock (phone-ratio) */
+  .app-mock{
+    position:relative;
+    /* 낮은 화면에서도 위아래가 잘리지 않게 높이 기준으로도 줄인다:
+       화면 높이 - 헤더(≈70) - 좌우 패널 위아래 패딩(64) - 여유 → 폭 = 높이 × 412/892 */
+    width:min(300px, 92%, calc((100dvh - 150px) * 0.4619));
+    aspect-ratio:412/892; /* app_1(골목 생활 실제 화면) 원본 폰 목업 크기와 동일한 비율 */
+    background:#fff;
+    border-radius:36px;
+    padding:22px 18px;
+    display:flex; flex-direction:column;
+    overflow:hidden;
+  }
+  /* 골목생활 화면(app_1)은 자체 상단바/하단 네비를 그대로 가진 통짜 화면이므로,
+     이 화면일 때는 공용 상단바를 숨기고 패딩도 없애서 iframe이 폰 목업 전체를 꽉 채우게 한다. */
+  .app-mock.app-mock--flush{ padding:0; }
+  .app-mock.app-mock--flush .app-topbar{ display:none; }
+  .app-mock.app-mock--flush .app-content{ overflow:hidden; }
+  /* app_1은 412x892 원본 크기로 고정 렌더링한 뒤, 폰 목업이 실제로 차지하는 크기에 맞춰
+     JS(fitAlleyFrame)에서 transform:scale로 축소한다 - iframe 자체를 100%로 늘리면
+     내부 요소들이 잘리거나 스크롤이 생기기 때문. */
+  .alley-app1-frame{
+    width:412px; height:892px;
+    flex:none; /* flex 컨테이너(app-screen) 안에서 기본 flex-shrink 때문에 892px 높이가
+                  줄어들어버리는 문제 방지 - 항상 원본 크기 그대로 유지한 뒤 transform으로
+                  축소해야 스케일 계산이 맞는다. */
+    transform-origin:top left;
+    border:0; display:block;
+    background:#F7F8FA;
+  }
+  .app-topbar{
+    flex:none;
+    display:flex; align-items:center; justify-content:space-between;
+    margin-bottom:4px;
+  }
+  .app-back{
+    width:28px; height:28px; border-radius:50%;
+    border:none; cursor:var(--cur-hand);
+    background:var(--point-light); color:var(--point-dark);
+    font-size:14px; font-weight:700;
+    display:flex; align-items:center; justify-content:center;
+  }
+  /* 서은민(A) 전용 [우리 규칙]/[틈새살림] 화면(app_2/app_3, flush 전체화면)은 자체 상단바가
+     없어서(app_1/합의서처럼 공용 상단바가 display:none 처리됨) 공용 뒤로가기 버튼이
+     함께 숨어버린다 - 그 두 화면일 때만 태블릿 왼쪽 위에 동동 뜨는 전용 뒤로가기 버튼. */
+  .app-flush-back-btn{
+    position:absolute;
+    top:14px; left:14px;
+    width:30px; height:30px; border-radius:50%;
+    border:none; cursor:var(--cur-hand);
+    background:rgba(255,255,255,0.92); color:var(--point-dark);
+    font-size:15px; font-weight:700;
+    display:none; align-items:center; justify-content:center;
+    z-index:70;
+    box-shadow:0 6px 16px -4px rgba(0,0,0,0.35);
+  }
+  .app-flush-back-btn.show{ display:flex; }
+  .app-mock-header{
+    font-size:18px; color:var(--point);
+    display:flex; align-items:center; gap:6px;
+  }
+  .app-content{
+    flex:1;
+    overflow-y:auto;
+    scrollbar-width:none;
+  }
+  .app-content::-webkit-scrollbar{ display:none; }
+  .app-screen{ display:none; flex-direction:column; }
+  .app-screen.active{ display:flex; }
+
+  /* ---------- 서은민(A) 상단 푸시 알림 (Figma 알림 배너) ----------
+     폰 화면 위에서 내려와 ① 앱 이름·시각 → ② 제목 → ③ 펼쳐져 본문까지 보여 주고 올라간다.
+     Figma 원본 px(배너 폭 485, 화면 폭 517 기준)로 그리고, 폰 화면 폭에 맞춰 JS가 zoom으로 줄인다(showTopNotification). */
+  .app-top-toast{
+    position:absolute; top:44px; left:16px; width:485px; z-index:80; box-sizing:border-box;
+    display:flex; align-items:center; gap:13.5px; padding:20px 28px 20px 20px; min-height:96px;
+    border-radius:48px; background:rgba(247,248,250,.85); box-shadow:0 0 16px rgba(26,26,26,.15);
+    -webkit-backdrop-filter:blur(12px); backdrop-filter:blur(12px);
+    font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif; color:#242424; text-align:left;
+    transform:translateY(-160%); opacity:0; pointer-events:none;
+    transition:transform .38s cubic-bezier(.2,.8,.2,1), opacity .3s ease, border-radius .3s ease;
+  }
+  .app-top-toast.show{ transform:none; opacity:1; }
+  .app-top-toast.open{ border-radius:56.86px; }
+  /* 가이드가 알림을 가리킬 때 - 앱 안 하이라이트(.teum-guide-ring)와 같은 초록 테두리 */
+  .app-top-toast.guided{ box-shadow:0 0 16px rgba(26,26,26,.15), 0 0 0 3px #71D369, 0 0 0 9px rgba(113,211,105,.28); }
+  .app-top-toast .tn-icon{ flex:none; width:56px; height:56px; border-radius:21px; background:#fff; display:flex; align-items:center; justify-content:center; }
+  .app-top-toast .tn-text{ flex:1; min-width:0; }
+  .app-top-toast .tn-head{ display:flex; align-items:baseline; gap:12px; line-height:1.2; }
+  .app-top-toast .tn-head b{ font-size:22px; font-weight:700; color:#1A1A1A; transition:font-size .3s ease; }
+  .app-top-toast .tn-head span{ font-size:13.5px; color:#9C9C9D; transition:font-size .3s ease, color .3s ease; }
+  .app-top-toast.titled .tn-head b{ font-size:16.5px; color:#242424; }
+  .app-top-toast.titled .tn-head span{ color:#606060; }
+  .app-top-toast.open .tn-head b{ font-size:13px; }
+  .app-top-toast.open .tn-head span{ font-size:11px; }
+  .app-top-toast .tn-title, .app-top-toast .tn-body{ display:grid; grid-template-rows:0fr; opacity:0; transition:grid-template-rows .35s ease, opacity .3s ease; }
+  .app-top-toast .tn-title > div, .app-top-toast .tn-body > div{ overflow:hidden; }
+  .app-top-toast .tn-title > div{ font-size:18px; font-weight:700; line-height:1.4; padding-top:2px; white-space:nowrap; text-overflow:ellipsis; }
+  .app-top-toast .tn-body > div{ font-size:14px; line-height:19px; padding-top:3px; word-break:keep-all; white-space:pre-line; }
+  .app-top-toast.titled .tn-title, .app-top-toast.open .tn-body{ grid-template-rows:1fr; opacity:1; }
+  .app-top-toast .tn-chev{ flex:none; width:16px; height:9px; transition:transform .3s ease; }
+  .app-top-toast.open .tn-chev{ transform:rotate(180deg); }
+
+  .app-mock-greeting{
+    font-size:12.5px; color:var(--ink-dim);
+  }
+
+  /* ---------- home dashboard (틈새살림) ---------- */
+  .app-home-header{ display:flex; align-items:center; justify-content:space-between; }
+  .app-home-title{ font-size:19px; color:var(--ink); }
+  .app-bell{ font-size:15px; color:var(--ink-dim); cursor:var(--cur-hand); transition:transform .15s ease; }
+  .app-bell:active{ transform:scale(.85); }
+
+  /* ---------- 알림 화면 ---------- */
+  .noti-list{ margin-top:14px; display:flex; flex-direction:column; gap:8px; }
+  .noti-item{
+    display:flex; align-items:center; gap:10px;
+    padding:12px 14px;
+    border-radius:16px;
+    background:#fff;
+  }
+  .noti-item-icon{
+    flex:none;
+    width:34px; height:34px;
+    border-radius:50%;
+    background:var(--point-light);
+    display:flex; align-items:center; justify-content:center;
+    font-size:16px;
+  }
+  .noti-item-title{ font-size:11.5px; color:var(--ink); line-height:1.5; }
+  .noti-item-time{ margin-top:2px; font-size:9px; color:var(--ink-dim); }
+
+  .noti-send-btn{
+    position:relative;
+    overflow:hidden;
+    appearance:none; border:none; cursor:var(--cur-hand);
+    margin-top:18px; width:100%;
+    padding:15px;
+    border-radius:999px;
+    font-family:'Jua', sans-serif;
+    font-size:12px;
+    line-height:1.4;
+    color:#fff;
+    background:linear-gradient(160deg, #5fb17c, var(--point) 65%, var(--point-dark));
+    box-shadow:0 16px 28px -10px rgba(44,95,61,0.45);
+  }
+  .noti-send-btn::after{
+    content:'';
+    position:absolute; top:0; left:-60%;
+    width:40%; height:100%;
+    background:linear-gradient(115deg, transparent, rgba(255,255,255,0.8), transparent);
+    animation:noti-shimmer 2.2s ease-in-out infinite;
+  }
+  /* 빛이 왼쪽 밖(-60%)에서 오른쪽 밖(130%)까지 지나간다 - left를 움직이면 매 프레임 다시 그려서 transform으로 (190% ÷ 자기 폭 40% = 475%) */
+  @keyframes noti-shimmer{
+    0%{ transform:translateX(0); }
+    55%, 100%{ transform:translateX(475%); }
+  }
+
+  .settle-hero{
+    margin-top:14px;
+    padding:16px 14px;
+    border-radius:20px;
+    border:1.5px solid var(--point);
+    background:#fff;
+    cursor:var(--cur-hand);
+    text-align:left;
+    transition:transform .15s ease;
+  }
+  .settle-hero:active{ transform:scale(.98); }
+  .settle-hero-label{
+    display:flex; align-items:center; gap:6px;
+    font-size:13px; color:var(--point-dark);
+  }
+  .settle-hero-empty{ margin-top:10px; font-size:11px; line-height:1.65; color:var(--ink-dim); }
+  .settle-hero-filled-row{ display:flex; align-items:flex-end; justify-content:space-between; margin-top:8px; gap:8px; }
+  .settle-hero-caption{ font-size:10px; color:var(--ink-dim); }
+  .settle-hero-amount{ margin-top:2px; font-size:21px; color:var(--ink); }
+  .settle-hero-amount span{ font-size:12.5px; }
+  .settle-hero-sub{ margin-top:4px; font-size:10px; color:var(--ink-dim); }
+
+  .card-row{ display:flex; gap:10px; margin-top:10px; }
+  .mini-card{
+    flex:1; min-width:0;
+    padding:14px 10px;
+    border-radius:18px;
+    background:#fff;
+    text-align:center;
+  }
+  .mini-card-title{ font-size:11.5px; color:var(--ink); }
+  .mini-card-sub{ margin-top:4px; font-size:9px; line-height:1.5; color:var(--ink-dim); }
+  .mini-card-btn{
+    appearance:none; border:none; cursor:var(--cur-hand);
+    margin-top:10px; width:100%;
+    padding:8px;
+    border-radius:999px;
+    background:var(--point);
+    color:#fff;
+    font-family:'Jua', sans-serif;
+    font-size:10px;
+  }
+
+  .app-bottom-nav{
+    flex:none;
+    display:flex; justify-content:space-between;
+    margin-top:14px;
+    padding-top:10px;
+    border-top:1px solid var(--line);
+  }
+  .nav-item{
+    flex:1;
+    display:flex; flex-direction:column; align-items:center; gap:2px;
+    font-size:8px; color:var(--ink-dim);
+  }
+  .nav-item.active{ color:var(--point); }
+  .nav-icon{ font-size:14px; }
+
+  /* ---------- 골목 생활 ---------- */
+  #appAlley, #appAlleyDetail{ height:100%; }
+  .alley-header{ flex:none; }
+  .alley-body{
+    flex:1; min-height:0;
+    position:relative;
+    margin-top:10px;
+    border-radius:20px;
+    overflow:hidden;
+    background:#eef1ea;
+  }
+  .alley-map{ position:absolute; inset:0; overflow:hidden; }
+  .alley-map-svg{ position:absolute; inset:0; width:100%; height:100%; }
+  .alley-pin{
+    position:absolute; transform:translate(-50%, -100%);
+    font-size:20px;
+    filter:drop-shadow(0 4px 4px rgba(31,40,34,0.28));
+  }
+  .alley-pin-badge{
+    position:absolute; transform:translate(-50%, -100%) rotate(45deg);
+    width:26px; height:26px;
+    background:#e0664a;
+    border-radius:50% 50% 50% 2px;
+    box-shadow:0 4px 8px rgba(31,40,34,0.3);
+    display:flex; align-items:center; justify-content:center;
+  }
+  .alley-pin-badge span{ display:block; transform:rotate(-45deg); font-size:12px; line-height:1; }
+  .alley-radius{
+    position:absolute; left:50%; top:26%; transform:translate(-50%, -50%);
+    width:40%; aspect-ratio:1;
+    border-radius:50%;
+    background:rgba(73,153,99,0.16);
+    border:1.5px solid rgba(73,153,99,0.45);
+    display:flex; align-items:center; justify-content:center;
+  }
+  .alley-center-dot{
+    width:16px; height:16px; border-radius:50%;
+    background:var(--point-dark);
+    border:3px solid #fff;
+    box-shadow:0 2px 6px rgba(31,40,34,0.35);
+  }
+  .alley-locate-btn{
+    position:absolute; right:12px; bottom:12px;
+    width:32px; height:32px; border-radius:50%;
+    border:none; background:#fff; color:var(--ink-dim);
+    font-size:14px; display:flex; align-items:center; justify-content:center;
+    box-shadow:0 4px 10px rgba(31,40,34,0.2);
+    cursor:var(--cur-hand);
+  }
+
+  .alley-sheet{
+    position:absolute; left:0; right:0; bottom:0;
+    height:60%;
+    display:flex; flex-direction:column;
+    background:#fff;
+    border-radius:22px 22px 0 0;
+    box-shadow:0 -10px 22px -14px rgba(31,40,34,0.3);
+    overflow:hidden;
+    transition:height .3s cubic-bezier(.22,.9,.35,1);
+  }
+  .alley-sheet.expanded{ height:100%; border-radius:0; }
+  #alleyDetailSheet:not(.expanded){ height:46%; }
+  .alley-sheet-handle{
+    flex:none;
+    display:flex; justify-content:center;
+    padding:10px 0 6px;
+    cursor:var(--cur-hand); touch-action:none;
+  }
+  .alley-sheet-handle span{ width:34px; height:4px; border-radius:999px; background:#d7dcd8; }
+
+  .alley-chip-row{
+    flex:none;
+    display:flex; gap:6px;
+    padding:0 12px 10px;
+    overflow-x:auto; scrollbar-width:none;
+  }
+  .alley-chip-row::-webkit-scrollbar{ display:none; }
+  .alley-chip{
+    appearance:none; cursor:var(--cur-hand); white-space:nowrap;
+    border:1.5px solid var(--line);
+    background:#fff; color:var(--ink-dim);
+    font-family:'Jua', sans-serif; font-size:10px;
+    padding:7px 12px;
+    border-radius:999px;
+  }
+  .alley-chip.active{ background:var(--point); border-color:var(--point); color:#fff; }
+
+  .alley-list{
+    flex:1; min-height:0;
+    overflow-y:auto; scrollbar-width:none;
+    padding:0 12px 14px;
+    display:flex; flex-direction:column; gap:10px;
+  }
+  .alley-list::-webkit-scrollbar{ display:none; }
+  .alley-card{
+    flex:none;
+    border:1px solid var(--line);
+    border-radius:16px;
+    padding:12px;
+    background:#fff;
+    cursor:var(--cur-hand);
+    transition:transform .15s ease;
+  }
+  .alley-card:active{ transform:scale(.98); }
+  .alley-card-top{ display:flex; align-items:center; gap:10px; }
+  .alley-card-thumb{
+    flex:none; width:50px; height:50px;
+    border-radius:12px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:22px;
+    background:var(--point-light);
+  }
+  .alley-card-info{ flex:1; min-width:0; }
+  .alley-card-shop{ font-size:9px; color:var(--ink-dim); }
+  .alley-card-name{ margin-top:2px; font-size:12px; color:var(--ink); }
+  .alley-card-price{ margin-top:3px; font-size:12.5px; color:var(--point-dark); }
+  .alley-card-arrow{ flex:none; font-size:15px; color:var(--ink-dim); }
+  .alley-card-divider{ margin:10px 0 8px; border-top:1px solid var(--line); }
+  .alley-card-bullets{ font-size:9px; line-height:1.75; color:var(--ink-dim); }
+  .alley-card-bullets div{ position:relative; padding-left:10px; }
+  .alley-card-bullets div::before{ content:'•'; position:absolute; left:0; }
+
+  /* ---------- 골목 생활 상세 ---------- */
+  .alley-detail-scroll{
+    flex:1; min-height:0;
+    overflow-y:hidden;
+    scrollbar-width:none;
+    padding:0 14px 18px;
+  }
+  .alley-detail-scroll::-webkit-scrollbar{ display:none; }
+  .alley-sheet.expanded .alley-detail-scroll{ overflow-y:auto; }
+  .alley-detail-shop{ font-size:9.5px; color:var(--ink-dim); }
+  .alley-detail-title{ margin-top:3px; font-size:13.5px; color:var(--ink); }
+  .alley-detail-rating{ margin-top:6px; font-size:11px; color:#e0a336; }
+  .alley-detail-rating .stars{ letter-spacing:1px; }
+  .alley-detail-addr{ margin-top:2px; font-size:9.5px; color:var(--ink-dim); }
+  .alley-detail-photo{
+    margin-top:10px;
+    height:90px; border-radius:14px;
+    background:linear-gradient(135deg, var(--point-light), #fce6d6);
+    display:flex; align-items:center; justify-content:center;
+    font-size:30px;
+  }
+  .alley-detail-desc{ margin-top:12px; font-size:10px; line-height:1.75; color:var(--ink-dim); }
+  .alley-detail-desc p{ margin:0 0 8px; }
+  .alley-desc-toggle{
+    appearance:none; border:none; background:none; cursor:var(--cur-hand);
+    display:block; margin:0 auto 6px;
+    font-family:'Jua', sans-serif; font-size:9.5px; color:var(--ink-dim);
+  }
+
+  .alley-plan-list{ margin-top:12px; display:flex; flex-direction:column; gap:10px; }
+  .alley-plan-card{
+    border-radius:16px; border:1.5px solid var(--line);
+    padding:12px;
+  }
+  .alley-plan-card--highlight{
+    position:relative;
+    overflow:hidden;
+    border-color:var(--point);
+    animation:alley-plan-glow 1.6s ease-in-out infinite;
+  }
+  .alley-plan-card--highlight::after{
+    content:'';
+    position:absolute; top:0; left:-60%;
+    width:40%; height:100%;
+    background:linear-gradient(115deg, transparent, rgba(255,255,255,0.6), transparent);
+    animation:noti-shimmer 2.2s ease-in-out infinite;
+    pointer-events:none;
+  }
+  @keyframes alley-plan-glow{
+    0%, 100%{ box-shadow:0 0 0 3px var(--point-light), 0 14px 26px -10px rgba(73,153,99,0.4); }
+    50%{ box-shadow:0 0 0 6px var(--point-light), 0 18px 30px -8px rgba(73,153,99,0.55); }
+  }
+  .alley-plan-tag{
+    display:inline-block;
+    font-size:8.5px; padding:3px 9px;
+    border-radius:999px;
+    color:#fff;
+  }
+  .alley-plan-tag--best{ background:var(--point); }
+  .alley-plan-tag--deal{ background:#e0a336; }
+  .alley-plan-tag--group{ background:#e0664a; }
+  .alley-plan-name{ margin-top:7px; font-size:12px; color:var(--ink); }
+  .alley-plan-bullets{ margin-top:5px; font-size:8.5px; line-height:1.7; color:var(--ink-dim); }
+  .alley-plan-bullets div{ position:relative; padding-left:10px; }
+  .alley-plan-bullets div::before{ content:'•'; position:absolute; left:0; }
+  .alley-plan-price-row{ margin-top:8px; display:flex; align-items:baseline; gap:6px; flex-wrap:wrap; }
+  .alley-plan-old{ font-size:9.5px; color:var(--ink-dim); text-decoration:line-through; }
+  .alley-plan-price{ font-size:13.5px; color:var(--point-dark); }
+  .alley-plan-note{ font-size:8.5px; color:var(--ink-dim); }
+
+  .alley-review-head{
+    margin-top:16px;
+    display:flex; align-items:center; justify-content:space-between;
+    font-size:12px; color:var(--ink);
+  }
+  .alley-review-head .stars{ color:#e0a336; letter-spacing:1px; }
+  .alley-review-count{ font-size:10px; color:var(--ink-dim); }
+  .alley-review-photos{ margin-top:8px; display:flex; gap:8px; }
+  .alley-review-photo{
+    flex:1; height:56px; border-radius:12px;
+    background:var(--point-light);
+    display:flex; align-items:center; justify-content:center;
+    font-size:20px;
+  }
+  .alley-review-list{ margin-top:12px; display:flex; flex-direction:column; gap:14px; }
+  .alley-review-item{ padding-top:12px; border-top:1px solid var(--line); }
+  .alley-review-item:first-child{ padding-top:0; border-top:none; }
+  .alley-review-top{ display:flex; align-items:center; gap:8px; }
+  .alley-review-avatar{
+    flex:none; width:26px; height:26px; border-radius:50%;
+    background:var(--point); color:#fff;
+    display:flex; align-items:center; justify-content:center;
+    font-size:11px;
+  }
+  .alley-review-name{ font-size:10px; color:var(--ink); }
+  .alley-review-meta{ margin-top:1px; font-size:8.5px; color:var(--ink-dim); }
+  .alley-review-meta .stars{ color:#e0a336; }
+  .alley-review-text{ margin:6px 0 0; font-size:9.5px; line-height:1.7; color:var(--ink-dim); }
+
+  /* ---------- 금액 정산 (screens 2 & 3) ---------- */
+  .settle2-headline{ margin-top:12px; font-size:14px; line-height:1.5; color:var(--ink); }
+  .settle2-headline b{ color:#e2685f; font-weight:400; }
+  .settle2-sub{ margin-top:4px; font-size:10px; color:var(--ink-dim); }
+
+  .segbar{
+    margin-top:12px;
+    height:9px; border-radius:999px;
+    display:flex; overflow:hidden;
+    background:var(--line);
+  }
+  .segbar span{ height:100%; }
+
+  .cat-list{
+    margin-top:14px;
+    padding:2px 12px;
+    border-radius:18px;
+    background:#fff;
+  }
+  .cat-row{
+    display:flex; align-items:center; justify-content:space-between;
+    gap:8px;
+    padding:9px 0;
+    border-bottom:1px solid var(--line);
+  }
+  .cat-row:last-child{ border-bottom:none; }
+  .cat-left{ display:flex; align-items:center; gap:5px; font-size:11.5px; color:var(--ink); }
+  .cat-pct{ font-size:9.5px; color:var(--ink-dim); }
+  .cat-amount-box{
+    padding:6px 9px;
+    border-radius:10px;
+    border:1px solid var(--line);
+    font-size:11px; color:var(--ink);
+    display:flex; align-items:center; gap:3px;
+    min-width:60px;
+    justify-content:flex-end;
+  }
+  .cat-amount-box .unit{ font-size:9px; color:var(--ink-dim); }
+
+  .add-row{ display:flex; gap:8px; margin-top:12px; }
+  .add-btn{
+    flex:1; min-width:0;
+    appearance:none; cursor:var(--cur-hand);
+    padding:11px 6px;
+    border-radius:14px;
+    border:1.5px dashed var(--line);
+    background:transparent;
+    font-family:'Jua', sans-serif;
+    font-size:9.5px; color:var(--ink-dim);
+    text-align:center;
+    transition:background .2s ease, border-color .2s ease, color .2s ease;
+  }
+  .add-btn.filled{ border-color:var(--point); color:var(--point-dark); background:var(--point-light); }
+
+  .summary-rows{ margin-top:14px; font-size:11px; color:var(--ink-dim); }
+  .summary-row{ display:flex; justify-content:space-between; padding:3px 0; }
+  .summary-row.total{
+    margin-top:6px; padding-top:10px;
+    border-top:1px solid var(--line);
+    font-size:12.5px; color:var(--ink);
+  }
+  .summary-row.total b{ color:var(--point); font-weight:400; font-size:15.5px; }
+
+  .btn-settle-submit{
+    appearance:none; border:none; cursor:var(--cur-hand);
+    margin-top:16px; width:100%;
+    padding:14px;
+    border-radius:999px;
+    background:var(--point);
+    color:#fff;
+    font-family:'Jua', sans-serif;
+    font-size:12.5px;
+    transition:opacity .2s ease;
+  }
+  .btn-settle-submit:disabled{ opacity:.4; pointer-events:none; }
+  .btn-edit-disabled{
+    appearance:none; border:none;
+    margin-top:16px; width:100%;
+    padding:14px;
+    border-radius:999px;
+    background:#d7dcd8;
+    color:#8b948e;
+    font-family:'Jua', sans-serif;
+    font-size:12.5px;
+    cursor:var(--cur-arrow);
+  }
+
+  .insight-card{
+    margin-top:16px;
+    padding:14px 12px;
+    border-radius:18px;
+    background:#fff;
+    text-align:left;
+  }
+  .insight-title{ font-size:12px; line-height:1.5; color:var(--ink); }
+  .insight-sub{ margin-top:4px; font-size:9.5px; line-height:1.55; color:var(--ink-dim); }
+  .insight-legend{ display:flex; gap:10px; margin-top:8px; font-size:8.5px; color:var(--ink-dim); align-items:center; }
+  .legend-dot{ display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:3px; }
+
+  .app-popup{
+    position:absolute; inset:0;
+    background:rgba(31,40,34,0.5);
+    border-radius:36px;
+    display:none; align-items:center; justify-content:center;
+    padding:20px;
+    z-index:20;
+  }
+  .app-popup.show{ display:flex; }
+  .app-popup-card{
+    background:#fff;
+    border-radius:22px;
+    padding:24px 18px;
+    text-align:center;
+  }
+  .app-popup-icon{ font-size:32px; }
+  .app-popup-title{ margin-top:10px; font-size:13.5px; line-height:1.65; color:var(--ink); }
+  .app-popup-sub{
+    margin-top:10px; font-size:11.5px; line-height:1.7; color:var(--ink-dim);
+    background:var(--point-light); padding:10px 12px; border-radius:12px;
+  }
+  .app-popup-close{
+    appearance:none; border:none; cursor:var(--cur-hand);
+    margin-top:14px;
+    padding:9px 26px;
+    border-radius:999px;
+    background:var(--point);
+    color:#fff;
+    font-family:'Jua', sans-serif;
+    font-size:12.5px;
+  }
+
+/* ============ 부엌 아이소메트릭 미니게임 (냉장고 미션) ============ */
+
+/* ============ 부엌 아이소메트릭 게임 뷰 (틈새살이 공용 변수와 충돌 방지를 위해 kitchen- 접두사 사용) ============ */
+  :root{
+    --kitchen-ink:#3a332c;
+    --kitchen-ink-dim:#8a7f72;
+    --kitchen-accent:#7fa387;
+    --kitchen-accent-dark:#5c8264;
+    --kitchen-cream:#fdf7ee;
+    --kitchen-tan:#f2c9a2;
+    --kitchen-line:rgba(58,51,44,0.12);
+    --kitchen-letterbox:#efe8db;
+  }
+
+/* ============ 게임 뷰 컨테이너 (부모 컨테이너에 꽉 채움) ============ */
+  #cohabit-game-container .kitchen-view{
+    position:relative;
+    width:100%;
+    height:100%;
+    /* 네모 칸 없음: 바탕색·둥근 모서리·그림자·잘라내기 없이 집 그림만 게임 화면 파란 배경 위에 */
+  }
+
+  /* kitchenScene: 실제 원본 캔버스(1536x1024, 3:2) 비율을 유지한 채
+     kitchen-view 안에 letterbox로 꽉 차게 배치되는 내부 좌표계.
+     모든 오브젝트는 이 kitchenScene 기준 %로 위치를 잡는다. */
+  .kitchenScene{
+    position:absolute;
+    left:50%; top:50%;
+    transform:translate(-50%, -50%);
+    cursor:var(--cur-arrow);
+    background:transparent; /* 방 그림 바깥(투명)으로 게임 화면 파란 배경이 그대로 보이게 */
+  }
+  .kitchenScene.is-busy{ cursor:var(--cur-arrow); }
+
+  .kitchen-layer-bg{
+    position:absolute; inset:0;
+    width:100%; height:100%;
+    /* object-fit 없이 그냥 꽉 채움: 세로가 잘리지 않게 하는 대신, 필요하면 가로 비율이
+       원본과 달라지도록(가로로 늘어나도록) 허용한다 - 비율 유지보다 "안 잘림"이 우선. */
+    pointer-events:none; user-select:none;
+    -webkit-user-drag:none;
+    display:block;
+  }
+
+  .kitchen-layer-table{
+    position:absolute;
+    pointer-events:none; user-select:none;
+    -webkit-user-drag:none;
+    z-index:10;
+  }
+
+  .kitchen-layer-fridge{
+    position:absolute;
+    pointer-events:none; user-select:none;
+    -webkit-user-drag:none;
+    z-index:4;
+  }
+
+  /* ---------- 빨래더미(다용도실 전용 오브젝트) ---------- */
+  .kitchen-layer-laundry{
+    position:absolute;
+    pointer-events:none; user-select:none;
+    -webkit-user-drag:none;
+    z-index:5;
+    display:none; /* 기본은 숨김 - 다용도실 화면일 때만 보인다 */
+  }
+  .kitchenScene.kitchen-scene-utility .kitchen-layer-laundry{ display:block; }
+
+  /* 세탁물 미션이 끝나면(kitchen:laundry-resolved) 빨래더미 대신 나타나는 빨래 바구니 +
+     개킨 옷더미. 다용도실 화면일 때는 항상 display:block으로 DOM에 존재시켜두고,
+     실제로 보이는지(opacity)는 kitchenScene의 kitchen-laundry-resolved 클래스로만
+     제어해서, 빨래더미 <-> 바구니/옷더미 사이가 순간 전환이 아니라 부드러운
+     크로스페이드로 보이게 한다. */
+  .kitchen-layer-laundry-basket,
+  .kitchen-layer-laundry-clothes{
+    position:absolute;
+    pointer-events:none; user-select:none;
+    -webkit-user-drag:none;
+    display:none;
+    opacity:0;
+    transition:opacity .4s ease;
+  }
+  .kitchen-layer-laundry-basket{ z-index:5; }
+  .kitchen-layer-laundry-clothes{ z-index:6; }
+  .kitchenScene.kitchen-scene-utility .kitchen-layer-laundry-basket,
+  .kitchenScene.kitchen-scene-utility .kitchen-layer-laundry-clothes{ display:block; }
+  .kitchenScene.kitchen-scene-utility.kitchen-laundry-resolved .kitchen-layer-laundry-basket,
+  .kitchenScene.kitchen-scene-utility.kitchen-laundry-resolved .kitchen-layer-laundry-clothes{ opacity:1; }
+  .kitchen-layer-laundry-basket{ transition:opacity .5s ease; } /* 빨래더미 → 빈 바구니 겹쳐 바꾸기 */
+  /* 개킨 빨래: 바구니가 바뀐 뒤(0.5초) 위에서 아래로 부드럽게 떨어지며 나타나 살짝 내려앉는다 */
+  .kitchen-layer-laundry-clothes{ transform:translateY(-55%); transform-origin:50% 100%;
+    transition:opacity .4s ease .5s, transform .9s cubic-bezier(.25,1.25,.45,1) .5s; }
+  .kitchenScene.kitchen-scene-utility.kitchen-laundry-resolved .kitchen-layer-laundry-clothes{ transform:none; }
+  .kitchenScene.kitchen-scene-utility.kitchen-laundry-resolved .kitchen-layer-laundry{
+    opacity:0;
+    transition:opacity .5s ease; /* 빈 바구니(0.5초)와 같은 시간에 겹쳐 바뀐다 */
+  }
+
+  /* 유형 탭으로 돌아와 끝낸 미션을 되살리는 순간엔 완료 연출 없이 (gpt-kitchen-game.js skipRestoreAnim) */
+  .kitchenScene.kitchen-restoring, .kitchenScene.kitchen-restoring *{ transition:none !important; }
+
+  /* ---------- 플레이어 캐릭터 (character.png 스프라이트) ---------- */
+  .kitchenPlayer{
+    position:absolute;
+    width:0; height:0;
+    z-index:9;
+    transition:none;
+  }
+  .kitchenPlayer-anchor{
+    position:absolute; left:0; top:0;
+    transform:translate(-50%, -100%);
+    pointer-events:none; /* 캐릭터 뒤 핀·가구도 눌리게 (메이트 스프라이트는 따로 auto) */
+  }
+  .kitchenPlayer-sprite{
+    display:block;
+    height:calc(560px * var(--scale, 1));
+    width:auto;
+    pointer-events:none; user-select:none;
+    -webkit-user-drag:none;
+    filter:drop-shadow(0 calc(3px * var(--scale,1)) calc(5px * var(--scale,1)) rgba(30,24,16,0.3));
+  }
+  /* 캐릭터 머리 위에 뜨는 말풍선 (예: 게임 시작 10초 뒤 배고픔 대사) */
+  .kitchen-player-bubble{
+    --bs:calc(var(--scale, 1) * 0.7); /* 말풍선 크기 = Figma의 0.7배 (캐릭터 높이 560은 그대로 scale) */
+    position:absolute;
+    /* left/top(%)은 이제 .kitchenPlayer의 형제 요소로서 JS(setPlayerStyle)가 캐릭터와
+       동일한 좌표로 맞춰준다 (기본값 0,0이면 온보딩 전에는 화면 좌상단에 숨어있음 -
+       opacity:0이라 안 보임). 세로 오프셋은 캐릭터 발끝 기준점에서 스프라이트 높이(560px)
+       만큼 위로, 거기서 다시 말풍선 자기 높이(-100%) + 여백(12px)만큼 더 위로 올린다. */
+    left:0; top:0;
+    transform:translate(-50%, calc(-100% - calc(560px * var(--scale, 1)) - calc(43px * var(--bs)))); /* 꼬리(아래로 39) + 여백 4 */
+    /* max-width를 텍스트 실제 너비보다 좁게 잡아뒀던 게 원인이라 텍스트가 말풍선
+       밖으로 삐져나왔었다 - white-space:nowrap(항상 한 줄) 특성상 폭 제한을 두지 않고
+       텍스트 길이에 맞춰 말풍선 자체가 늘어나도록 max-width를 없앴다. */
+    width:max-content;
+    background:#fff;
+    color:#000;
+    font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif;
+    font-size:calc(55px * var(--bs)); /* 25px에서 30px 확대 요청 반영 */
+    font-weight:700;
+    line-height:1.3;
+    white-space:nowrap;
+    /* Figma 말풍선: 흰 상자(높이 181, 모서리 30, 글 좌우 여백 96) + 아래 가운데 끝이 둥근 꼬리 */
+    padding:calc(55px * var(--bs)) calc(96px * var(--bs));
+    border-radius:calc(30px * var(--bs));
+    filter:drop-shadow(0 calc(6px * var(--bs)) calc(10px * var(--bs)) rgba(20,30,25,0.18)); /* 꼬리까지 같이 그림자 */
+    opacity:0;
+    pointer-events:none;
+    transition:opacity .3s ease;
+    z-index:25; /* 미션 핀(20)보다 위 - 핀이 말풍선 글자를 가리지 않게 */
+  }
+  .kitchen-player-bubble::after{
+    content:'';
+    position:absolute;
+    left:50%; top:calc(100% - calc(8px * var(--bs)));
+    width:calc(55.5px * var(--bs)); height:calc(47px * var(--bs));
+    transform:translateX(-50%);
+    background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 55.5 47'%3E%3Cpath d='M43.415 0C51.113 0 55.924 8.333 52.075 15L36.625 41.76C32.776 48.426 23.154 48.426 19.305 41.76L3.855 15C.006 8.333 4.817 0 12.515 0Z' fill='%23fff'/%3E%3C/svg%3E") no-repeat center / 100% 100%;
+  }
+  .kitchen-player-bubble.show{ opacity:1; }
+  /* 예전에는 좌우 반전(scaleX)으로 방향을 흉내냈지만, 지금은 방향별 실제 그림(character1)을
+     갈아끼우므로 반전은 더 이상 쓰지 않는다 (JS의 updatePlayerFacing 참고). */
+  /* ---------- 메이트 캐릭터 (서은민 A 전용, 부엌/거실을 자유롭게 돌아다님) ----------
+     플레이어와 같은 스프라이트 구조/크기를 쓰되, 클릭을 받지 않고(pointer-events:none)
+     충돌 판정에도 끼지 않아서 관람객 아바타의 이동을 절대 방해하지 않는다. */
+  .kitchenSeoMate{
+    position:absolute;
+    width:0; height:0;
+    z-index:9;
+    pointer-events:none;
+    opacity:0;
+    transition:opacity .45s ease;
+  }
+  .kitchenSeoMate.show{ opacity:1; }
+  .kitchenSeoMate:not(.show) .kitchenPlayer-sprite{ pointer-events:none !important; } /* 다른 방에 있어 안 보일 땐 눌리지 않게 */
+  .kitchenSeoMate.kitchen-is-walking .kitchenPlayer-anchor,
+  .kitchenPlayer.kitchen-is-walking .kitchenPlayer-anchor{
+    animation:kitchenPlayer-bob .38s ease-in-out infinite alternate;
+  }
+  @keyframes kitchenPlayer-bob{
+    from{ transform:translate(-50%, -100%) translateY(0); }
+    to{ transform:translate(-50%, -100%) translateY(calc(-4px * var(--scale, 1))); }
+  }
+
+  /* ---------- 냉장고 상태이상 아이콘 ----------
+     기존에는 CSS로 그린 주황색 원형 배지 안에 "!" 텍스트를 넣는 방식이었지만,
+     사용자가 준비한 알림 이미지(핀 모양, object/alert_pin.svg)로 교체한다. */
+  .kitchen-fridge-icon{
+    position:absolute;
+    /* --icon-scale: 튜너에서 조절하는 배율(기본 1 = 100%). JS(renderFridgeIcon)가 설정. */
+    width:calc(48px * var(--scale, 1) * var(--icon-scale, 1));
+    height:calc(63px * var(--scale, 1) * var(--icon-scale, 1)); /* 이미지 원본 비율(303:396)에 맞춤 */
+    transform:translate(-50%, -50%);
+    cursor:var(--cur-hand);
+    z-index:20;
+    animation:fridge-blink 1.3s ease-in-out infinite;
+  }
+  .kitchen-fridge-icon-img{
+    width:100%;
+    height:100%;
+    object-fit:contain;
+    display:block;
+    pointer-events:none;
+    filter:drop-shadow(0 calc(6px * var(--scale,1)) calc(10px * var(--scale,1)) rgba(190,60,30,0.4));
+  }
+  /* 미션 핀 크기 통일: 냉장고·세탁물·싱크대·쓰레기통·종이·거실 메이트 핀 모두 같은 크기 (--pin-scale 하나로 조절).
+     ponytail: 튜너의 아이콘별 '크기' 값은 이제 핀 크기에 안 쓰임 - 위치(top/left)만 아이콘별 */
+  .kitchenScene{ --pin-scale:1.8; }
+  .kitchenScene :is(.kitchen-fridge-icon, .kitchen-laundry-icon, .kitchen-sink-icon, .kitchen-bins-icon, .kitchen-paper-icon){
+    width:calc(48px * var(--scale, 1) * var(--pin-scale));
+    height:calc(62.5px * var(--scale, 1) * var(--pin-scale)); /* alert_pin.svg 비율 309:402 */
+    animation:fridge-blink 1.3s ease-in-out infinite; /* 움직임도 통일 - 예전엔 냉장고 핀만 커졌다 작아졌다 */
+  }
+  /* 미션 주체(냉장고·빨래더미)를 눌러도 핀을 누른 것과 같다 - 미션 전에만 눌림 (JS 클릭 처리와 짝) */
+  .kitchenScene.game-started:not(.fridge-done) .kitchen-layer-fridge,
+  .kitchenScene.kitchen-scene-utility.fridge-done:not(.kitchen-laundry-resolved) .kitchen-layer-laundry{ pointer-events:auto; cursor:var(--cur-hand); }
+  /* 미션 핀은 게임 시작(메이트 환영 대화가 끝난 뒤, kitchen:game-start)부터 서서히 나타난다 */
+  .kitchen-fridge-icon, .kitchen-sink-icon, .kitchen-bins-icon, .kitchen-bubble-icon{ transition:opacity .6s ease; }
+  .kitchenScene:not(.game-started) :is(.kitchen-fridge-icon, .kitchen-sink-icon, .kitchen-bins-icon, .kitchen-bubble-icon){ opacity:0; pointer-events:none; }
+  @keyframes fridge-blink{ /* 핀 색 깜빡임(object/alert_pin.svg)과 함께 살짝 커졌다 작아진다 - 흐려지지 않게 */
+    0%, 100%{ transform:translate(-50%,-50%) scale(1); }
+    50%{ transform:translate(-50%,-50%) scale(1.08); }
+  }
+  .kitchen-fridge-icon:hover .kitchen-fridge-icon-img{ filter:drop-shadow(0 calc(6px * var(--scale,1)) calc(10px * var(--scale,1)) rgba(190,60,30,0.4)) brightness(1.08); }
+
+  /* ---------- 세탁물 상태이상 아이콘 (다용도실 전용) ----------
+     냉장고 알림 아이콘과 완전히 같은 구조/이미지(범용 경고 핀)를 쓰되, 다용도실
+     화면일 때만 보이도록 기본은 숨겨두고 방이 바뀔 때만 CSS로 드러낸다. */
+  .kitchen-laundry-icon{
+    position:absolute;
+    display:none; /* 기본은 숨김 - 다용도실 화면일 때만 보인다 */
+    /* --icon-scale: 튜너에서 조절하는 배율(기본 1 = 100%). JS(renderLaundryIcon)가 설정. */
+    width:calc(48px * var(--scale, 1) * var(--icon-scale, 1));
+    height:calc(63px * var(--scale, 1) * var(--icon-scale, 1));
+    transform:translate(-50%, -50%);
+    cursor:var(--cur-hand);
+    z-index:20;
+    /* 냉장고 알림 아이콘(fridge-blink)은 깜빡이면서 크기도 88%까지 줄어드는데, 이 세탁물
+       아이콘은 원래 크기 자체가 작아서(48x63px) 애니메이션 중 클릭 영역까지 함께 줄어들면
+       마우스로 정확히 클릭하기 어려워질 수 있다. 그래서 크기는 그대로 두고 밝기(opacity)만
+       깜빡이도록 별도 애니메이션(laundry-icon-blink)을 쓴다 - 클릭 판정 영역이 항상 100%로 유지됨. */
+    animation:laundry-icon-blink 1.3s ease-in-out infinite;
+  }
+  .kitchenScene.kitchen-scene-utility .kitchen-laundry-icon{ display:block; }
+  @keyframes laundry-icon-blink{ /* 예전엔 흐려지며 깜빡였는데, 이제 핀 색이 깜빡인다(alert_pin.svg) - 비워 둠.
+     (opacity를 넣으면 게임 시작 전 핀 숨김(opacity 0)을 덮어써서 핀이 미리 보였다) */ }
+  .kitchen-laundry-icon-img{
+    width:100%;
+    height:100%;
+    object-fit:contain;
+    display:block;
+    pointer-events:none;
+    filter:drop-shadow(0 calc(6px * var(--scale,1)) calc(10px * var(--scale,1)) rgba(190,60,30,0.4));
+  }
+  .kitchen-laundry-icon:hover .kitchen-laundry-icon-img{ filter:drop-shadow(0 calc(6px * var(--scale,1)) calc(10px * var(--scale,1)) rgba(190,60,30,0.4)) brightness(1.08); }
+
+  /* ---------- 싱크대/쓰레기통 상태이상 아이콘 (서은민 부엌 전용) ----------
+     냉장고/세탁물 알림 아이콘과 같은 구조 - 둘 중 아무거나 눌러도 미션1(가사 규칙)이 시작된다. */
+  .kitchen-sink-icon, .kitchen-bins-icon{
+    position:absolute;
+    display:none; /* 기본은 숨김 - 서은민 부엌 화면일 때만 보인다 */
+    width:calc(48px * var(--scale, 1) * var(--icon-scale, 1));
+    height:calc(63px * var(--scale, 1) * var(--icon-scale, 1));
+    transform:translate(-50%, -50%);
+    cursor:var(--cur-hand);
+    z-index:20;
+    animation:laundry-icon-blink 1.3s ease-in-out infinite;
+  }
+  .kitchenScene.kitchen-scene-eunmin .kitchen-sink-icon,
+  .kitchenScene.kitchen-scene-eunmin .kitchen-bins-icon{ display:block; }
+  .kitchen-sink-icon-img, .kitchen-bins-icon-img{
+    width:100%;
+    height:100%;
+    object-fit:contain;
+    display:block;
+    pointer-events:none;
+    filter:drop-shadow(0 calc(6px * var(--scale,1)) calc(10px * var(--scale,1)) rgba(190,60,30,0.4));
+  }
+  .kitchen-sink-icon:hover .kitchen-sink-icon-img,
+  .kitchen-bins-icon:hover .kitchen-bins-icon-img{ filter:drop-shadow(0 calc(6px * var(--scale,1)) calc(10px * var(--scale,1)) rgba(190,60,30,0.4)) brightness(1.08); }
+
+  /* ---------- 서은민 부엌 전용 말풍선 상태 버튼 ----------
+     싱크대/쓰레기통 알림과 같은 구조(클릭 -> 걸어가서 대화창)지만, 미션 진행과는 무관한
+     상시 노출 아이콘이다 - 누르면 강은지(여성 관람객 기준) / 강지혁(남성 관람객 기준)이
+     아침 인사를 건네는 짧은 대화창이 뜬다. 빨간 경고 핀 대신 실제 말풍선 이미지(object/speech_bubble.png,
+     정사각형에 가까운 비율)를 쓰므로 width/height를 1:1에 가깝게 둔다. */
+  .kitchen-bubble-icon{
+    position:absolute;
+    display:none; /* 메이트가 지금 보는 방에 있을 때만(.mate-on) 보인다 */
+    width:calc(60px * var(--scale, 1) * var(--icon-scale, 1));
+    height:calc(60px * var(--scale, 1) * var(--icon-scale, 1));
+    transform:translate(-50%, calc(-100% - 560px * var(--scale, 1) - 6px * var(--scale, 1)));
+    cursor:var(--cur-hand);
+    z-index:20;
+    animation:laundry-icon-blink 1.3s ease-in-out infinite;
+  }
+  .kitchen-bubble-icon.mate-on{ display:block; }
+  .kitchenScene:has(#kitchenMateBubble.show) .kitchen-bubble-icon{ visibility:hidden; } /* 메이트가 말하는 동안엔 '…' 버튼이 말풍선 글자를 가리지 않게 */
+  /* '메이트와 이야기하기' 핀이 떠 있을 때(규칙·감정형 eunmin-talk-ready, 금전형은 syncMateVisible의 talkPin)와 대화창이 열려 있는 동안엔
+     말풍선 버튼을 숨긴다 - JS 토글이 늦게 따라와 잠깐 같이 보이던 것까지 막는다 */
+  .kitchenScene.eunmin-talk-ready .kitchen-bubble-icon,
+  body:has(#kitchenDialogue.show) .kitchen-bubble-icon,
+  .kitchenScene.all-missions-done .kitchen-bubble-icon{ display:none !important; }
+  .kitchen-bubble-icon-img{
+    width:100%;
+    height:100%;
+    object-fit:contain;
+    display:block;
+    pointer-events:none;
+    filter:drop-shadow(0 calc(6px * var(--scale,1)) calc(10px * var(--scale,1)) rgba(100,60,80,0.35));
+  }
+  .kitchen-bubble-icon:hover .kitchen-bubble-icon-img{ filter:drop-shadow(0 calc(6px * var(--scale,1)) calc(10px * var(--scale,1)) rgba(100,60,80,0.35)) brightness(1.08); }
+
+  /* ---------- 거실 식탁 위 정산 종이 상태이상 아이콘 (거실 전용) ----------
+     싱크대/쓰레기통 알림과 같은 구조 - 클릭하면 캐릭터가 식탁으로 걸어가서 미션2
+     (틈새살림 정산)를 시작한다. */
+  .kitchen-paper-icon{
+    position:absolute;
+    display:none; /* 기본은 숨김 - 거실 화면일 때만 보인다 */
+    width:calc(48px * var(--scale, 1) * var(--icon-scale, 1));
+    height:calc(63px * var(--scale, 1) * var(--icon-scale, 1));
+    transform:translate(-50%, -50%);
+    cursor:var(--cur-hand);
+    /* 다른 핀처럼 캐릭터 위 - 거실 시작 위치에 선 캐릭터 머리에 가려 핀이 안 보이던 문제 */
+    z-index:20;
+    animation:laundry-icon-blink 1.3s ease-in-out infinite;
+  }
+  .kitchenScene.kitchen-scene-livingroom .kitchen-paper-icon{ display:block; }
+  .kitchen-paper-icon-img{
+    width:100%;
+    height:100%;
+    object-fit:contain;
+    display:block;
+    pointer-events:none;
+    filter:drop-shadow(0 calc(6px * var(--scale,1)) calc(10px * var(--scale,1)) rgba(190,60,30,0.4));
+  }
+  .kitchen-paper-icon:hover .kitchen-paper-icon-img{ filter:drop-shadow(0 calc(6px * var(--scale,1)) calc(10px * var(--scale,1)) rgba(190,60,30,0.4)) brightness(1.08); }
+
+  /* ---------- 강은지(S) 엔딩 전용: 거실에서 강은지에게 말 거는 아이콘 ----------
+     서은민(A) 전용 정산 종이 아이콘(.kitchen-paper-icon)과 같은 거실 화면을 쓰지만,
+     메이트 타입에 따라 둘 중 하나만 보이게 한다 - kitchen:set-mate-type에서 kitchenScene에
+     붙이는 kitchen-mode-s/kitchen-mode-a 클래스로 구분. 다른 아이콘들과 달리 위치는
+     튜너 없이 고정값(top/left)을 쓴다. */
+  .kitchenScene.kitchen-scene-livingroom.kitchen-mode-s .kitchen-paper-icon{ display:none; }
+  /* 감정형(H): 거실만 쓰고 아직 미션이 없다 - 규칙형 정산 핀·돌아가기 버튼 숨김 */
+  .kitchenScene.kitchen-mode-h .kitchen-paper-icon{ display:none !important; }
+  /* 규칙형 거실: 정산 고지서(Payment notice.png 530x431을 배경 2046x1686의 x932 y963, 폭 182에) - 정산 핀은 그만큼 위로(JS renderPaperIcon) */
+  .kitchen-a-notice{ display:none; position:absolute; left:45.55%; top:57.12%; width:8.9%; z-index:3; pointer-events:none; user-select:none; -webkit-user-drag:none; }
+  .kitchenScene.kitchen-mode-a.kitchen-scene-livingroom .kitchen-a-notice{ display:block; }
+  /* 감정형 거실: TV 뉴스 화면(tv_news.png 236x286을 배경 2046x1686의 x1112 y362에) + 그 위 미션 핀 + 켜진 전등 불빛 */
+  .kitchen-h-tv, .kitchen-h-lamp-glow, .kitchen-tv-icon{ display:none; position:absolute; pointer-events:none; }
+  .kitchenScene.kitchen-mode-h.kitchen-scene-livingroom :is(.kitchen-h-tv, .kitchen-h-lamp-glow){ display:block; }
+  .kitchen-h-tv{ left:54.35%; top:21.47%; width:11.53%; z-index:3; user-select:none; -webkit-user-drag:none;
+    /* 켜진 TV 화면 빛 - 화면 모양(그림 테두리)을 따라 푸르스름하게 은은히 번지고 숨 쉬듯. 미션을 마치면(.tv-off) 그림과 함께 사라진다 */
+    filter:drop-shadow(0 0 calc(18px * var(--scale,1)) rgba(180,212,255,.85)) drop-shadow(0 0 calc(54px * var(--scale,1)) rgba(190,218,255,.65)); }
+  /* 숨 쉬는 빛: 예전엔 큰 번짐(drop-shadow)을 매 프레임 새로 그려서(filter 애니메이션) 무거웠다 →
+     센 빛을 입힌 같은 그림을 TV 밑에 한 장 더 깔고 그 투명도만 움직인다(그래픽카드가 처리, 다시 그리지 않음) */
+  .kitchen-h-tv-glow{ z-index:2; pointer-events:none !important; will-change:opacity;
+    filter:drop-shadow(0 0 calc(26px * var(--scale,1)) rgba(180,212,255,1)) drop-shadow(0 0 calc(76px * var(--scale,1)) rgba(190,218,255,.9));
+    animation:tv-glow 2.8s ease-in-out infinite; }
+  @keyframes tv-glow{ 0%,100%{ opacity:0; } 50%{ opacity:1; } }
+  .kitchen-tv-icon{ left:60.1%; top:20.5%; transform:translate(-50%,-50%); z-index:20; cursor:var(--cur-hand); pointer-events:auto;
+    width:calc(48px * var(--scale, 1) * var(--pin-scale)); height:calc(62.5px * var(--scale, 1) * var(--pin-scale));
+    animation:fridge-blink 1.3s ease-in-out infinite; }
+  .kitchenScene.game-started.kitchen-mode-h.kitchen-scene-livingroom:not(.tv-off):not(.tv-asked) .kitchen-tv-icon:not(.kitchen-fb-icon){ display:block; } /* 미션1(채팅 안건 등록)을 마치면 핀만 숨김 - TV는 미션3까지 켜진 채 */
+  /* 감정형 미션2 핀 - TV 핀과 같은 모양, 자리는 메이트 머리 위(JS mateRender) */
+  .kitchenScene.game-started.kitchen-mode-h.kitchen-scene-livingroom.fb-ready .kitchen-fb-icon{ display:block; }
+  /* TV 화면 그림을 눌러도 핀과 같다 (미션 전에만) */
+  .kitchenScene.game-started.kitchen-mode-h.kitchen-scene-livingroom .kitchen-h-tv{ pointer-events:auto; cursor:var(--cur-hand); } /* 끝낸 뒤(화면은 꺼져 투명)에도 눌리면 한마디 */
+  /* 미션을 마치면 TV 화면·전등 불빛이 서서히 꺼져 원래 거실 그림으로 */
+  .kitchen-h-tv, .kitchen-h-lamp-glow{ transition:opacity .9s ease; }
+  .kitchenScene.tv-off :is(.kitchen-h-tv, .kitchen-h-lamp-glow){ opacity:0; animation:none; }
+  .kitchen-tv-icon img{ width:100%; height:100%; display:block; pointer-events:none; filter:drop-shadow(0 calc(6px * var(--scale,1)) calc(10px * var(--scale,1)) rgba(190,60,30,0.4)); }
+  /* 전등 갓(배경 x≈859 y≈505) 둘레로 퍼지는 따뜻한 빛 - 은은하게 숨 쉬듯 */
+  .kitchen-h-lamp-glow{ left:42%; top:30%; width:22%; aspect-ratio:1; transform:translate(-50%,-50%); z-index:2;
+    background:radial-gradient(circle, rgba(255,250,215,.95) 0%, rgba(255,226,140,.7) 9%, rgba(255,205,105,.38) 24%, rgba(255,195,95,.14) 44%, rgba(255,190,90,0) 66%);
+    animation:lamp-glow 3.2s ease-in-out infinite; }
+  @keyframes lamp-glow{ 0%,100%{ opacity:.85; } 50%{ opacity:1; } }
+  .kitchen-tv-icon:hover img{ /* 감정형 TV·피드백 핀도 다른 핀처럼 */ filter:drop-shadow(0 calc(6px * var(--scale,1)) calc(10px * var(--scale,1)) rgba(190,60,30,0.4)) brightness(1.08); }
+
+  /* 다용도실에 미리 가도 세탁물 미션은 냉장고 미션(반찬 구독)을 마친 뒤에만 시작된다 */
+  .kitchenScene.kitchen-scene-utility:not(.fridge-done) .kitchen-laundry-icon{ display:none; }
+
+  /* 방 전환 시(부엌 <-> 다용도실) 잠깐 화면을 어둡게 덮는 페이드 오버레이 */
+  .kitchen-room-fade{
+    position:absolute; inset:0;
+    background:#1b1712;
+    opacity:0;
+    pointer-events:none;
+    transition:opacity .35s ease;
+    z-index:76; /* 대화창(75) 위 - 방 전환 땐 대화창까지 덮는다 */
+  }
+  .kitchen-room-fade.show{ opacity:1; }
+
+  /* 다용도실 화면에서는 부엌 전용 오브젝트(냉장고/테이블/알림 아이콘)를 전부 숨긴다 -
+     배경만 다용도실로 바뀌고 부엌 가구가 겹쳐 보이면 안 되므로.
+     */
+  .kitchenScene.kitchen-scene-utility .kitchen-layer-table{ /* 한방판: 냉장고·냉장고 핀은 다용도실에도 둔다 */
+    display:none !important;
+  }
+
+  /* =========================================================
+     서은민(A 메이트) 전용 부엌/거실 — 강은지(S) 오브젝트(냉장고/식탁/세탁물)는
+     전부 숨기고, 서은민 전용 오브젝트(밥먹는 식탁)만 보이게 한다. 거실 화면에서는
+     부엌 오브젝트가 전부 숨는 것은 물론 밥먹는 식탁도 함께 숨긴다.
+     ========================================================= */
+  .kitchenScene.kitchen-scene-eunmin .kitchen-layer-fridge,
+  .kitchenScene.kitchen-scene-eunmin .kitchen-layer-table,
+  .kitchenScene.kitchen-scene-eunmin .kitchen-fridge-icon,
+  .kitchenScene.kitchen-scene-livingroom .kitchen-layer-fridge,
+  .kitchenScene.kitchen-scene-livingroom .kitchen-layer-table,
+  .kitchenScene.kitchen-scene-livingroom .kitchen-fridge-icon,
+  .kitchenScene.kitchen-scene-livingroom .kitchen-layer-dining-table{
+    display:none !important;
+  }
+  .kitchen-layer-dining-table{
+    position:absolute;
+    pointer-events:none; user-select:none;
+    -webkit-user-drag:none;
+    z-index:10;
+    display:none; /* 기본은 숨김 - 서은민 부엌 화면일 때만 보인다 */
+  }
+  .kitchenScene.kitchen-scene-eunmin .kitchen-layer-dining-table{ display:block; }
+  /* ===== 한방판: 유형마다 방 하나 (금전형 다용도실 / 규칙형 부엌 / 감정형 거실) ===== */
+  /* 금전형: 냉장고·냉장고 핀도 다용도실에 - 위 다용도실 숨김 규칙에서 뺐다 (위치는 JS가 다용도실 좌표로) */
+  /* 규칙형: 생활비 고지서·핀도 부엌 식탁 위에 (위치는 JS renderANotice/renderPaperIcon). 식탁(z 10) 위에 놓는다 */
+  .kitchenScene.kitchen-mode-a.kitchen-scene-eunmin .kitchen-a-notice{ display:block; z-index:10; /* 식탁과 같은 높이(DOM이 뒤라 식탁 위) - 식탁 앞 캐릭터(11)를 덮지 않게 */ }
+  .kitchenScene.kitchen-mode-a.kitchen-scene-eunmin .kitchen-paper-icon{ display:block; }
+  /* 서은민 부엌의 설거지 더미·쓰레기 (깨끗한 부엌 배경 위에 얹는다 - 각 미션을 마치면 JS가 숨김). 가구 뒤에 설 일이 없어 캐릭터보다 아래 */
+  .kitchen-layer-eunmin-mess{
+    position:absolute;
+    pointer-events:none; user-select:none;
+    -webkit-user-drag:none;
+    z-index:8;
+    display:none;
+  }
+  .kitchenScene.kitchen-scene-eunmin .kitchen-layer-eunmin-mess{ display:block; }
+
+  /* 거실 이동 버튼(서은민 미션1 완료 후 등장) - 다용도실 이동 버튼과 완전히 같은 스타일 */
+
+  /* ---------- 냉장고 확인 대화창 (쯔꾸르 게임풍 다이얼로그) ----------
+     항상 #kitchenScene(아이소메트릭 방) 안쪽에만 절대좌표로 배치되므로,
+     방을 감싸는 #cohabit-game-container의 overflow:hidden 라운드 프레임 밖으로는
+     절대 튀어나오지 않는다. 폰트/여백은 다른 디버그 요소들과 동일하게
+     --scale 변수로 스케일링해서 화면 크기가 달라져도 방 안에서 항상 같은 비율을 유지한다. */
+  .kitchen-dialogue{
+    position:absolute;
+    left:0; right:0; bottom:0;
+    display:none;
+    align-items:flex-end;
+    z-index:75; /* 축하 폭죽(70)보다 위 */
+    /* 캐릭터 쪽(왼쪽)은 화면 가장자리로부터 24px, 대화상자 쪽(오른쪽)은 아이소메트릭
+       화면과의 여백을 20px 더 넓혀서 44px를 두도록 한다. */
+    padding:0 calc(44px * var(--scale,1)) calc(40px * var(--scale,1)) calc(24px * var(--scale,1));
+    /* 인물은 예전 크기(500x560) 그대로. 대화창은 Figma(인물 880x1024 : 대화창 높이 570, 인물 x=518부터 겹침)
+       비율을 인물 크기에 맞춰 줄인 단위(--d = 560/1024 ≈ 0.57배). 대화창 가로는 남은 화면 폭을 꽉 채운다(flex:1) */
+    --d:calc(var(--scale,1) * 0.57);
+  }
+  .kitchen-dialogue.show{ display:flex; }
+  .kitchen-dialogue-portrait{
+    /* cha1_sad.png/cha1_happy.png(성별별) 대화 전용 일러스트 - 캐릭터가 대화상자 위로 살짝
+       겹쳐 보이되, 대화창 전체 영역(캐릭터+상자)이 아이소메트릭 화면 높이의 1/3 정도만
+       차지하도록 크기를 조정한다(화면을 다 채우지 않게). sad/happy 이미지마다 원본 가로세로
+       비율이 조금씩 달라서 width:auto로 두면 무드가 바뀔 때마다 캐릭터 크기가 미묘하게
+       달라 보였다 - 너비/높이를 둘 다 고정하고 object-fit:contain으로 그 박스 안에
+       맞춰 넣어서, 어떤 이미지가 오든 항상 같은 크기로 보이게 한다. */
+    width:calc(500px * var(--scale,1));
+    height:calc(560px * var(--scale,1));
+    object-fit:contain;
+    object-position:bottom;
+    flex:none;
+    position:relative;
+    z-index:2;
+    filter:drop-shadow(0 calc(8px * var(--scale,1)) calc(10px * var(--scale,1)) rgba(0,0,0,0.35));
+    pointer-events:none;
+  }
+  /* Figma 대화창(1572x570, 모서리 30, 검정 50%) 비율 그대로 - 부엌 원본 좌표(가로 2046) 기준 px.
+     이름(굵게) + 틈 로고 → 그 아래 본문, 오른쪽 아래 회색 ▼ 삼각형 */
+  .kitchen-dialogue-box{
+    flex:1;
+    height:calc(570px * var(--d));
+    box-sizing:border-box;
+    display:flex;
+    flex-direction:column;
+    justify-content:flex-start;
+    /* 캐릭터 폭 일부와 자연스럽게 겹치도록 음수 마진으로 대화상자를 캐릭터 쪽으로 끌어당긴다 */
+    margin-left:calc(-206px * var(--scale,1)); /* 인물 오른쪽 206만큼 뒤로 깔린다 (Figma 362/880 × 인물 폭 500) */
+    margin-right:0;
+    background:rgba(0,0,0,0.5);
+    /* 집 네모칸 아래 테두리에 붙어 잘려 보이지 않도록 아래·오른쪽을 띄우고 네 모서리 모두 둥글게 */
+    border-radius:calc(30px * var(--d));
+    /* 왼쪽 캐릭터 이미지가 겹치면서 생기는 여백(120px)을 기준으로 오른쪽 텍스트 여백을
+       동일하게 맞추고, 오른쪽만 그보다 살짝 더 넓게(150px) 벌려서 텍스트가 좌우로
+       치우치지 않으면서도 오른쪽에 약간의 여유를 두도록 한다. */
+    padding:calc(73px * var(--d)) calc(150px * var(--d)) calc(64px * var(--d)) calc(222px * var(--scale,1)); /* 글은 인물 오른쪽 끝 바로 옆에서 시작 */
+    color:#fff;
+    position:relative;
+    z-index:1;
+  }
+  /* 선택지가 여러 줄 뜨면 고정 높이(330px)를 넘기므로, 선택지가 떠 있는 동안은
+     내용에 맞춰 높이가 자동으로 늘어나게 한다(그렇지 않으면 버튼이 상자 배경 밖으로
+     삐져나와 보인다). */
+
+  .kitchen-dialogue-name-row{
+    display:flex;
+    align-items:center;
+    gap:calc(14px * var(--scale,1));
+    margin-bottom:calc(24px * var(--scale,1));
+  }
+  .kitchen-dialogue-name{
+    font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif;
+    font-weight:700;
+    font-size:calc(44px * var(--scale,1));
+    line-height:1;
+    color:#fff;
+  }
+  .kitchen-dialogue-logo{
+    width:calc(48px * var(--scale,1));
+    height:calc(48px * var(--scale,1));
+    object-fit:contain;
+    flex:none;
+  }
+  .kitchen-dialogue-text{
+    text-wrap:balance; /* 두 줄 길이를 고르게 (formatDialogueHtml의 기호 단위 덩어리 사이에서만 줄바꿈) */
+    font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif;
+    font-weight:600; /* 세미볼드 */
+    font-size:calc(38px * var(--scale,1));
+    line-height:1.3;
+    word-break:keep-all;
+  }
+  .kitchen-dialogue-text .dlg-seg{ display:inline-block; max-width:100%; }
+  .kitchen-dialogue-next{
+    position:absolute;
+    right:calc(60px * var(--d));
+    bottom:calc(64px * var(--d));
+    width:calc(58px * var(--d));
+    height:calc(51px * var(--d));
+    background:#D9D9D9;
+    clip-path:polygon(0 0, 100% 0, 50% 100%);
+    font-size:0; /* 글자 ▼ 대신 회색 삼각형 */
+    animation:kitchen-dialogue-bounce 1s ease-in-out infinite;
+  }
+  @keyframes kitchen-dialogue-bounce{
+    0%,100%{ transform:translateY(0); }
+    50%{ transform:translateY(calc(3px * var(--scale,1))); }
+  }
+
+  /* ---------- 메이트(강은지)가 직접 말하는 대화 - 초상화 사진이 없어서 이모지로 대신한다 ----------
+     기존 kitchen-dialogue-portrait(관람객 사진)와 같은 자리/크기를 쓰되, img 대신 큰 이모지
+     텍스트를 보여준다. showKitchenDialogue에 opts.emoji를 넘기면 이쪽으로 전환된다. */
+  .kitchen-dialogue-emoji-portrait{
+    width:calc(500px * var(--scale,1));
+    height:calc(560px * var(--scale,1));
+    display:none;
+    align-items:flex-end;
+    justify-content:center;
+    flex:none;
+    position:relative;
+    z-index:2;
+    font-size:calc(280px * var(--scale,1));
+    line-height:1;
+    filter:drop-shadow(0 calc(8px * var(--scale,1)) calc(10px * var(--scale,1)) rgba(0,0,0,0.35));
+    pointer-events:none;
+  }
+
+  /* ---------- 대화 중 선택지(강은지 엔딩용 갈림길 대화) ----------
+     기존 "클릭하면 다음 줄" 방식 대신, 선택을 기다리는 동안 ▼ 다음 화살표를 숨기고
+     이 버튼들을 보여준다. 버튼을 고르기 전까지는 화면 클릭/Enter로 못 건너뛰게 막는다
+     (kitchenDialogueChoiceMode 플래그). */
+  .kitchen-dialogue-choices{
+    /* 선택지는 대화상자 "안"이 아니라 대화상자 바로 위 오른쪽 끝에 떠 있는 버튼 묶음으로 둔다 -
+       상자 안에 넣으면 상자가 늘어나고 대사 영역이 좁아져서 글자가 작아 보였다. */
+    position:absolute;
+    right:0;
+    bottom:calc(100% + 16px * var(--scale,1));
+    display:none;
+    flex-direction:column;
+    align-items:flex-end;
+    gap:calc(14px * var(--scale,1));
+    max-width:85%;
+  }
+  .kitchen-dialogue-choices.show{ display:flex; }
+  .kitchen-dialogue-choice-btn{
+    appearance:none;
+    cursor:var(--cur-hand);
+    text-align:left;
+    font-family:'Jua', sans-serif;
+    font-size:calc(46px * var(--scale,1));
+    line-height:1.4;
+    word-break:keep-all;
+    padding:calc(18px * var(--scale,1)) calc(36px * var(--scale,1));
+    border-radius:calc(40px * var(--scale,1));
+    background:rgba(0,0,0,0.62);
+    color:#fff;
+    border:calc(3px * var(--scale,1)) solid rgba(255,255,255,0.55);
+    box-shadow:0 calc(10px * var(--scale,1)) calc(24px * var(--scale,1)) rgba(0,0,0,0.35);
+    transition:background .15s ease, transform .1s ease, border-color .15s ease;
+    animation:kitchen-choice-in .25s ease both;
+  }
+  .kitchen-dialogue-choice-btn:nth-child(2){ animation-delay:.06s; }
+  .kitchen-dialogue-choice-btn:nth-child(3){ animation-delay:.12s; }
+  .kitchen-dialogue-choice-btn:hover{ background:rgba(73,153,99,0.92); border-color:#fff; }
+  .kitchen-dialogue-choice-btn:active{ transform:scale(.98); }
+  @keyframes kitchen-choice-in{
+    from{ opacity:0; transform:translateY(calc(10px * var(--scale,1))); }
+    to{ opacity:1; transform:none; }
+  }
+
+  /* ---------- 미션1 완료 축하 팝업 (아이소메트릭 화면 위, 폭죽 효과 포함) ---------- */
+  .kitchen-celebrate{
+    position:absolute; inset:0;
+    display:none;
+    align-items:center; justify-content:center;
+    z-index:70;
+    pointer-events:none; /* 카드 팝업이 없어진 뒤로는 폭죽 연출만 남아서, 아래 장면/대화창 클릭을 가로채면 안 된다 */
+  }
+  .kitchen-celebrate.show{ display:flex; }
+  /* 폭죽(색종이) 효과 - 카드 뒤에서 위->아래로 회전하며 떨어지는 작은 조각들.
+     nth-child로 색/위치/시작딜레이를 다르게 줘서 랜덤처럼 보이게 한다. */
+  .kitchen-confetti{
+    display:none; /* 10-03: 화면 전체 폭죽(celebrateBurst)으로 대체 */
+    position:absolute; inset:0;
+    overflow:hidden;
+    pointer-events:none;
+    z-index:1;
+  }
+  .kitchen-confetti span{
+    position:absolute;
+    top:28%; /* 카드 중심 근처에서 터지는 느낌이 나도록 화면 맨 위가 아니라 중간쯤에서 시작 */
+    width:calc(15px * var(--scale,1));
+    height:calc(22px * var(--scale,1));
+    border-radius:3px;
+    opacity:0;
+  }
+  .kitchen-celebrate.show .kitchen-confetti span{
+    animation-name:kitchen-confetti-fall;
+    animation-duration:1.3s;
+    animation-timing-function:ease-out;
+    animation-fill-mode:forwards;
+  }
+  @keyframes kitchen-confetti-fall{
+    0%{ transform:translateY(0) rotate(0deg); opacity:1; }
+    100%{ transform:translateY(calc(260px * var(--scale,1))) rotate(540deg); opacity:0; }
+  }
+  .kitchen-confetti span:nth-child(6n+1){ background:#ff9d7a; }
+  .kitchen-confetti span:nth-child(6n+2){ background:#5c8264; }
+  .kitchen-confetti span:nth-child(6n+3){ background:#ffd166; }
+  .kitchen-confetti span:nth-child(6n+4){ background:#7fa3ff; }
+  .kitchen-confetti span:nth-child(6n+5){ background:#ff6f91; }
+  .kitchen-confetti span:nth-child(6n+0){ background:#8b7fff; }
+  .kitchen-confetti span:nth-child(1){ left:4%;  animation-delay:0s; }
+  .kitchen-confetti span:nth-child(2){ left:10%; animation-delay:.12s; }
+  .kitchen-confetti span:nth-child(3){ left:17%; animation-delay:.04s; }
+  .kitchen-confetti span:nth-child(4){ left:24%; animation-delay:.22s; }
+  .kitchen-confetti span:nth-child(5){ left:31%; animation-delay:.08s; }
+  .kitchen-confetti span:nth-child(6){ left:38%; animation-delay:.3s; }
+  .kitchen-confetti span:nth-child(7){ left:45%; animation-delay:0s; }
+  .kitchen-confetti span:nth-child(8){ left:52%; animation-delay:.18s; }
+  .kitchen-confetti span:nth-child(9){ left:59%; animation-delay:.06s; }
+  .kitchen-confetti span:nth-child(10){ left:66%; animation-delay:.26s; }
+  .kitchen-confetti span:nth-child(11){ left:73%; animation-delay:.1s; }
+  .kitchen-confetti span:nth-child(12){ left:80%; animation-delay:.34s; }
+  .kitchen-confetti span:nth-child(13){ left:87%; animation-delay:.02s; }
+  .kitchen-confetti span:nth-child(14){ left:93%; animation-delay:.2s; }
+  .kitchen-confetti span:nth-child(15){ left:14%; animation-delay:.4s; }
+  .kitchen-confetti span:nth-child(16){ left:48%; animation-delay:.44s; }
+  .kitchen-confetti span:nth-child(17){ left:63%; animation-delay:.38s; }
+  .kitchen-confetti span:nth-child(18){ left:96%; animation-delay:.46s; }
+
+  /* =========================================================
+     강은지(S)·서은민(A) 서랍 레이아웃: 아이소메트릭 룸을 크게 가운데 두고, 틈 앱(폰 목업)은
+     평소엔 화면 오른쪽 밖에 완전히 숨겨둔다. 앱 미션이 진행될 때만 app-tablet.js가 서랍처럼
+     밀어내고, 그만큼 룸도 왼쪽으로 함께 밀린다. body.layout-drawer는 setDrawerLayout()이
+     강은지·서은민일 때만 붙인다 - 김정희(H)는 기존 좌우 분할 레이아웃 그대로다.
+     ========================================================= */
+  .phone-mockup{ display:contents; } /* 분할 레이아웃에서는 래퍼가 없는 것처럼 동작 */
+  .app-guide-col{ display:none; }
+
+  body.layout-drawer{
+    /* 앱 화면 폭: 예전 300px의 1.2배(360px)까지 키우되, 프레임 전체 높이(화면 폭 x 599/260.894)가 헤더(70) 아래 위아래 12px 여백 안에 들어가게 */
+    --app-w:min(360px, calc((100dvh - 70px - 24px) * 260.894 / 599));
+    --drawer-gap:24px; /* 폰 오른쪽 여백 = 오늘의 미션 카드 왼쪽 여백(24px)과 같게 */
+    --guide-w:210px;
+    --guide-gap:14px;
+    --drawer-w:calc(var(--guide-w) + var(--guide-gap) + var(--app-w) * 295 / 260.894 + var(--drawer-gap) * 2);
+    --drawer-ease:cubic-bezier(.33,0,.2,1); /* 처음에 확 튀지 않고 부드럽게 출발·도착 (예전 .22,.9,.35,1은 첫 0.1초에 거의 다 움직여 덜컥였다) */
+  }
+  body.layout-drawer .cohabit-body{ position:relative; overflow:hidden; }
+  /* 서랍이 열리면 룸 영역 오른쪽에 서랍 폭만큼 여백을 줘서, 룸이 남은 공간의 가운데로
+     (= 왼쪽으로) 함께 밀려나게 한다. 남은 공간이 좁으면 룸이 그만큼 작아진다. */
+  body.layout-drawer .cohabit-left{
+    flex:1;
+    padding-right:0;
+    /* 여백(padding)을 애니메이션하면 0.45초 내내 매 프레임 집 화면 전체를 다시 배치·다시 그려서 폰이 열리고 닫힐 때 버벅였다
+       → 배치는 한 번에 바꾸고, 움직임은 app-tablet.js setDrawerOpen이 .room-stage에 이동·크기 변환(transform)으로만 보여 준다 */
+  }
+  body.layout-drawer.app-drawer-open .cohabit-left{ padding-right:var(--drawer-w); }
+  /* 룸은 화면 높이에 맞춰 최대한 키우고 가운데에 둔다.
+     단 앱 서랍이 열렸을 때 남는 폭(화면 폭 - 서랍 폭 - 여백)보다 4%까지만 크게 - 노트북 화면에서 서랍이 열릴 때
+     집이 확 작아져 보였다(1366~1600 폭에서 8~11% 축소 → 4% 안팎). 넓은 화면은 서랍이 열려도 자리가 남아 그대로 */
+  body.layout-drawer .room-stage{
+    will-change:transform; /* 폰 열고 닫을 때 집 크기 변환 - 레이어를 미리 올려 둬서 애니메이션 시작·끝에 다시 그리며 덜컥이지 않게 */
+    width:min(calc(100% - 48px), calc((100dvh - 70px - 40px) * 2046 / 1686), calc((100vw - var(--drawer-w) - 48px) * 1.04));
+  }
+
+  /* ---------- 미션 가이드 말풍선 (폰 왼쪽) ---------- */
+  body.layout-drawer .app-guide-col{
+    display:block;
+    position:relative;
+    flex:none;
+    align-self:stretch;
+    width:var(--guide-w);
+    margin-right:var(--guide-gap);
+  }
+  .app-guide-bubble{
+    --arrow-y:50%;
+    position:absolute; left:0; right:0; top:0;
+    padding:16px 16px 14px;
+    border-radius:20px;
+    background:#fff;
+    box-shadow:0 18px 36px -14px rgba(20,40,28,0.45), 0 0 0 2px var(--point);
+    font-family:'Jua', sans-serif;
+    opacity:0; visibility:hidden;
+    transform:translateX(-8px);
+    transition:opacity .25s ease, transform .25s ease, top .35s cubic-bezier(.22,.9,.35,1), visibility 0s linear .25s;
+  }
+  .app-guide-bubble.show{
+    opacity:1; visibility:visible; transform:none;
+    transition:opacity .25s ease, transform .25s ease, top .35s cubic-bezier(.22,.9,.35,1), visibility 0s;
+  }
+  /* 오른쪽(폰 쪽)을 가리키는 꼬리 - 대상 버튼 높이(--arrow-y)를 따라 움직인다 */
+  .app-guide-bubble::after{
+    content:'';
+    position:absolute;
+    right:-9px; top:var(--arrow-y);
+    width:16px; height:16px;
+    background:#fff;
+    border-top:2px solid var(--point);
+    border-right:2px solid var(--point);
+    transform:translateY(-50%) rotate(45deg);
+    transition:top .35s cubic-bezier(.22,.9,.35,1);
+  }
+  .app-guide-bubble.no-arrow::after{ display:none; }
+  .app-guide-bubble.show{ cursor:var(--cur-hand); } /* 말풍선을 눌러도 지금 단계 진행 (app-tablet.js guidePress) */
+  .app-guide-bubble.shake{ animation:app-guide-shake .4s ease; }
+  @keyframes app-guide-shake{
+    0%,100%{ transform:translateX(0); }
+    25%{ transform:translateX(-7px); }
+    50%{ transform:translateX(6px); }
+    75%{ transform:translateX(-3px); }
+  }
+  .app-guide-head{ display:flex; align-items:center; justify-content:space-between; gap:6px; margin-bottom:9px; }
+  .app-guide-chip{
+    font-size:11px; color:#fff;
+    background:var(--point);
+    padding:4px 10px; border-radius:999px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .app-guide-progress{ flex:none; font-size:11px; color:var(--ink-dim); }
+  .app-guide-text{
+    margin:0;
+    font-size:14px; line-height:1.6;
+    color:var(--ink);
+    word-break:keep-all;
+    white-space:pre-line;
+  }
+  .app-guide-text b{ color:var(--point-dark); font-weight:400; }
+  /* 문장 줄바꿈 공통 (window.teumWrap): 기호 뒤 덩어리 사이에서 먼저 줄을 바꾸고, 줄 길이는 고르게, 단어 중간은 자르지 않는다 */
+  .tw{ display:inline; text-wrap:balance; word-break:keep-all; overflow-wrap:break-word; }
+  .tw-seg{ display:inline-block; max-width:100%; text-wrap:balance; }
+  .app-guide-text, .talk-bubble, .mh-bubble{ white-space:normal; text-wrap:balance; word-break:keep-all; }
+  .app-guide-next{
+    display:none;
+    width:100%;
+    margin-top:12px;
+    appearance:none; border:none; cursor:var(--cur-hand);
+    padding:11px;
+    border-radius:999px;
+    background:linear-gradient(160deg, #5fb17c, var(--point) 65%, var(--point-dark));
+    color:#fff;
+    font-family:'Jua', sans-serif;
+    font-size:14px;
+    box-shadow:0 10px 20px -10px rgba(44,95,61,0.6);
+  }
+  .app-guide-next.show{ display:block; animation:app-guide-next-in .3s ease; }
+  .app-guide-next:active{ transform:translateY(1px) scale(.98); }
+  @keyframes app-guide-next-in{ from{ opacity:0; transform:translateY(4px); } to{ opacity:1; transform:none; } }
+
+  body.layout-drawer .cohabit-right{
+    position:absolute; top:0; bottom:0; right:0;
+    z-index:40;
+    flex:none;
+    width:var(--drawer-w);
+    padding:0 var(--drawer-gap);
+    background:none;
+    display:flex; align-items:center; justify-content:center;
+    /* 닫힘: 오른쪽 화면 밖으로 완전히 빼서 폰이 전혀 보이지 않게 한다 */
+    transform:translateX(100%);
+    visibility:hidden;
+    transition:transform .55s var(--drawer-ease), visibility 0s linear .55s;
+  }
+  body.layout-drawer.app-drawer-open .cohabit-right{
+    transform:translateX(0);
+    visibility:visible;
+    transition:transform .55s var(--drawer-ease), visibility 0s;
+  }
+
+  /* 폰 프레임 = object/phone_frame.svg (Figma 295x599, 화면 자리 x14.65 y14.79 260.894x568.456 r23.665).
+     화면 폭(--app-w)을 기준으로 프레임 전체를 같은 비율로 키우고, 프레임 그림은 앱 화면 '위'에 덮는다(화면 자리는 뚫려 있음).
+     일부 그래픽카드에서 크롬이 앱 화면(iframe)의 흐림 헤더·사진을 둥근 모서리로 잘라 주지 않고 네모로 그려 삐져나왔는데,
+     프레임이 위에 그려지므로 항상 가려진다 */
+  body.layout-drawer .phone-mockup{
+    --u:calc(var(--app-w) / 260.894); /* 프레임 그림 1단위 */
+    display:block;
+    position:relative;
+    flex:none;
+    padding:calc(var(--u) * 14.7881) calc(var(--u) * 19.458) calc(var(--u) * 15.756) calc(var(--u) * 14.6484);
+    border-radius:calc(var(--u) * 36);
+    background:none;
+    box-shadow:0 12px 28px -12px #14231B38;
+  }
+  body.layout-drawer .phone-mockup::after{
+    content:''; position:absolute; inset:0; z-index:85; pointer-events:none;
+    background:url('object/phone_frame.svg') 0 0 / 100% 100% no-repeat;
+  }
+  body.layout-drawer .app-mock{
+    width:var(--app-w);
+    aspect-ratio:260.894 / 568.456; /* 프레임의 화면 자리 비율 (앱 412x892보다 아주 조금 길다 - 남는 아래 몇 px은 앱 바탕색) */
+    border-radius:calc(var(--u) * 23.665);
+    box-shadow:none;
+    border:none;
+  }
+  body.layout-drawer .app-popup{ border-radius:calc(var(--u) * 23.665); }
+  /* 서랍이 닫혀 있는 동안에는 앱 안내 스포트라이트/말풍선을 숨긴다(가리킬 대상이 화면 밖) */
+  body.layout-drawer:not(.app-drawer-open) .guide-spotlight,
+  body.layout-drawer:not(.app-drawer-open) .guide-tooltip{ visibility:hidden; }
+
+  @media (max-width:640px){
+  }
+
+</style>
+  <style id="gpt-design-theme">
+/* GPT design study: presentation only. Shared engine, embedded apps and coordinates unchanged. */
+:root{--point:#71D369;--point-dark:#32743C;--point-deep:#23572D;--point-light:#EDF8EB;--ink:#202420;--ink-dim:#717771;--line:#E1E6E1;--warn:#A53D46;--warn-light:#FFF0F1;--teum-pink:#FF9696;}
+body{font-family:'Pretendard','Apple SD Gothic Neo',sans-serif;background:#F7F8FA;}
+button,input,textarea{font-family:inherit!important;}
+.stage{position:relative;z-index:1;}
+.title{font-weight:750;letter-spacing:-.045em;line-height:1.3;font-size:clamp(30px,3.4vw,44px);}
+.subtitle{font-size:16px;line-height:1.7;color:#717771;}
+.clay{box-shadow:none;border:1px solid var(--line);}
+.clay-point{background:var(--point);box-shadow:none;border:0;color:#203D24;}
+.brand-art{position:fixed;inset:0;overflow:hidden;pointer-events:none;z-index:0;}
+.brand-art svg{position:absolute;width:min(40vw,580px);height:auto;}
+.brand-art .brand-connection{display:none;right:-13vw;top:-13vw;fill:#FFD3D7;transform:rotate(12deg);}
+.brand-art .brand-harmony{left:-15vw;bottom:-16vw;fill:#D4F2D2;}
+.brand-art svg.brand-bg{left:0;top:0;width:100%;height:100%;} /* 코드 입력 화면 배경 (예전 왼쪽 아래 연두색 도형 대신) */
+body:has(#codePanel.hide) .brand-art{display:none;}body.cohabit-active .brand-art{display:none;} /* 게임 화면에선 코드 화면 배경이 절대 안 보이게 */
+.brand-wordmark{display:flex;align-items:center;justify-content:center;gap:10px;font-size:19px;font-weight:750;letter-spacing:-.04em;margin:0 auto 30px;}
+.brand-wordmark svg{width:30px;height:30px;fill:var(--point);}
+.avatar-badge{display:none;}
+.otp-row{gap:12px;margin-top:32px;}
+.otp-box{width:72px;height:84px;border:1px solid #D6DDD6;border-radius:10px;font-weight:600;color:var(--ink);box-shadow:none;}
+.otp-box:focus{border-color:var(--point);outline:2px solid #BBF2B7;outline-offset:3px;}
+.btn-primary{min-width:320px;padding:17px 28px;font-size:17px;font-weight:650;margin-top:28px;}
+.btn-primary:hover:not(:disabled),.onboarding-next:hover,.ending-next:hover{background:#BBF2B7;}
+.error-msg{background:transparent;padding:10px 0;font-size:13px;}
+.gender-btn{border-radius:12px;font-weight:600;}
+.gender-btn.active{background:#EDF8EB;color:var(--ink);border:1px solid var(--point);box-shadow:none;}
+.gender-btn-img,.gender-btn.active .gender-btn-img{box-shadow:none;}
+.name-input{border-radius:10px;background:#fff;box-shadow:none;}
+.name-label{font-weight:600;color:var(--ink);}
+.reveal-desc{background:transparent;border:0;border-top:1px solid var(--line);border-radius:0;padding:22px 0;}
+.reveal-name{font-weight:750;letter-spacing:-.03em;}
+.match-me,.match-mate{box-shadow:none;}
+.talk-bubble{border:1px solid var(--line);border-radius:16px;box-shadow:0 4px 16px #20302408;}
+.cohabit-topbar{background:#fff;}
+.cohabit-title{font-weight:650;letter-spacing:-.025em;}
+.cohabit-title b{font-weight:700;color:var(--point-dark);}
+.mate-tab{background:transparent;border:0;border-bottom:3px solid transparent;border-radius:0;font-weight:600;color:#717771;}
+.mate-tab.active{background:#EDF8EB;color:var(--point-deep);border-color:var(--point);}
+.mate-tab.active::before,.mate-tab.active::after{display:none;}
+.cohabit-left{background:#F3F6F2;}
+.cohabit-reset{border:1px solid var(--line);font-weight:500;}
+/* Keep the app's Our Rules list geometry and its completion language. */
+.mission-card{box-shadow:none;border-color:#E8EBE8;}
+.mc-list li::after{border-color:var(--point);}
+.mc-list li.done::after{background-color:var(--point);}
+.mc-bar i{background:var(--point);}
+.kitchen-dialogue-box{background:rgba(255,255,255,.97);color:var(--ink);border:1px solid #DDE5DC;box-shadow:0 4px 18px #21321D0A;}
+.kitchen-dialogue-name{color:var(--point-deep);font-weight:750;}
+.kitchen-dialogue-text{color:var(--ink);font-weight:500;line-height:1.5;}
+.kitchen-dialogue-next{background:var(--point);animation:none;}
+.kitchen-dialogue-portrait,.kitchen-dialogue-emoji-portrait{filter:none;}
+.kitchen-dialogue-choice-btn{background:#fff;color:var(--ink);border:1px solid #CFDCCF;border-radius:calc(14px * var(--scale,1));box-shadow:none;font-weight:600;}
+.kitchen-dialogue-choice-btn:hover{background:#D4F2D2;border-color:var(--point-dark);}
+.app-guide-bubble{border-radius:12px;border:1px solid #C6DCC5;box-shadow:0 4px 16px #2030240D;font-family:'Pretendard',sans-serif;padding:20px;}
+.app-guide-bubble::after{border-width:1px;border-color:#C6DCC5;}
+.app-guide-chip{background:#EDF8EB;color:var(--point-deep);font-weight:650;border-radius:5px;padding:5px 8px;}
+.app-guide-text{font-size:15px;line-height:1.7;}
+.app-guide-text b{font-weight:700;}
+.app-guide-next{background:var(--point);box-shadow:none;color:#203D24;font-weight:650;}
+.onboarding-card,.ending-card{border-radius:16px;padding:36px;border:1px solid var(--line);box-shadow:0 12px 48px #16281512;}
+.onboarding-title,.ending-title{font-size:22px;font-weight:700;letter-spacing:-.03em;}
+.onboarding-title b,.ending-title b{color:var(--point-dark);font-weight:700;}
+.onboarding-desc,.ending-desc{font-size:15px;line-height:1.75;}
+.onboarding-icon,.ending-icon{background:#EDF8EB;box-shadow:none;}
+.onboarding-next,.ending-next{color:#203D24;font-weight:650;}
+.ending-feedback-textarea{background:#F7F8FA;border-radius:8px;font-size:15px;}
+.ending-star.active{color:#FF9696;}
+body.layout-drawer .phone-mockup{box-shadow:0 12px 28px -12px #14231B38;}
+button:focus-visible{outline:3px solid #32743C;outline-offset:4px;}
+@media(max-width:640px){.btn-primary{min-width:0;width:100%;}.brand-art svg:not(.brand-bg){width:65vw;}.otp-box{width:60px;height:74px;}.title{font-size:32px;}.brand-wordmark{margin-bottom:24px;}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;}}
+
+/* Preserve the legacy in-document app, in addition to untouched iframe documents. */
+.app-mock{--point:#499963;--point-dark:#3a7d51;--point-deep:#2c5f3d;--point-light:#e7f4ec;--ink:#1f2822;--ink-dim:#75827a;--line:rgba(31,40,34,.08);--warn:#e0664a;--warn-light:#fbeae5;font-family:'Jua','Apple SD Gothic Neo',sans-serif;}
+.app-mock button,.app-mock input,.app-mock textarea{font-family:'Jua',sans-serif!important;}
+.app-mock .clay{background:#fff;box-shadow:0 14px 28px -12px rgba(31,58,40,.16),0 2px 6px rgba(31,58,40,.05),inset 0 2px 0 rgba(255,255,255,.9),inset 0 -3px 7px rgba(31,58,40,.05);border:1px solid rgba(31,58,40,.04);}
+
+/* Review refinement: bring the phone inward without changing its app viewport. */
+@font-face{
+  font-family:'NationalPension';
+  src:url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2310@1.0/NPSfontBold.woff2') format('woff2');
+  font-weight:700;font-style:normal;font-display:swap;
+}
+.title,.brand-wordmark,.reveal-name,.cohabit-title,.mc-title,
+.onboarding-title,.ending-title,.kitchen-dialogue-name,.room-avatar-name,
+#resMeName,#resMateName,#cohabitVisitorName,#cohabitMateName{
+  font-family:'NationalPension','Pretendard','Apple SD Gothic Neo',sans-serif;
+  font-weight:700;
+}
+body.layout-drawer{--design-drawer-inset:0px;} /* 폰 오른쪽 여백은 --drawer-gap 하나로 */
+body.layout-drawer .cohabit-right{
+  right:var(--design-drawer-inset);
+  transform:translateX(calc(100% + var(--design-drawer-inset)));
+}
+body.layout-drawer.app-drawer-open .cohabit-right{transform:translateX(0);}
+/* 앱 화면(iframe)을 꽉 채울 때는 폰 화면 바탕을 앱 바탕색과 같게 - 화면 배율(150% 등)에 따라 앱 화면이 1px 모자라거나
+   모서리 둥글기가 살짝 어긋나면 흰 바탕이 줄·모서리로 비쳐 보였다 */
+body .app-mock.app-mock--flush{background:#F7F8FA;}
+.kitchen-dialogue-choice-btn{font-size:calc(31px * var(--scale,1));}
+
+/* Onboarding title tracking and agreement dialogue placement. */
+#stageWrap .title,.onboarding-title{letter-spacing:0;}
+#stageAgreementWrap .talk-bubble{top:auto;bottom:var(--talk-bottom, 85%);} /* --talk-bottom: 말풍선 아래 끝 = 캐릭터 머리 꼭대기 근처 (JS fitStageAgreement) - 줄 수가 달라도 아래 끝이 머리 위에 맞는다 */
+
+/* Game GNB: flat brand identity, a shared day, and app-style selected navigation. */
+.cohabit-topbar{height:70px;min-height:70px;padding:0 28px;gap:24px;background:#fff;border-bottom:1px solid #E6EBE5;}
+.cohabit-topbar-left{flex:1;min-width:0;align-items:center;align-self:auto;gap:24px;}
+.gnb-brand{display:flex;align-items:center;gap:9px;flex:none;color:#202420;font-family:'NationalPension','Pretendard',sans-serif;font-size:18px;white-space:nowrap;}
+.gnb-brand svg{width:30px;height:30px;color:#71D369;flex:none;}
+.cohabit-topbar .cohabit-title{gap:7px;min-width:0;padding-left:24px;border-left:1px solid #E3E8E2;font-size:14px;letter-spacing:0;white-space:nowrap;}
+.cohabit-topbar .cohabit-title b{color:#303A30;max-width:130px;overflow:hidden;text-overflow:ellipsis;}
+.gnb-name-link{color:#DC858A;font-family:'Pretendard',sans-serif;font-weight:500;font-size:15px;}
+.gnb-together{font-family:'Pretendard',sans-serif;color:#7A8279;font-size:13px;font-weight:400;}
+.cohabit-topbar .mate-tabs{margin:0 0 0 auto;padding:0;gap:6px;align-self:auto;align-items:center;}
+.cohabit-topbar .mate-tab{height:38px;min-width:74px;justify-content:center;padding:0 20px;border:0;border-radius:999px;background:transparent;color:#7B857A;font-family:'Pretendard',sans-serif!important;font-size:14px;font-weight:600;transition:background .15s,color .15s;}
+.cohabit-topbar .mate-tab:hover{background:#F2F7F0;color:#32743C;}
+.cohabit-topbar .mate-tab.active{background:#D4F2D2;color:#285E31;}
+.cohabit-topbar .mate-tabs.locked .mate-tab,.cohabit-topbar .mate-tabs.busy .mate-tab{filter:none;opacity:.45;cursor:var(--cur-arrow);}
+.cohabit-topbar .cohabit-reset{display:flex;align-items:center;gap:7px;padding:8px 0 8px 22px;border:0;border-left:1px solid #E3E8E2;border-radius:0;color:#7A8279;background:transparent;font-size:12px;white-space:nowrap;}
+.cohabit-topbar .cohabit-reset::before{content:'↻';font-size:18px;line-height:1;}.cohabit-topbar .cohabit-newcode::before{content:'←';font-size:15px;} .cohabit-topbar .cohabit-reset + .cohabit-reset{margin-left:-6px;}
+.cohabit-topbar .cohabit-reset:hover{color:#285E31;}
+@media(max-width:1000px){.cohabit-topbar{padding:0 18px;gap:16px;}.cohabit-topbar-left{gap:16px;}.cohabit-topbar .cohabit-title{padding-left:16px;font-size:12px;}.cohabit-topbar .mate-tab{min-width:56px;padding:0 12px;}.gnb-brand{font-size:16px;}.gnb-together{display:none;}}
+@media(max-width:720px){.cohabit-topbar{padding:0 12px;gap:10px;}.cohabit-topbar-left{gap:10px;}.gnb-brand span{display:none;}.gnb-brand svg{width:25px;height:25px;}.cohabit-topbar .cohabit-title{padding-left:10px;gap:4px;}.cohabit-topbar .cohabit-title b{max-width:65px;}.cohabit-topbar .mate-tabs{gap:2px;}.cohabit-topbar .mate-tab{min-width:42px;padding:0 8px;font-size:12px;}.cohabit-topbar .cohabit-reset{padding-left:10px;font-size:11px;}.cohabit-topbar .cohabit-reset::before{display:none;}}
+
+/* S missions may be played in either order; all destinations stay accessible. */
+.kitchenScene.kitchen-mode-s.kitchen-scene-utility:not(.kitchen-laundry-resolved) .kitchen-laundry-icon{display:flex;}
+.kitchenScene.game-started.kitchen-mode-s.kitchen-scene-utility:not(.kitchen-laundry-resolved) .kitchen-layer-laundry{pointer-events:auto;cursor:var(--cur-hand);}
+/* The ending is triggered by meeting the roaming mate after both errands. */
+.eunji-roam-bubble{position:absolute;z-index:35;transform:translate(-50%,calc(-100% - 560px * var(--scale,1) - 8px));width:44px;height:30px;border:1px solid #D4E4D1;border-radius:14px;background:#fff;color:#32743C;font-size:24px;line-height:1;cursor:var(--cur-hand);}
+.eunji-roam-bubble[hidden]{display:none;}
+.kitchenMate,.kitchenMate *{pointer-events:none!important;}
+
+
+/* 1005 shared mechanics, retaining the design variant's mission card and choices. */
+.mission-hint{ position:absolute; top:calc(100% + 12px); left:0; visibility:hidden; pointer-events:none; display:flex; align-items:center; gap:calc(4.2 * var(--mc)); width:max-content; min-width:calc(183 * var(--mc)); max-width:calc(183 * 1.6 * var(--mc));
+    opacity:0; transform:translateY(-4px); transition:opacity .4s ease, transform .4s ease;
+    font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif; color:#000; }
+  .mission-card.open .mission-hint.has{ visibility:visible; opacity:1; transform:none; transition-delay:.5s; } /* 카드가 펼쳐진 뒤 */
+  .mission-hint .mh-side{ flex:none; width:calc(23 * var(--mc)); display:flex; flex-direction:column; align-items:center; gap:calc(4.9 * var(--mc)); }
+  .mission-hint .mh-icon{ display:block; width:calc(19.4 * var(--mc)); height:calc(19.4 * var(--mc)); }
+  .mission-hint .mh-label{ font-size:calc(8 * var(--mc)); /* 완료율 글자와 같은 크기 */ line-height:1; white-space:nowrap; letter-spacing:-0.02em; }
+  .mission-hint .mh-bubble{ flex:1; min-width:0; min-height:calc(32.2 * var(--mc)); box-sizing:border-box; display:flex; align-items:center;
+    padding:calc(7 * var(--mc)) calc(12 * var(--mc)) calc(7 * var(--mc)) calc(15 * var(--mc));
+    border:calc(0.6 * var(--mc)) solid transparent; border-radius:calc(19.4 * var(--mc)) calc(19.4 * var(--mc)) calc(19.4 * var(--mc)) 0;
+    background:linear-gradient(#fff, #fff) padding-box, linear-gradient(#71D369, #FF9696) border-box;
+    font-size:calc(13 * var(--mc)); /* 미션 항목(냉장고 채우기)과 같은 크기 */ font-weight:500; line-height:1.35; word-break:keep-all; letter-spacing:-0.02em; }
+.kitchenMate #kitchenMateSprite{pointer-events:auto!important;cursor:var(--cur-hand);}
+.day-end{position:absolute;inset:0;z-index:65;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:linear-gradient(150deg,#D4F2D2ed,#FFD3D7ed);opacity:0;visibility:hidden;pointer-events:none;transition:opacity 1.2s,visibility 1.2s;}
+.day-end.show{opacity:1;visibility:visible;pointer-events:auto;}.day-end b,.day-end span{transition:opacity .25s;}.day-end.quiet b,.day-end.quiet span{opacity:0;}.day-end b{font:700 clamp(25px,3vw,44px) 'NationalPension','Pretendard',sans-serif;}.day-end span{font:16px 'Pretendard',sans-serif;}
+.kitchenScene .kitchen-dialogue.show .kitchen-dialogue-box{ cursor:var(--cur-hand); } /* 대화창은 눌러서 다음 줄로 넘기므로 손가락 */
+.ending-card{font-family:'Pretendard',sans-serif;
+  /* 평가 창을 통째로(글자·별·버튼 같이) 1.3배 - 폭·높이 한도는 그만큼 나눠서 화면을 넘지 않게 */
+  zoom:1.3; width:min(460px, calc((100vw - 48px) / 1.3)); max-height:calc(88vh / 1.3);}.ending-overlay.show .ending-card{animation:ending-review-in .4s ease-out both;}
+/* 감사 화면 배경 도형 - 카드 모서리 밖으로 잘리게 걸쳐 놓는다 (카드가 overflow로 자른다) */
+.ending-deco{display:none;position:absolute;width:190px;height:auto;opacity:.45;pointer-events:none;z-index:0;}
+.ending-card.thanks .ending-deco{display:block;}
+.ending-deco.flower{width:160px;right:-60px;top:-56px;transform:rotate(20deg);} /* 카드 모서리에 걸쳐(넘친 부분은 카드에 잘림) 글은 가리지 않게 */
+.ending-deco.clover{left:-64px;bottom:-70px;}
+.ending-card > :not(.ending-deco){position:relative;z-index:1;}
+.ending-more{color:var(--point-deep,#3E7A45);font-weight:600;}
+@keyframes ending-review-in{from{opacity:0;transform:translateY(18px);}to{opacity:1;transform:translateY(0);}}
+/* 세 번째 미션: 메이트가 올린 새 안건 알림 (게임 화면 오른쪽 위, gpt-kitchen-game.js agendaBegin) */
+.agenda-noti{position:absolute;z-index:72;top:24px;right:28px;width:min(485px,calc(100% - 40px));display:flex;flex-direction:column;gap:12px;font-family:'Pretendard',sans-serif;}
+.agenda-noti[hidden],body.app-drawer-open .agenda-noti{display:none;}
+/* 알림 시안: 반투명 회백색 알약 카드 + 옅은 그림자, 접힘(높이 96) / 펼침(설명 한두 줄 더) */
+.agenda-noti-card{display:flex;align-items:center;gap:29px;width:100%;box-sizing:border-box;min-height:96px;padding:20px 29px 20px 20px;background:rgba(247,248,250,.85);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border:0;border-radius:48px;box-shadow:0 0 16px rgba(26,26,26,.15);text-align:left;cursor:var(--cur-hand, pointer);font:inherit;color:#242424;animation:agenda-noti-in .42s cubic-bezier(.2,.9,.3,1.2) both;}
+.agenda-noti-card.open{border-radius:57px;}
+.agenda-noti-card{position:relative;}
+/* 누를 수 있다는 초록 물결 - 그림자(box-shadow)를 움직이면 매 프레임 다시 그려서, 고정된 테두리 한 겹의 크기·투명도만 움직인다 */
+.agenda-noti-card.pulse{animation:agenda-noti-in .42s cubic-bezier(.2,.9,.3,1.2) both, agenda-noti-buzz 4s ease-in-out 4s infinite;} /* 안 누르고 두면 4초마다 폰 알림처럼 부르르 (누르면 알림이 사라져 멈춘다) */
+@keyframes agenda-noti-buzz{0%,16%,100%{transform:none;}2%,6%,10%{transform:translateX(-5px) rotate(-.6deg);}4%,8%,12%{transform:translateX(5px) rotate(.6deg);}14%{transform:translateX(-2px);}}
+@media (prefers-reduced-motion:reduce){.agenda-noti-card.pulse{animation:agenda-noti-in .42s both;}}
+.agenda-noti-card.pulse::after{content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none;box-shadow:0 0 0 3px rgba(113,211,105,.5);animation:agenda-noti-pulse 1.6s ease-in-out .6s infinite;opacity:0;}
+.agenda-noti-icon{flex:none;width:56px;height:56px;border-radius:21px;background:#fff;display:grid;place-items:center;}
+.agenda-noti-icon svg{width:35px;height:35px;}
+.agenda-noti-body{flex:1;min-width:0;display:flex;flex-direction:column;}
+.agenda-noti-head{display:flex;align-items:baseline;gap:10px;font-size:16px;line-height:20px;color:#606060;}
+.agenda-noti-head b{font-weight:700;color:#242424;}
+.agenda-noti-title{margin-top:4px;font-size:16px;line-height:20px;font-weight:700;color:#242424;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.agenda-noti-text{display:none;margin-top:4px;font-size:15px;line-height:19px;color:#242424;word-break:keep-all;}
+.agenda-noti-card.open{align-items:flex-start;padding-top:24px;}
+.agenda-noti-card.open .agenda-noti-icon{align-self:center;}
+.agenda-noti-card.open .agenda-noti-head{font-size:13px;line-height:16px;}
+.agenda-noti-card.open .agenda-noti-title{white-space:normal;}
+.agenda-noti-card.open .agenda-noti-text{display:block;}
+.agenda-noti-fold{flex:none;display:grid;place-items:center;width:28px;height:28px;margin-right:-6px;}
+.agenda-noti-fold svg{width:16px;height:9.5px;transition:transform .2s;}
+.agenda-noti-card.open .agenda-noti-fold svg{transform:rotate(180deg);}
+@keyframes agenda-noti-in{from{opacity:0;transform:translateY(-14px) scale(.97);}to{opacity:1;transform:none;}}
+@keyframes agenda-noti-pulse{0%{opacity:.9;transform:scale(1);}70%,100%{opacity:0;transform:scale(1.035,1.08);}}
+/* 예전 '메이트와 이야기하기' 핀은 쓰지 않는다 (세 번째 미션이 새 안건으로 바뀜) */
+</style>
+</head>
+<body>
+<div class="brand-art" aria-hidden="true"><!-- 코드 입력 화면 배경 (Figma 1920x1080): 오른쪽 위 분홍 꽃 + 왼쪽 아래 연한 초록 클로버. 화면 비율이 달라도 빈틈 없이 채운다(slice) -->
+<svg class="brand-bg" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid slice" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+<g clip-path="url(#brandBgClip)">
+<rect width="1920" height="1080" fill="white"/>
+<path id="brandFlower" d="M1489.8 -224.906C1571.06 -210.097 1646.59 -163.979 1696.53 -90.1487C1725.61 -47.0689 1742.76 0.534616 1748.72 48.804C1752.7 49.0861 1756.7 49.6077 1760.71 50.3824C1764.69 51.1507 1768.57 52.1466 1772.34 53.3515C1795.83 10.8557 1829.41 -26.8682 1872.41 -55.951C1946.24 -105.885 2033.52 -120.646 2114.44 -104.063C2099.63 -22.8039 2053.51 52.7302 1979.68 102.665C1936.84 131.591 1889.48 148.719 1841.47 154.766C1841.2 158.95 1840.66 163.164 1839.85 167.388C1839.1 171.249 1838.14 175.014 1836.99 178.674C1879.28 202.143 1916.86 235.633 1945.82 278.45C1995.82 352.372 2010.5 439.646 1993.91 520.64C1912.55 505.893 1836.96 459.683 1787.02 385.853C1758.18 343.133 1741.07 295.965 1734.98 248.111C1730.96 247.832 1726.9 247.308 1722.84 246.524C1718.66 245.716 1714.59 244.658 1710.65 243.369C1687.18 285.449 1653.8 322.804 1611.14 351.654C1537.39 401.604 1450.19 416.303 1369.26 399.797C1384.06 318.615 1430.16 243.158 1503.99 193.224C1546.82 164.306 1594.16 147.179 1642.16 141.126C1642.44 137.276 1642.96 133.401 1643.71 129.518C1644.52 125.334 1645.57 121.261 1646.86 117.312C1604.5 93.838 1566.85 60.3139 1537.85 17.4374C1487.85 -56.4849 1473.18 -143.835 1489.78 -224.829L1489.8 -224.906Z" fill="#FFD3D7"/>
+<path id="brandClover" d="M-215.146 727.406C-137.828 645.796 -9.0715 642.426 72.4482 719.575C150.122 638.471 278.802 635.446 360.077 713.116C441.001 790.452 444.774 918.169 369.271 1000.33C448.845 1078.56 451.335 1206.4 374.351 1287.65C297.033 1369.26 168.276 1372.63 86.7561 1295.48C9.08205 1376.59 -119.598 1379.61 -200.873 1301.94C-281.797 1224.61 -285.57 1096.89 -210.067 1014.73C-289.64 936.499 -292.13 808.664 -215.146 727.406ZM76.895 898.572C16.7191 900.067 -30.8516 950.061 -29.3567 1010.24C-27.8618 1070.41 22.1325 1117.98 82.3083 1116.49C142.484 1114.99 190.055 1065 188.56 1004.82C187.065 944.648 137.071 897.077 76.895 898.572Z" fill="#BBF2B7"/>
+</g>
+<defs><clipPath id="brandBgClip"><rect width="1920" height="1080" fill="white"/></clipPath></defs>
+</svg></div>
+
+<div class="stage" id="stageWrap">
+  <div class="code-panel" id="codePanel">
+    <div class="brand-wordmark"><svg viewBox="0 0 200 200" aria-hidden="true"><path d="M100 28C45-32-32 45 28 100C-32 155 45 232 100 172C155 232 232 155 172 100C232 45 155-32 100 28Z"/><circle cx="100" cy="100" r="29" fill="#F7F8FA"/></svg><span>틈새살이</span></div>
+    <div class="title">틈새살이 코드를<br/>입력해주세요</div>
+    <p class="subtitle">핸드폰 유형 테스트 화면에 뜬 4자리 코드를 입력하면<br/>나와 잘 맞는 메이트를 만날 수 있어요</p>
+
+    <form id="otpForm">
+      <div class="otp-row" id="otpRow">
+        <input class="otp-box clay" id="otp0" type="text" inputmode="numeric" maxlength="1" autocomplete="off" />
+        <input class="otp-box clay" id="otp1" type="text" inputmode="numeric" maxlength="1" autocomplete="off" />
+        <input class="otp-box clay" id="otp2" type="text" inputmode="numeric" maxlength="1" autocomplete="off" />
+        <input class="otp-box clay" id="otp3" type="text" inputmode="numeric" maxlength="1" autocomplete="off" />
+      </div>
+
+      <button class="btn-primary clay-point" id="confirmBtn" type="submit">코드 확인하기 →</button>
+    </form>
+    <div class="error-msg" id="errorMsg">코드가 일치하지 않아요. 휴대폰 화면을 다시 확인해주세요!</div>
+  </div>
+
+  <div class="reveal-panel" id="genderNamePanel">
+    <div class="gender-preview" id="genderPreview">
+      <div class="gender-preview-circle"></div>
+      <img class="gender-preview-img" id="genderPreviewImg" alt="" draggable="false" />
+    </div>
+    <div class="title">당신에 대해<br/>알려주세요</div>
+    <p class="subtitle">메이트에게 보여줄 프로필 정보예요</p>
+
+    <div class="gender-select-area">
+      <label class="name-label">성별을 선택해주세요</label>
+      <div class="gender-btn-row">
+        <button type="button" class="gender-btn clay" data-gender="female" id="genderBtnFemale">
+          <img class="gender-btn-img" src="object/character1/cha1_profile.png" alt="여성 아바타 프로필" draggable="false" />
+          <span>여성</span>
+        </button>
+        <button type="button" class="gender-btn clay" data-gender="male" id="genderBtnMale">
+          <img class="gender-btn-img" src="object/charater1_man/cha1_man_profile.png" alt="남성 아바타 프로필" draggable="false" />
+          <span>남성</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="visitor-name-area">
+      <label class="name-label" for="visitorName">당신의 이름을 알려주세요</label>
+      <input class="name-input clay" id="visitorName" type="text" placeholder="이름을 입력해주세요" maxlength="10" autocomplete="off" />
+    </div>
+
+    <button class="btn-primary clay-point" id="nameGenderNextBtn" disabled>다음 →</button>
+  </div>
+
+  <div class="reveal-panel" id="revealPanel">
+    <div class="gender-preview" id="myPreview">
+      <div class="gender-preview-circle"></div>
+      <img class="gender-preview-img" id="myPreviewImg" alt="" draggable="false" />
+    </div>
+    <div class="gender-preview" id="matePreview">
+      <div class="gender-preview-circle"></div>
+      <img class="gender-preview-img" id="matePreviewImg" alt="" draggable="false" />
+    </div>
+    <div class="match-result">
+      <div class="match-card match-card-me">
+        <div class="match-me clay-point" id="resMeBadge"></div>
+        <div class="reveal-name" id="resMeName"></div>
+      </div>
+      <div class="match-link" aria-hidden="true"><span>♥</span></div>
+      <div class="match-card match-card-mate">
+        <div class="match-mate clay" id="resMateBadge"></div>
+        <div class="reveal-name" id="resMateName"></div>
+      </div>
+    </div>
+    <div class="match-loading-text">
+      <div class="title">나에게 맞는 메이트를 찾고 있어요<span class="match-dots"><span>.</span><span>.</span><span>.</span></span></div>
+      <p class="match-sub">첫 만남이 어색하지 않도록 성향을 맞춰보고 있어요</p>
+    </div>
+    <div class="reveal-emoji clay-point" id="revealEmoji">☕</div>
+    <div class="reveal-name" id="revealName">김정희</div>
+    <div class="reveal-type" id="revealType">68세 · 감정형 메이트</div>
+    <p class="reveal-desc clay" id="revealDesc"></p>
+
+    <button class="btn-primary clay-point" id="startCohabitBtn">동거 시작하기 →</button>
+    <div class="stage-agreement-wrap" id="stageAgreementWrap">
+      <div class="talk-bubble me" id="talkMe"></div>
+      <div class="talk-bubble mate" id="talkMate"></div>
+      <div class="stage-agreement" id="stageAgreement">
+        <div class="phone" id="stagePhone">
+          <div class="phone-screen"><iframe id="stageAgreementFrame" title="틈새살이 합의서"></iframe></div>
+          <span class="phone-mask"></span>
+          <span class="phone-cam"></span>
+        </div>
+      </div>
+    </div>
+    <button class="reset-link" id="resetLink">다른 코드로 새 메이트 찾기</button>
+  </div>
+</div>
+
+<div class="cohabit" id="cohabitView">
+  <div class="onboarding-overlay" id="onboardingOverlay">
+    <div class="onboarding-card clay">
+      <button class="onboarding-skip" id="onboardingSkipBtn">건너뛰기</button>
+
+      <div class="onboarding-step active" data-step="1">
+        <div class="onboarding-icon clay-point">🏠</div>
+        <p class="onboarding-title">환영합니다! 드디어 나와 딱 맞는<br/><b>메이트와의 '틈새살이'</b>가 시작되었어요.</p>
+        <p class="onboarding-desc">서명해주신 합의서를 바탕으로 나만의 룸이 완성되었습니다.<br/>하지만 타인과 함께 살다 보면 생각지 못한<br/>크고 작은 일상 문제들이 생기기 마련이죠!</p>
+      </div>
+
+      <div class="onboarding-step" data-step="2">
+        <div class="onboarding-icon clay-point">🎉</div>
+        <p class="onboarding-title">준비되셨나요?<br/>틈과 함께 슬기로운 동거 라이프를<br/>시작해 볼까요?</p>
+      </div>
+
+      <div class="onboarding-dots">
+        <span class="onboarding-dot active"></span>
+        <span class="onboarding-dot"></span>
+      </div>
+      <button class="onboarding-next clay-point" id="onboardingNextBtn">다음 →</button>
+    </div>
+  </div>
+
+  <!-- 미션2(마지막 미션)까지 끝난 뒤 보여주는 게임 종료 연출: 에필로그 -> 앱 이용 유도 -> 피드백 설문 -->
+  <div class="ending-overlay" id="gameEndingOverlay">
+    <div class="ending-card clay">
+      <!-- 감사 화면 배경: 시작(코드 입력) 화면의 분홍 꽃·초록 클로버를 옅게 (.ending-card.thanks일 때만) -->
+      <svg class="ending-deco flower" viewBox="1360 -235 765 765" aria-hidden="true"><use href="#brandFlower"/></svg>
+      <svg class="ending-deco clover" viewBox="-300 630 760 760" aria-hidden="true"><use href="#brandClover"/></svg>
+
+      <!-- 엔딩 연출은 평가(피드백) 팝업 하나만 남긴다 - 관계 에필로그/앱 홍보 단계는 제거됨. -->
+      <div class="ending-step active" data-ending-step="1">
+        <div id="endingFeedbackForm">
+          <p class="ending-title">체험해주셔서 감사해요!</p>
+          <p class="ending-desc">1. 이 체험이 틈 앱의 서비스 기능을 이해하는 데<br/>얼마나 도움이 되셨나요?</p>
+          <div class="ending-star-row" id="endingStarRow">
+            <button type="button" class="ending-star" data-value="1">★</button>
+            <button type="button" class="ending-star" data-value="2">★</button>
+            <button type="button" class="ending-star" data-value="3">★</button>
+            <button type="button" class="ending-star" data-value="4">★</button>
+            <button type="button" class="ending-star" data-value="5">★</button>
+          </div>
+          <p class="ending-desc">2. 틈 앱이 메이트와 함께 살아가는 데<br/>얼마나 도움이 될 것 같으신가요?</p>
+          <div class="ending-star-row" id="endingStarRow2">
+            <button type="button" class="ending-star" data-value="1">★</button>
+            <button type="button" class="ending-star" data-value="2">★</button>
+            <button type="button" class="ending-star" data-value="3">★</button>
+            <button type="button" class="ending-star" data-value="4">★</button>
+            <button type="button" class="ending-star" data-value="5">★</button>
+          </div>
+          <textarea class="ending-feedback-textarea" id="endingFeedbackText" placeholder="어떤 점이 도움이 되었는지 자유롭게 남겨주세요 (선택)"></textarea>
+        </div>
+        <div id="endingThanks" style="display:none;">
+          <p class="ending-title">소중한 의견 감사합니다!</p>
+          <p class="ending-desc">남겨주신 의견은 더 나은 틈 서비스를<br/>만드는 데 큰 도움이 될 거예요.</p>
+          <p class="ending-desc ending-more">같은 아바타로 다른 메이트들도 만나보세요!</p>
+        </div>
+        <!-- 세 유형을 모두 끝냈을 때: 나와 메이트 셋이 나란히 서서 인사 (gpt-kitchen-game.js showEndingThanks가 채운다) -->
+        <div id="endingAllClear" style="display:none;">
+          <div class="allclear-cast" id="endingAllClearCast"></div>
+          <p class="ending-title">모든 유형을 플레이해 주셔서 감사해요!</p>
+          <p class="ending-desc">금전형·규칙형·감정형 메이트와 함께한 틈새살이,<br/>남겨주신 의견까지 정말 고마워요.</p>
+        </div>
+      </div>
+
+      <button class="ending-next clay-point" id="endingNextBtn">의견 제출하기</button>
+      <div id="endingOtherTypes" style="display:none;width:100%"></div>
+      <button class="ending-restart" id="endingRestartBtn" style="display:none;">처음으로 돌아가기</button>
+    </div>
+  </div>
+
+  <div class="cohabit-topbar">
+    <div class="cohabit-topbar-left">
+      <div class="gnb-brand" aria-label="틈새살이">
+        <svg viewBox="0 0 200 200" aria-hidden="true"><path d="M100 28C45-32-32 45 28 100C-32 155 45 232 100 172C155 232 232 155 172 100C232 45 155-32 100 28Z" fill="currentColor"/><circle cx="100" cy="100" r="29" fill="#fff"/></svg>
+        <span>틈새살이</span>
+      </div>
+      <div class="cohabit-title"><b id="cohabitVisitorName">나</b><span class="gnb-name-link" aria-label="그리고">&amp;</span><b id="cohabitMateName">김정희</b><span class="gnb-together">의 하루</span></div>
+      <div class="mate-tabs" id="mateTabs" role="group" aria-label="메이트 유형 선택">
+        <button type="button" class="mate-tab" data-type="S">금전</button>
+        <button type="button" class="mate-tab" data-type="A">규칙</button>
+        <button type="button" class="mate-tab" data-type="H">감정</button>
+      </div>
+    </div>
+    <button class="cohabit-reset" id="cohabitRestartBtn">다시하기</button>
+    <button class="cohabit-reset cohabit-newcode" id="cohabitResetBtn">다른 코드 입력</button>
+  </div>
+  <div class="cohabit-body">
+    <div class="cohabit-left">
+<div class="day-end" id="dayEndOverlay"><b>함께 맞춰 간 첫날</b><span>오늘의 미션을 모두 마쳤어요</span></div>
+      <!-- 오늘의 미션 카드 (Figma) - 게임 화면 왼쪽 위. 항목·완료 표시는 부엌 스크립트 renderMissionCard가 채운다 -->
+      <div class="mission-card" id="missionCard">
+        <div class="mc-title">오늘의 미션</div>
+        <!-- v.8 금전형과 같은 모션: 처음엔 제목만 보이는 접힌 카드로 나타났다가 아래로 부드럽게 펼쳐진다 (.show → .open) -->
+        <div class="mc-body"><div>
+        <ul class="mc-list" id="missionCardList"></ul>
+        <div class="mc-rate"><span>완료율</span><span id="missionCardRate">0%</span></div>
+        <div class="mc-bar"><i id="missionCardBar"></i></div>
+        </div></div>
+<div class="mission-hint" id="missionHint">
+        <div class="mh-side">
+        <svg class="mh-icon" viewBox="18 10 87.5 87.5" aria-hidden="true">
+          <path d="M18.5038 10.1703C18.3754 21.4329 22.5935 32.7383 31.1903 41.3352C37.9885 48.1334 46.489 52.1909 55.3106 53.5292C46.489 54.8674 37.9992 58.9356 31.201 65.7232C22.6149 74.3093 18.3968 85.5933 18.5145 96.8344C29.7664 96.9522 41.0504 92.7341 49.6258 84.148C56.4348 77.339 60.4923 68.8386 61.8305 59.9955C63.1581 68.8493 67.2263 77.3604 74.0352 84.1801C82.6214 92.7662 93.9268 96.995 105.189 96.8666C105.318 85.604 101.1 74.3093 92.5029 65.7125C85.7046 58.9142 77.2042 54.8567 68.3825 53.5185C77.2042 52.1802 85.6939 48.112 92.4922 41.3244C101.078 32.7383 105.296 21.4436 105.179 10.1917C93.9268 10.0633 82.6321 14.2921 74.0459 22.8782C67.237 29.6872 63.1795 38.1876 61.8412 47.0307C60.5137 38.1769 56.4455 29.6657 49.6365 22.8461C41.0504 14.26 29.7557 10.0419 18.5038 10.1596V10.1703Z" fill="#FF9696"/>
+          <circle cx="61.85" cy="53.6" r="13.6" fill="#fff"/>
+        </svg>
+        <span class="mh-label">힌트</span>
+        </div>
+        <div class="mh-bubble" id="missionHintText"></div>
+      </div>
+      </div>
+      <div class="room-stage" id="kitchenRoomStage">
+        <div id="cohabit-game-container">
+<div class="kitchen-view" id="kitchenGameView">
+  <div class="kitchenScene" id="kitchenScene">
+    <img class="kitchen-layer-bg" id="kitchenBgImg" src="object/kitchen_bg22.png" alt="부엌 배경" draggable="false" />
+
+    <img class="kitchen-layer-fridge" id="kitchenFridgeImg" src="object/fridge/fridge_nomal.png" alt="냉장고" draggable="false" />
+
+    <div class="kitchen-fridge-icon" id="kitchenFridgeIcon">
+      <img class="kitchen-fridge-icon-img" src="object/alert_pin.svg" alt="냉장고 확인 알림" draggable="false" />
+    </div>
+
+    <!-- 두 번째 미션: 반찬 구독(미션1)이 끝나면 화면 오른쪽 하단에 나타나는 다용도실 이동 버튼 -->
+
+    <!-- 서은민(A) 미션1(가사·매너 규칙)이 끝나면 화면 오른쪽 하단에 나타나는 거실 이동 버튼 -->
+
+    <!-- 서은민(A) 메이트 - 부엌/거실을 자유롭게 오가며 걷는다(kitchen-game.js 4-1-B). 강은지(S)의
+         #kitchenMate(제자리 NPC)와는 별개 요소. 플레이어보다 DOM상 앞에 둬서 같은 z-index일 때는
+         관람객 아바타가 위에 보이게 한다. -->
+    <div class="kitchenSeoMate" id="kitchenSeoMate">
+      <div class="kitchenPlayer-anchor">
+        <img class="kitchenPlayer-sprite" id="kitchenSeoMateSprite" src="object/mate2/mate_women_2_front.png" alt="메이트 캐릭터" draggable="false" />
+      </div>
+    </div>
+
+    <div class="kitchenPlayer" id="kitchenPlayer">
+      <div class="kitchenPlayer-anchor">
+        <img class="kitchenPlayer-sprite" id="kitchenPlayerSprite" src="object/character1/cha_front.png" alt="플레이어 캐릭터" draggable="false" />
+      </div>
+      <!-- 충돌 판정 기준점(발끝 중심점) 시각화 - 디버그 모드에서만 표시 -->
+    </div>
+
+    <!-- 메이트(금전형 강은지/강지혁) - 조작 없이 부엌 바닥을 혼자 돌아다닌다. 크기·걷기 흔들림은 플레이어와 같은 클래스 -->
+    <div class="kitchenPlayer kitchenMate" id="kitchenMate" style="display:none">
+      <div class="kitchenPlayer-anchor">
+        <img class="kitchenPlayer-sprite" id="kitchenMateSprite" alt="메이트" draggable="false" />
+      </div>
+    </div>
+
+    <!-- 캐릭터 머리 위 말풍선 (예: 게임 시작 10초 후 배고픔 대사) - 원래는 .kitchenPlayer
+         안에 중첩돼 있었지만, .kitchenPlayer는 테이블과의 앞/뒤 깊이 정렬 때문에
+         z-index가 9<->11로 계속 바뀌어서 말풍선까지 테이블에 가려지는 문제가 있었다.
+         말풍선은 항상 맨 위에 보여야 하므로 형제 요소로 분리했다 (JS의 setPlayerStyle이
+         캐릭터와 같은 좌표로 위치를 맞춰준다). -->
+    <div class="kitchen-player-bubble" id="kitchenPlayerBubble"></div>
+    <!-- 메이트 머리 위 말풍선 (게임 시작 때 메이트가 냉장고로 이끄는 말) - 위치는 메이트 자리(MATE_POS)로 JS가 맞춘다 -->
+    <div class="kitchen-player-bubble" id="kitchenMateBubble"></div>
+
+    <img class="kitchen-layer-table" id="kitchenTableImg" src="object/table.png" alt="식탁" draggable="false" />
+
+    <!-- 서은민(A) 전용 오브젝트: 밥먹는 식탁 (서은민 부엌 화면일 때만 CSS로 보임) -->
+    <!-- 서은민(A) 부엌의 설거지 더미·쓰레기 (미션 전 지저분한 모습) - 누르면 싱크대·쓰레기통 핀과 같다, 🍽/🗑 튜너로 위치·크기 조절 -->
+    <img class="kitchen-layer-eunmin-mess" id="kitchenDishWashImg" src="object/dish wash.png" alt="설거지 더미" draggable="false" />
+    <img class="kitchen-layer-eunmin-mess" id="kitchenTrashImg" src="object/trash.png" alt="쓰레기" draggable="false" />
+    <img class="kitchen-layer-dining-table" id="kitchenDiningTableImg" src="object/table.png" alt="밥먹는 식탁" draggable="false" />
+
+    <!-- 다용도실 전용 오브젝트: 빨래더미 (다용도실 화면일 때만 CSS로 보임) -->
+    <img class="kitchen-layer-laundry" id="kitchenLaundryImg" src="object/laundry/laundry_not.png" alt="빨래더미" draggable="false" />
+
+    <!-- 세탁물 미션(생활빨래 단체권 신청)이 끝나면 지저분한 빨래더미 대신 이 두 이미지(빨래
+         바구니 + 개킨 옷더미)로 바뀐다. kitchenScene에 kitchen-laundry-resolved 클래스가
+         붙으면(kitchen:laundry-resolved) CSS가 서로 크로스페이드로 교체한다. -->
+    <img class="kitchen-layer-laundry-basket" id="kitchenLaundryBasketImg" src="object/laundry/laundry_finish.png" alt="빈 빨래 바구니" draggable="false" />
+    <img class="kitchen-layer-laundry-clothes" id="kitchenLaundryClothesImg" src="object/laundry/laundry.png" alt="개킨 빨래" draggable="false" />
+
+    <!-- 세 번째 미션: 다용도실 세탁물 이상표시 (다용도실 화면일 때만 CSS로 보임) -->
+    <div class="kitchen-laundry-icon" id="kitchenLaundryIcon">
+      <img class="kitchen-laundry-icon-img" src="object/alert_pin.svg" alt="세탁물 확인 알림" draggable="false" />
+    </div>
+
+    <!-- 서은민(A) 미션1: 싱크대/쓰레기통 상태이상 (서은민 부엌 화면일 때만 CSS로 보임).
+         둘 중 아무거나 눌러도 미션1(가사·매너 규칙)이 시작된다. -->
+    <div class="kitchen-sink-icon" id="kitchenSinkIcon">
+      <img class="kitchen-sink-icon-img" src="object/alert_pin.svg" alt="싱크대 확인 알림" draggable="false" />
+    </div>
+    <div class="kitchen-bins-icon" id="kitchenBinsIcon">
+      <img class="kitchen-bins-icon-img" src="object/alert_pin.svg" alt="쓰레기통 확인 알림" draggable="false" />
+    </div>
+    <!-- 서은민 메이트 머리 위 말풍선 버튼 - 메이트를 따라다니며 항상 떠 있고, 누르면 서은민/서민호와
+         대화한다(첫 클릭은 인사 선택지 대화, 이후엔 인사). -->
+    <div class="kitchen-bubble-icon" id="kitchenBubbleIcon" title="말을 걸어보세요">
+      <img class="kitchen-bubble-icon-img" src="object/speech_bubble.png" alt="말풍선 상태 버튼" draggable="false" />
+    </div>
+
+    <!-- 서은민(A) 미션2: 거실 식탁 위 정산 종이 상태이상 (거실 화면일 때만 CSS로 보임).
+         누르면 캐릭터가 식탁 앞으로 걸어가서 틈새살림(정산) 화면으로 넘어간다. -->
+    <!-- 감정형(H) 거실: TV 뉴스 화면 + 미션 핀, 켜진 전등 불빛 (CSS로 감정형 거실에서만 보임) -->
+    <img class="kitchen-h-tv kitchen-h-tv-glow" src="object/tv_news.png" alt="" aria-hidden="true" draggable="false" />
+    <img class="kitchen-h-tv" id="kitchenTvImg" src="object/tv_news.png" alt="TV 뉴스" draggable="false" />
+    <div class="kitchen-h-lamp-glow"></div>
+    <div class="kitchen-tv-icon" id="kitchenTvIcon"><img src="object/alert_pin.svg" alt="TV 확인 알림" draggable="false" /></div>
+    <div class="kitchen-tv-icon kitchen-fb-icon" id="kitchenFbIcon"><img src="object/alert_pin.svg" alt="피드백 주고받기 알림" draggable="false" /></div>
+    <!-- 규칙형(A) 거실: 책상 위 정산 고지서 그림 (CSS로 규칙형 거실에서만 보임, 정산 핀과 같이 숨는다 - JS) -->
+    <img class="kitchen-a-notice" id="kitchenANotice" src="object/Payment notice.png" alt="정산 고지서" draggable="false" />
+    <div class="kitchen-paper-icon" id="kitchenPaperIcon">
+      <img class="kitchen-paper-icon-img" src="object/alert_pin.svg" alt="정산 종이 확인 알림" draggable="false" />
+    </div>
+
+
+    <!-- 냉장고 확인 시 뜨는 대화창 (쯔꾸르 게임 스타일 다이얼로그) - 아이소메트릭 방 안에서만 표시 -->
+    <div class="kitchen-dialogue" id="kitchenDialogue">
+      <img class="kitchen-dialogue-portrait" id="kitchenDialoguePortrait" src="object/character1/cha1_sad.png" alt="플레이어 캐릭터" draggable="false" />
+      <!-- 강은지(메이트)가 직접 말하는 대화일 때 쓰는 이모지 초상화 - 사진 에셋이 없어서
+           대신 쓴다 (showKitchenDialogue에 opts.emoji를 넘기면 이쪽이 보인다). -->
+      <div class="kitchen-dialogue-emoji-portrait" id="kitchenDialogueEmojiPortrait"></div>
+      <div class="kitchen-dialogue-box" id="kitchenDialogueBox">
+        <div class="kitchen-dialogue-name-row">
+          <span class="kitchen-dialogue-name" id="kitchenDialogueName">나</span>
+          <img class="kitchen-dialogue-logo" src="object/logo.png" alt="틈 로고" draggable="false" />
+        </div>
+        <div class="kitchen-dialogue-text" id="kitchenDialogueText"></div>
+        <!-- 강은지 엔딩의 갈림길 대화에서만 쓰는 선택지 버튼 영역 - 떠 있는 동안은 화면
+             클릭/엔터로 건너뛸 수 없고, 버튼을 눌러야만 다음으로 진행된다. -->
+        <div class="kitchen-dialogue-choices" id="kitchenDialogueChoices"></div>
+        <div class="kitchen-dialogue-next" id="kitchenDialogueNextArrow">▼</div>
+      </div>
+    </div>
+
+    <!-- 방 전환(부엌 <-> 다용도실) 페이드 오버레이 -->
+    <div class="kitchen-room-fade" id="kitchenRoomFade"></div>
+
+    <!-- 미션1(반찬 공동구독) 완료 시 아이소메트릭 화면 위에 뜨는 폭죽 효과.
+         팝업 카드 대신 아래의 캐릭터 대화창(kitchenDialogue)이 함께 뜬다
+         (kitchen:show-celebrate 이벤트로 켜짐). -->
+    <div class="kitchen-celebrate" id="kitchenCelebrate">
+      <div class="kitchen-confetti" aria-hidden="true">
+        <span></span><span></span><span></span><span></span><span></span><span></span>
+        <span></span><span></span><span></span><span></span><span></span><span></span>
+        <span></span><span></span><span></span><span></span><span></span><span></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div>
+        <svg class="room-svg" viewBox="0 0 1040 980" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="holoGrad" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#ffd6e6"/>
+              <stop offset="0.35" stop-color="#c9f0ff"/>
+              <stop offset="0.7" stop-color="#fff3c4"/>
+              <stop offset="1" stop-color="#ffd6e6"/>
+            </linearGradient>
+          </defs>
+
+          <!-- room shell -->
+          <polygon points="60,190 560,50 560,560 60,680" fill="#eef5fb" stroke="#33413a" stroke-width="6" stroke-linejoin="round"/>
+          <polygon points="560,50 940,155 940,545 560,560" fill="#e2edf7" stroke="#33413a" stroke-width="6" stroke-linejoin="round"/>
+          <polygon points="60,680 560,560 940,545 430,860" fill="#f4f8fb" stroke="#33413a" stroke-width="6" stroke-linejoin="round"/>
+
+          <!-- ambient stars -->
+          <g fill="#ffffff" stroke="#33413a" stroke-width="1.5">
+            <circle cx="160" cy="120" r="4"/>
+            <circle cx="340" cy="90" r="4"/>
+            <circle cx="480" cy="330" r="4"/>
+            <circle cx="650" cy="90" r="4"/>
+            <circle cx="800" cy="260" r="4"/>
+            <circle cx="905" cy="200" r="4"/>
+            <circle cx="905" cy="420" r="4"/>
+            <circle cx="120" cy="450" r="4"/>
+          </g>
+
+          <!-- AC unit -->
+          <rect x="95" y="98" width="230" height="68" rx="10" fill="#ffffff" stroke="#33413a" stroke-width="5"/>
+          <g stroke="#9fb2bd" stroke-width="4" stroke-linecap="round">
+            <line x1="118" y1="120" x2="298" y2="120"/>
+            <line x1="118" y1="132" x2="298" y2="132"/>
+            <line x1="118" y1="144" x2="298" y2="144"/>
+            <line x1="118" y1="156" x2="298" y2="156"/>
+          </g>
+
+          <!-- curtain rod + curtains + window -->
+          <line x1="175" y1="230" x2="450" y2="203" stroke="#33413a" stroke-width="6" stroke-linecap="round"/>
+          <circle cx="175" cy="230" r="9" fill="#33413a"/>
+          <circle cx="450" cy="203" r="9" fill="#33413a"/>
+
+          <rect x="163" y="230" width="42" height="215" rx="8" fill="#dfe4e7" stroke="#33413a" stroke-width="4"/>
+          <g stroke="#b8c1c6" stroke-width="2.5">
+            <line x1="175" y1="234" x2="175" y2="441"/>
+            <line x1="187" y1="234" x2="187" y2="441"/>
+            <line x1="197" y1="234" x2="197" y2="441"/>
+          </g>
+          <rect x="405" y="222" width="42" height="215" rx="8" fill="#dfe4e7" stroke="#33413a" stroke-width="4"/>
+          <g stroke="#b8c1c6" stroke-width="2.5">
+            <line x1="417" y1="226" x2="417" y2="433"/>
+            <line x1="427" y1="226" x2="427" y2="433"/>
+            <line x1="437" y1="226" x2="437" y2="433"/>
+          </g>
+
+          <rect x="200" y="235" width="210" height="185" fill="#eef7fc" stroke="#33413a" stroke-width="6"/>
+          <line x1="305" y1="235" x2="305" y2="420" stroke="#33413a" stroke-width="5"/>
+          <line x1="200" y1="327" x2="410" y2="327" stroke="#33413a" stroke-width="5"/>
+
+          <!-- frame cluster -->
+          <g fill="#ffffff" stroke="#33413a" stroke-width="4">
+            <rect x="95" y="335" width="88" height="72" rx="6"/>
+            <rect x="197" y="350" width="66" height="60" rx="6"/>
+            <rect x="185" y="422" width="90" height="108" rx="6" fill="#2c3648"/>
+            <rect x="95" y="432" width="82" height="92" rx="6"/>
+          </g>
+          <path d="M132,344 A19,19 0 1 0 132,382 A14,14 0 1 1 132,344 Z" fill="#ecd98f" stroke="#33413a" stroke-width="3" stroke-linejoin="round"/>
+          <g fill="#ffffff" stroke="#33413a" stroke-width="2.5" stroke-linejoin="round">
+            <circle cx="153" cy="383" r="9"/>
+            <circle cx="164" cy="378" r="11"/>
+            <circle cx="175" cy="384" r="8"/>
+          </g>
+          <g fill="#ecd98f" stroke="none">
+            <circle cx="215" cy="372" r="5"/>
+            <circle cx="236" cy="392" r="7"/>
+            <circle cx="249" cy="365" r="4"/>
+          </g>
+          <g stroke="#fff" stroke-width="4" fill="none" stroke-linecap="round">
+            <circle cx="230" cy="470" r="18"/>
+            <circle cx="217" cy="452" r="8"/>
+            <circle cx="243" cy="452" r="8"/>
+          </g>
+          <g stroke="#33413a" stroke-width="3" fill="none" stroke-linecap="round">
+            <circle cx="136" cy="478" r="20"/>
+            <circle cx="120" cy="458" r="9"/>
+            <circle cx="152" cy="458" r="9"/>
+            <circle cx="129" cy="480" r="2.5" fill="#33413a"/>
+            <circle cx="143" cy="480" r="2.5" fill="#33413a"/>
+          </g>
+
+          <!-- standing wall fan -->
+          <rect x="478" y="222" width="24" height="34" rx="4" fill="#c7d0d4" stroke="#33413a" stroke-width="4"/>
+          <circle cx="490" cy="148" r="72" fill="#ffffff" stroke="#33413a" stroke-width="5"/>
+          <circle cx="490" cy="148" r="50" fill="none" stroke="#9fb2bd" stroke-width="3"/>
+          <line x1="490" y1="98" x2="490" y2="198" stroke="#9fb2bd" stroke-width="3"/>
+          <line x1="440" y1="148" x2="540" y2="148" stroke="#9fb2bd" stroke-width="3"/>
+          <circle cx="490" cy="148" r="11" fill="#33413a"/>
+
+          <!-- right wall decor -->
+          <g transform="rotate(-4 655 270)">
+            <rect x="580" y="185" width="150" height="170" rx="8" fill="url(#holoGrad)" stroke="#33413a" stroke-width="5"/>
+          </g>
+          <g transform="rotate(3 645 455)">
+            <rect x="580" y="380" width="130" height="150" rx="8" fill="#ffffff" stroke="#33413a" stroke-width="5"/>
+            <path d="M645,470 C625,450 625,425 645,432 C665,425 665,450 645,470 Z" fill="#499963" stroke="#33413a" stroke-width="3"/>
+          </g>
+          <circle cx="762" cy="232" r="40" fill="#f6dfe4" stroke="#33413a" stroke-width="5"/>
+          <rect x="738" y="315" width="85" height="85" rx="8" fill="#ffffff" stroke="#33413a" stroke-width="4"/>
+          <g stroke="#33413a" stroke-width="3" fill="none" stroke-linecap="round">
+            <circle cx="762" cy="345" r="14"/>
+            <path d="M752,368 q10,10 20,0"/>
+          </g>
+
+          <ellipse cx="858" cy="258" rx="48" ry="40" fill="#dcecf7" stroke="#33413a" stroke-width="5"/>
+          <g stroke="#33413a" stroke-width="4" fill="none" stroke-linecap="round">
+            <path d="M825,285 Q828,320 820,350"/>
+            <path d="M842,292 Q846,325 838,358"/>
+            <path d="M858,295 Q858,328 858,362"/>
+            <path d="M874,292 Q870,325 878,358"/>
+            <path d="M891,285 Q888,320 896,350"/>
+          </g>
+
+          <circle cx="878" cy="140" r="55" fill="#fdfdfb" stroke="#33413a" stroke-width="6"/>
+          <line x1="878" y1="140" x2="878" y2="105" stroke="#33413a" stroke-width="5" stroke-linecap="round"/>
+          <line x1="878" y1="140" x2="902" y2="152" stroke="#33413a" stroke-width="5" stroke-linecap="round"/>
+          <circle cx="878" cy="140" r="5" fill="#33413a"/>
+
+          <circle cx="962" cy="175" r="33" fill="#e7edf0" stroke="#33413a" stroke-width="5"/>
+          <g stroke="#9fb2bd" stroke-width="3">
+            <line x1="962" y1="150" x2="962" y2="200"/>
+            <line x1="937" y1="175" x2="987" y2="175"/>
+            <line x1="944" y1="157" x2="980" y2="193"/>
+            <line x1="980" y1="157" x2="944" y2="193"/>
+          </g>
+
+          <rect x="843" y="322" width="90" height="188" rx="6" fill="#ffffff" stroke="#33413a" stroke-width="5"/>
+          <line x1="843" y1="352" x2="933" y2="352" stroke="#33413a" stroke-width="3"/>
+          <g fill="#f3b6c2" stroke="none">
+            <rect x="856" y="368" width="12" height="12"/>
+            <rect x="900" y="384" width="12" height="12"/>
+            <rect x="878" y="400" width="12" height="12"/>
+            <rect x="856" y="432" width="12" height="12"/>
+            <rect x="900" y="464" width="12" height="12"/>
+          </g>
+          <g stroke="#dfe4e7" stroke-width="2">
+            <line x1="856" y1="384" x2="912" y2="384"/>
+            <line x1="856" y1="400" x2="912" y2="400"/>
+            <line x1="856" y1="416" x2="912" y2="416"/>
+            <line x1="856" y1="432" x2="912" y2="432"/>
+            <line x1="856" y1="448" x2="912" y2="448"/>
+            <line x1="856" y1="464" x2="912" y2="464"/>
+            <line x1="856" y1="480" x2="912" y2="480"/>
+          </g>
+
+          <!-- bed -->
+          <rect x="560" y="528" width="290" height="92" rx="16" fill="#6b4a35" stroke="#33413a" stroke-width="6"/>
+          <rect x="560" y="608" width="290" height="172" rx="22" fill="#dfe4e7" stroke="#33413a" stroke-width="6"/>
+          <rect x="588" y="578" width="120" height="82" rx="18" fill="#eef0f1" stroke="#33413a" stroke-width="5"/>
+
+          <!-- nightstand + lamp + teddy -->
+          <rect x="850" y="655" width="112" height="122" rx="8" fill="#ffffff" stroke="#33413a" stroke-width="5"/>
+          <line x1="862" y1="696" x2="950" y2="696" stroke="#33413a" stroke-width="3"/>
+          <line x1="862" y1="737" x2="950" y2="737" stroke="#33413a" stroke-width="3"/>
+          <circle cx="875" cy="678" r="5" fill="#c9a24a"/>
+          <circle cx="875" cy="717" r="5" fill="#c9a24a"/>
+
+          <line x1="933" y1="602" x2="933" y2="655" stroke="#33413a" stroke-width="5" stroke-linecap="round"/>
+          <path d="M910,602 L956,602 L942,568 L924,568 Z" fill="#f0c14b" stroke="#33413a" stroke-width="4" stroke-linejoin="round"/>
+
+          <g stroke="#33413a" stroke-width="4" fill="#e7c39a" stroke-linejoin="round">
+            <circle cx="838" cy="647" r="46"/>
+            <circle cx="806" cy="583" r="24"/>
+            <circle cx="866" cy="583" r="24"/>
+            <circle cx="838" cy="595" r="46"/>
+            <ellipse cx="793" cy="638" rx="20" ry="30"/>
+            <ellipse cx="883" cy="638" rx="20" ry="30"/>
+          </g>
+          <ellipse cx="838" cy="608" rx="20" ry="15" fill="#f6e3c8" stroke="#33413a" stroke-width="3"/>
+          <circle cx="828" cy="592" r="4" fill="#33413a" stroke="none"/>
+          <circle cx="850" cy="592" r="4" fill="#33413a" stroke="none"/>
+
+          <!-- laundry basket -->
+          <path d="M848,742 L940,742 L928,832 Q894,850 862,832 Z" fill="#faf3df" stroke="#33413a" stroke-width="5" stroke-linejoin="round"/>
+          <path d="M852,742 Q894,700 936,742" fill="none" stroke="#33413a" stroke-width="4"/>
+          <path d="M860,748 Q862,790 848,820" fill="#8fb8e0" stroke="#33413a" stroke-width="4" stroke-linejoin="round"/>
+
+          <!-- moon cushion + mat -->
+          <g transform="rotate(-6 235 785)">
+            <rect x="90" y="740" width="290" height="130" rx="30" fill="#cfc6ea" stroke="#33413a" stroke-width="5"/>
+          </g>
+          <path d="M300,650 A150,150 0 1 0 300,890 A115,115 0 1 1 300,650 Z" fill="#faf3df" stroke="#33413a" stroke-width="5" stroke-linejoin="round"/>
+
+          <!-- chair -->
+          <rect x="325" y="655" width="72" height="128" rx="16" fill="#3a4a52" stroke="#33413a" stroke-width="5"/>
+          <rect x="315" y="778" width="96" height="36" rx="10" fill="#425560" stroke="#33413a" stroke-width="5"/>
+          <line x1="325" y1="812" x2="315" y2="880" stroke="#33413a" stroke-width="5" stroke-linecap="round"/>
+          <line x1="400" y1="812" x2="410" y2="880" stroke="#33413a" stroke-width="5" stroke-linecap="round"/>
+
+          <!-- desk -->
+          <rect x="335" y="822" width="390" height="26" rx="6" fill="#ffffff" stroke="#33413a" stroke-width="5"/>
+          <line x1="355" y1="848" x2="345" y2="940" stroke="#33413a" stroke-width="5" stroke-linecap="round"/>
+          <line x1="700" y1="848" x2="710" y2="940" stroke="#33413a" stroke-width="5" stroke-linecap="round"/>
+
+          <!-- checkered rug -->
+          <g stroke="#33413a" stroke-width="2.5">
+            <rect x="352" y="852" width="336" height="86" fill="#ffffff"/>
+            <g fill="#33413a">
+              <rect x="352" y="852" width="42" height="43"/>
+              <rect x="436" y="852" width="42" height="43"/>
+              <rect x="520" y="852" width="42" height="43"/>
+              <rect x="604" y="852" width="42" height="43"/>
+              <rect x="394" y="895" width="42" height="43"/>
+              <rect x="478" y="895" width="42" height="43"/>
+              <rect x="562" y="895" width="42" height="43"/>
+              <rect x="646" y="895" width="42" height="43"/>
+            </g>
+          </g>
+
+          <!-- sparkle -->
+          <path d="M985,895 L992,915 L1012,922 L992,929 L985,949 L978,929 L958,922 L978,915 Z" fill="#c7d0d4" stroke="#33413a" stroke-width="3" stroke-linejoin="round"/>
+        </svg>
+
+        <div class="room-avatar" style="left:38%; top:57%;">
+          <div class="room-avatar-badge clay-point" id="mateAvatarBadge">☕</div>
+          <div class="room-avatar-name" id="mateAvatarName">김정희</div>
+        </div>
+
+        <div class="room-avatar" style="left:23%; top:70%;">
+          <div class="room-avatar-badge clay-point" id="visitorAvatarBadge">🙂</div>
+          <div class="room-avatar-name" id="visitorAvatarName">나</div>
+        </div>
+      </div>
+      <div class="cohabit-left-dim" id="cohabitLeftDim"></div>
+    </div>
+    <div class="cohabit-right" id="cohabitRight">
+      <!-- 미션 안내 말풍선 - 폰 바깥 왼쪽에 떠서 앱 내용을 가리지 않고, 화살표가 지금 눌러야 할
+           (또는 보고 있는) 버튼 높이를 가리킨다 (app-tablet.js eg*). -->
+      <div class="app-guide-col" id="appGuideCol">
+        <div class="app-guide-bubble" id="appGuideBubble">
+          <div class="app-guide-head">
+            <span class="app-guide-chip" id="appGuideChip"></span>
+            <span class="app-guide-progress" id="appGuideProgress"></span>
+          </div>
+          <p class="app-guide-text" id="appGuideText"></p>
+          <button type="button" class="app-guide-next" id="appGuideNext">다음 ▶</button>
+        </div>
+      </div>
+      <!-- 폰 목업 껍데기 - 서랍 레이아웃(강은지·서은민)에서만 베젤/버튼/다이나믹 아일랜드가 보이고,
+           평소에는 display:contents라 없는 것처럼 동작한다 -->
+      <div class="phone-mockup" id="phoneMockup">
+      <div class="app-mock clay">
+        <div class="app-top-toast" id="appTopToast">
+          <span class="tn-icon"><svg width="34" height="35" viewBox="47 46 34 35" fill="none" aria-hidden="true">
+            <path d="M77.7842 50.1913C74.0661 46.4617 68.0274 46.4526 64.2934 50.1596C60.5595 46.4549 54.5207 46.464 50.8026 50.1913C47.0982 53.9074 47.0687 59.888 50.7051 63.6448C47.0687 67.4016 47.0959 73.3844 50.8026 77.0982C54.5207 80.8279 60.5595 80.8369 64.2934 77.1299C68.0274 80.8347 74.0661 80.8256 77.7842 77.0982C81.4887 73.3822 81.5182 67.4016 77.8818 63.6448C81.5182 59.888 81.4909 53.9051 77.7842 50.1913Z" fill="#537954"/>
+            <path d="M67.9069 67.2535C69.9029 65.2611 69.9029 62.0307 67.9069 60.0383C65.911 58.0458 62.6749 58.0458 60.679 60.0383C58.683 62.0307 58.683 65.2611 60.679 67.2535C62.6749 69.2459 65.911 69.2459 67.9069 67.2535Z" fill="#A6C673"/>
+          </svg></span>
+          <div class="tn-text">
+            <div class="tn-head"><b>틈</b><span id="appTopToastTime"></span></div>
+            <div class="tn-title"><div id="appTopToastTitle"></div></div>
+            <div class="tn-body"><div id="appTopToastBody"></div></div>
+          </div>
+          <svg class="tn-chev" viewBox="456 59.5 16 9" fill="none" aria-hidden="true"><path fill-rule="evenodd" clip-rule="evenodd" d="M471.651 59.8417C471.186 59.3861 470.431 59.3861 469.966 59.8417L464 65.6834L458.034 59.8417C457.569 59.3861 456.814 59.3861 456.349 59.8417C455.884 60.2973 455.884 61.036 456.349 61.4916L463.157 68.1583C463.623 68.6139 464.377 68.6139 464.843 68.1583L471.651 61.4916C472.116 61.036 472.116 60.2973 471.651 59.8417Z" fill="#A1A1A1"/></svg>
+        </div>
+        <button type="button" class="app-flush-back-btn" id="appFlushBackBtn">‹</button>
+        <div class="app-topbar">
+          <button class="app-back" id="appBackBtn" style="visibility:hidden;">‹</button>
+          <div class="app-mock-header">🏠 틈</div>
+          <span style="width:28px;"></span>
+        </div>
+
+        <div class="app-content">
+          <div class="app-screen active" id="appHome">
+            <div id="appHomeDefault">
+            <div class="app-home-header">
+              <div class="app-home-title">틈새살림</div>
+              <div class="app-bell" id="appBell">🔔</div>
+            </div>
+
+            <div class="settle-hero clay" id="settleHero">
+              <div class="settle-hero-label">🍀 금액 정산</div>
+
+              <div id="heroEmptyState">
+                <div class="settle-hero-empty">고지서를 등록해<br/>이번 달 지출액을 빠르게 계산해보세요!</div>
+              </div>
+
+              <div id="heroFilledState" style="display:none;">
+                <div class="settle-hero-filled-row">
+                  <div>
+                    <div class="settle-hero-caption">이번달 지출액</div>
+                    <div class="settle-hero-amount"><span id="heroAmount">785,680</span><span>원</span></div>
+                    <div class="settle-hero-sub">이번 달 틈새살림 대기 1건</div>
+                  </div>
+                  <svg width="58" height="42" viewBox="0 0 64 46">
+                    <rect x="2" y="10" width="14" height="36" rx="5" fill="#f5a39a"/>
+                    <rect x="24" y="18" width="14" height="28" rx="5" fill="#4f9e6c"/>
+                    <rect x="46" y="26" width="14" height="20" rx="5" fill="#bcdcc2"/>
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            <div class="card-row">
+              <div class="mini-card">
+                <div class="mini-card-title">틈새살이 리포트</div>
+                <div class="mini-card-sub">리포트를 모두 확인했어요.<br/>서로 배려한 따듯한 달이었네요!</div>
+                <svg width="72" height="42" viewBox="0 0 100 58" style="margin-top:6px;">
+                  <path d="M10,55 A45,45 0 0,1 90,55" fill="none" stroke="#e4ece6" stroke-width="10" stroke-linecap="round"/>
+                  <path d="M10,55 A45,45 0 0,1 90,55" fill="none" stroke="#4f9e6c" stroke-width="10" stroke-linecap="round" stroke-dasharray="141.3" stroke-dashoffset="11.3"/>
+                  <text x="50" y="48" text-anchor="middle" font-size="15" fill="#1f2822" font-family="Jua">92<tspan font-size="9" fill="#75827a">/100</tspan></text>
+                </svg>
+              </div>
+              <div class="mini-card">
+                <div class="mini-card-title">상호 피드백</div>
+                <div class="mini-card-sub">피드백 대기 1건</div>
+                <div style="font-size:22px; margin-top:6px;">💬</div>
+                <button class="mini-card-btn" type="button">피드백 작성하기</button>
+              </div>
+            </div>
+
+            <div class="app-bottom-nav">
+              <div class="nav-item" data-screen="alley"><span class="nav-icon">🏪</span>골목 생활</div>
+              <div class="nav-item active" data-screen="home"><span class="nav-icon">📆</span>틈새살림</div>
+              <div class="nav-item"><span class="nav-icon">🏠</span>홈</div>
+              <div class="nav-item"><span class="nav-icon">💬</span>채팅</div>
+              <div class="nav-item"><span class="nav-icon">👤</span>마이</div>
+            </div>
+            </div>
+
+            <!-- 서은민(A) 전용 홈 화면 - 골목생활 기반 강은지 미션과 달리, 태블릿에서
+                 [우리 규칙]/[틈새살림] 두 화면으로 바로 들어가는 간단한 메뉴로 구성한다. -->
+            <div id="appHomeEunmin" style="display:none;">
+              <div class="app-home-header">
+                <div class="app-home-title">🏡 우리 집</div>
+              </div>
+              <div class="settle-hero clay" id="eunminRulesCard" style="cursor:var(--cur-hand);">
+                <div class="settle-hero-label">📋 우리 규칙</div>
+                <div class="settle-hero-empty">가사·매너 규칙을 등록하고<br/>분담 체크를 진행해보세요!</div>
+              </div>
+              <div class="settle-hero clay" id="eunminLivingCard" style="cursor:var(--cur-hand); margin-top:12px;">
+                <div class="settle-hero-label">📆 틈새살림</div>
+                <div class="settle-hero-empty">이번 달 지출을 확인하고<br/>메이트에게 정산을 요청해보세요!</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="app-screen" id="appRules">
+            <!-- 서은민 미션1(가사·매너 규칙) 화면 - app_2/index.html을 그대로 통짜로 iframe에 넣는다. -->
+            <iframe class="alley-app1-frame" id="appRulesFrame" src="app_2/index.html" title="우리 규칙"></iframe>
+          </div>
+
+          <div class="app-screen" id="appLiving">
+            <!-- 서은민 미션2(틈새살림 정산) 화면 - app_3/index.html을 그대로 통짜로 iframe에 넣는다. -->
+            <iframe class="alley-app1-frame" id="appLivingFrame" src="app_3/index.html" title="틈새살림"></iframe>
+          </div>
+
+          <div class="app-screen" id="appEmotion">
+            <!-- 감정형 TV 미션(전기세 안건 → AI 물어보기) 화면 - app_4/index.html을 그대로 통짜로 iframe에 넣는다. -->
+            <iframe class="alley-app1-frame" id="appEmotionFrame" src="app_4/index.html" title="틈 홈"></iframe>
+          </div>
+
+          <div class="app-screen" id="appNotification">
+            <div class="app-home-header">
+              <div class="app-home-title">🔔 알림</div>
+            </div>
+
+            <div class="noti-list">
+              <div class="noti-item">
+                <div class="noti-item-icon">🧺</div>
+                <div>
+                  <div class="noti-item-title">이번 주 빨래 당번은 나예요</div>
+                  <div class="noti-item-time">3일 전</div>
+                </div>
+              </div>
+              <div class="noti-item">
+                <div class="noti-item-icon">🧹</div>
+                <div>
+                  <div class="noti-item-title">청소 체크리스트가 갱신됐어요</div>
+                  <div class="noti-item-time">5일 전</div>
+                </div>
+              </div>
+              <div class="noti-item">
+                <div class="noti-item-icon">💬</div>
+                <div>
+                  <div class="noti-item-title">메이트가 상호 피드백을 남겼어요</div>
+                  <div class="noti-item-time">1주 전</div>
+                </div>
+              </div>
+            </div>
+
+            <button class="noti-send-btn" id="notiSendBtn" type="button">✨ 이번 주 생활 규칙 및 가사 분담 알림 보내기</button>
+          </div>
+
+          <div class="app-screen" id="appSettle">
+            <div class="settle2-headline">이번 달 우리 집 총 지출은<br/><b id="settleHeadlineAmount">0</b>원이에요.</div>
+            <div class="settle2-sub" id="settleSubText">고지서를 등록하면 지난달과 비교해드려요.</div>
+
+            <div class="segbar" id="segBar"><span style="width:100%; background:#e3e8e4;"></span></div>
+
+            <div class="cat-list">
+              <div class="cat-row">
+                <div class="cat-left">💧 수도 <span class="cat-pct" id="pctWater">-</span></div>
+                <div class="cat-amount-box"><span id="amtWater">0</span><span class="unit">원</span></div>
+              </div>
+              <div class="cat-row">
+                <div class="cat-left">⚡ 전기 <span class="cat-pct" id="pctElec">-</span></div>
+                <div class="cat-amount-box"><span id="amtElec">0</span><span class="unit">원</span></div>
+              </div>
+              <div class="cat-row">
+                <div class="cat-left">🔥 난방 <span class="cat-pct" id="pctHeat">-</span></div>
+                <div class="cat-amount-box"><span id="amtHeat">0</span><span class="unit">원</span></div>
+              </div>
+              <div class="cat-row">
+                <div class="cat-left">🔧 관리비 <span class="cat-pct" id="pctMgmt">-</span></div>
+                <div class="cat-amount-box"><span id="amtMgmt">0</span><span class="unit">원</span></div>
+              </div>
+              <div class="cat-row">
+                <div class="cat-left">🏠 월세 <span class="cat-pct" id="pctRent">-</span></div>
+                <div class="cat-amount-box"><span id="amtRent">0</span><span class="unit">원</span></div>
+              </div>
+            </div>
+
+            <div class="add-row">
+              <button class="add-btn" id="addPhotoBtn" type="button">📷 고지서 사진으로 추가</button>
+              <button class="add-btn" id="addManualBtn" type="button">✏️ 직접 항목 추가</button>
+            </div>
+
+            <div class="summary-rows">
+              <div class="summary-row"><span>전체 금액</span><span id="sumTotal">0원</span></div>
+              <div class="summary-row"><span>메이트와 나눌 금액</span><span id="sumSplit">- 0원</span></div>
+              <div class="summary-row total"><span>내가 지불해야 될 금액</span><b id="sumMine">0원</b></div>
+            </div>
+
+            <button class="btn-settle-submit" id="submitSettleBtn" disabled>이번 달 금액 정산 진행하기</button>
+          </div>
+
+          <div class="app-screen" id="appReport">
+            <div class="settle2-headline">이번 달 우리 집 총 지출은<br/><b>728,630</b>원이에요.</div>
+            <div class="settle2-sub">지난달보다 전체 금액이 21% 늘었어요.</div>
+
+            <div class="segbar">
+              <span style="width:55%; background:#4f9e6c;"></span>
+              <span style="width:15%; background:#bcdcc2;"></span>
+              <span style="width:15%; background:#f6b8c2;"></span>
+              <span style="width:10%; background:#ef8c86;"></span>
+              <span style="width:5%; background:#e3e8e4;"></span>
+            </div>
+
+            <div class="cat-list">
+              <div class="cat-row"><div class="cat-left">💧 수도 <span class="cat-pct">3.40%</span></div><div class="cat-amount-box">26,590<span class="unit">원</span></div></div>
+              <div class="cat-row"><div class="cat-left">⚡ 전기 <span class="cat-pct">6.83%</span></div><div class="cat-amount-box">53,400<span class="unit">원</span></div></div>
+              <div class="cat-row"><div class="cat-left">🔥 난방 <span class="cat-pct">3.95%</span></div><div class="cat-amount-box">30,910<span class="unit">원</span></div></div>
+              <div class="cat-row"><div class="cat-left">🔧 관리비 <span class="cat-pct">7.67%</span></div><div class="cat-amount-box">60,000<span class="unit">원</span></div></div>
+              <div class="cat-row"><div class="cat-left">🏠 월세 <span class="cat-pct">78.14%</span></div><div class="cat-amount-box">610,910<span class="unit">원</span></div></div>
+            </div>
+
+            <div class="summary-rows">
+              <div class="summary-row"><span>전체 금액</span><span>781,810원</span></div>
+              <div class="summary-row"><span>메이트와 나눌 금액</span><span>- 390,905원</span></div>
+              <div class="summary-row total"><span>내가 지불해야 될 금액</span><b>390,905원</b></div>
+            </div>
+
+            <button class="btn-edit-disabled" type="button">수정하기</button>
+
+            <div class="insight-card">
+              <div class="insight-title">수도세와 기타 비용이<br/>지난달보다 5.5% 상승했어요.</div>
+              <div class="insight-sub">샤워 시간이나 세탁 횟수 등 공동 규칙을 한번 점검해 볼까요?</div>
+              <div class="insight-legend"><span><span class="legend-dot" style="background:#f0a19a;"></span>지난 달</span><span><span class="legend-dot" style="background:#4f9e6c;"></span>이번 달</span></div>
+              <svg width="100%" height="88" viewBox="0 0 220 90" preserveAspectRatio="xMidYMid meet">
+                <rect x="14" y="38" width="12" height="42" rx="3" fill="#f0a19a"/>
+                <rect x="28" y="28" width="12" height="52" rx="3" fill="#4f9e6c"/>
+                <rect x="64" y="42" width="12" height="38" rx="3" fill="#f0a19a"/>
+                <rect x="78" y="48" width="12" height="32" rx="3" fill="#4f9e6c"/>
+                <rect x="114" y="22" width="12" height="58" rx="3" fill="#f0a19a"/>
+                <rect x="128" y="26" width="12" height="54" rx="3" fill="#4f9e6c"/>
+                <rect x="164" y="56" width="12" height="24" rx="3" fill="#f0a19a"/>
+                <rect x="178" y="38" width="12" height="42" rx="3" fill="#4f9e6c"/>
+                <text x="27" y="90" font-size="8" fill="#75827a" text-anchor="middle" font-family="Jua">수도세</text>
+                <text x="77" y="90" font-size="8" fill="#75827a" text-anchor="middle" font-family="Jua">전기세</text>
+                <text x="127" y="90" font-size="8" fill="#75827a" text-anchor="middle" font-family="Jua">월세</text>
+                <text x="177" y="90" font-size="8" fill="#75827a" text-anchor="middle" font-family="Jua">기타</text>
+              </svg>
+            </div>
+
+            <div class="insight-card">
+              <div class="insight-title">우리 집이 구독 중인 '세탁 서비스'<br/>이용률이 지난달 대비 30% 하락했어요.</div>
+              <div class="insight-sub">멤버십 등급을 낮추면 매달 12,000원을 더 아낄 수 있어요.</div>
+              <div class="insight-legend"><span><span class="legend-dot" style="background:#f0a19a;"></span>지난 달</span><span><span class="legend-dot" style="background:#4f9e6c;"></span>이번 달</span></div>
+              <svg width="100%" height="88" viewBox="0 0 200 90" preserveAspectRatio="xMidYMid meet">
+                <polygon points="10,30 48,28 86,32 124,30 162,34 190,38 190,80 10,80" fill="#f0a19a" opacity="0.4"/>
+                <polyline points="10,30 48,28 86,32 124,30 162,34 190,38" fill="none" stroke="#e2685f" stroke-width="2"/>
+                <polygon points="10,34 48,30 86,36 124,42 162,50 190,58 190,80 10,80" fill="#4f9e6c" opacity="0.5"/>
+                <polyline points="10,34 48,30 86,36 124,42 162,50 190,58" fill="none" stroke="#3a7d51" stroke-width="2"/>
+                <text x="10" y="90" font-size="8" fill="#75827a" font-family="Jua">1월</text>
+                <text x="45" y="90" font-size="8" fill="#75827a" font-family="Jua">2월</text>
+                <text x="82" y="90" font-size="8" fill="#75827a" font-family="Jua">3월</text>
+                <text x="120" y="90" font-size="8" fill="#75827a" font-family="Jua">4월</text>
+                <text x="158" y="90" font-size="8" fill="#75827a" font-family="Jua">5월</text>
+                <text x="184" y="90" font-size="8" fill="#75827a" font-family="Jua">6월</text>
+              </svg>
+            </div>
+          </div>
+
+          <div class="app-screen" id="appAlley">
+            <!-- 실제 골목생활 화면(app_1) 전체를 그대로 통짜로 iframe에 넣는다.
+                 지도 드래그/시트 드래그/상세화면 전환 등은 이 iframe 안에서 자체적으로
+                 처리되고, 미션 진행에 필요한 클릭(카드 열기·단체구독 신청)만 postMessage로
+                 부모(이 문서)에 알려준다 - 아래 kitchen_script 쪽 message 리스너 참고. -->
+            <iframe class="alley-app1-frame" id="appAlleyFrame" src="app_1/index.html" title="골목 생활"></iframe>
+          </div>
+
+          <!-- 예전에는 여기(appAlleyDetail)에 골목생활 상세화면을 따로 그렸지만, 이제 그
+               내용도 위 app_1 iframe이 자체적으로 처리한다. appShowScreen()/기존 코드 곳곳에서
+               이 id를 참조하므로(null 에러 방지) 빈 채로만 남겨둔다. -->
+          <div class="app-screen" id="appAlleyDetail"></div>
+
+          <!-- 동거 시작 직후, 게임 설명 팝업보다 먼저 보여주는 '틈새살이 합의서 서명' 화면.
+               agreement_newhome_auto.html도 app_1과 마찬가지로 412x892 폰 목업 원본 크기로
+               통짜 iframe에 넣고, 동일한 transform:scale로 축소한다(fitAlleyFrame 참고).
+               서명(3/3의 '합의 완료' 버튼)이 끝나면 그 문서가 postMessage로 알려주고,
+               부모(이 문서)는 그 신호를 받아서 실제 동거 화면으로 넘어가며 게임 설명 팝업을 띄운다. -->
+          <div class="app-screen" id="appAgreement">
+            <iframe class="alley-app1-frame" id="appAgreementFrame" src="agreement/agreement_newhome_auto.html" title="틈새살이 합의서"></iframe>
+          </div>
+        </div>
+
+        <div class="app-popup" id="appPopup">
+          <div class="app-popup-card clay">
+            <div class="app-popup-icon" id="popupIcon">💌</div>
+            <div class="app-popup-title" id="popupTitle">말하기 껄끄러운 정산,<br/>틈이 대신 다정하게 전달했어요!</div>
+            <div class="app-popup-sub" id="popupSub">[김정희 님이 정산 금액을 확인하고 송금을 완료했습니다]</div>
+            <button class="app-popup-close" id="popupCloseBtn">확인</button>
+          </div>
+        </div>
+      </div>
+      </div><!-- /.phone-mockup -->
+    </div>
+  </div>
+</div>
+
+<div class="guide-spotlight" id="guideSpotlight"></div>
+<div class="guide-tooltip" id="guideTooltip">
+  <button class="guide-tooltip-close" id="guideTooltipClose">✕</button>
+  <span class="guide-tooltip-step" id="guideTooltipStep">① 금액 정산</span>
+  <p class="guide-tooltip-text" id="guideTooltipText">카드를 눌러 이번 달 지출 정산을 시작해보세요.</p>
+</div>
+
+<script src="app-tablet.js"></script>
+<script src="url-code.js"></script><!-- 사이트 유형 테스트에서 ?code=로 넘어오면 코드 자동 입력 -->
+<!-- 튜너 좌표·충돌 다각형 저장 파일 (튜너 [📁 좌표 파일로 저장]으로 만든다) - kitchen-game.js보다 먼저 -->
+<script src="tuner-defaults.js"></script>
+<script src="walk-masks.js"></script>
+<script src="tuner-state.js"></script>
+<script src="room-images.js"></script>
+<script src="gpt-kitchen-game.js"></script>
+</body>
+</html>

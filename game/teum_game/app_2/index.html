@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<!-- 폰 프레임(412) + 여백(20×2) = 452. 폰에서는 이 폭 전체가 화면에 맞게 축소된다 -->
+<meta name="viewport" content="width=452">
+<title>우리 규칙</title>
+<link rel="stylesheet" href="../teum-cursor.css">
+<style>
+  @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+  @font-face {
+    font-family: 'NationalPension';
+    src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2310@1.0/NPSfontBold.woff2') format('woff2');
+    font-weight: 700;
+    font-display: swap;
+  }
+  :root { --ai-from: #71D369; --ai-to: #FF9696; }  /* AI 칩 테두리 그라데이션 (위→아래) */
+  /* 게임 화면 폰 안(iframe)은 해상도에 따라 축소 반올림으로 412x892보다 1px 작아질 때가 있다 → 페이지가 넘쳐 가로·세로 스크롤바가 생기며
+     화면이 작아 보였다(합의서와 같은 문제). 페이지 자체는 스크롤하지 않는다 (앱 안 스크롤 영역은 그대로) */
+  html, body { overflow: hidden; }
+  body {
+    margin: 0; padding: 0;
+    display: flex; justify-content: center; align-items: center;
+    background: #e2e8f0;
+    font-family: 'Pretendard', sans-serif;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+  .app-wrapper {
+    position: relative;
+    width: 412px; height: 892px; flex-shrink: 0;   /* 창이 좁아도 폰 프레임이 찌그러지지 않게 */
+    border-radius: 30px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.15);
+    background: #F7F8FA;
+    overflow: hidden;
+    user-select: none; -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    /* 한글은 어절 단위로만 줄바꿈, 띄어쓰기 없는 긴 문자열(URL 등)만 칸 끝에서 끊는다 */
+    word-break: keep-all; overflow-wrap: break-word;
+  }
+  /* ponytail: Figma dev-mode CSS emits width = full visual width with padding inside. */
+  .app-wrapper, .app-wrapper * { box-sizing: border-box; }
+  .hide-scrollbar::-webkit-scrollbar { display: none; }
+  .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  .nps { font-family: 'NationalPension', 'Pretendard', sans-serif; }
+
+  /* Tabs */
+  .tabs { width: 380px; left: 16px; top: 112px; position: absolute; border-bottom: 1px #F9F9F9 solid;
+          display: inline-flex; align-items: center; gap: 20px; z-index: 2; }
+  .tab { width: 38px; padding: 6px 0 10px; display: flex; justify-content: center; align-items: center;
+         border-bottom: 2px solid transparent; cursor: pointer; }
+  .tab > span { color: #BABFCF; font-size: 20px; font-weight: 500; }
+  .tab.active { border-bottom-color: #71D369; }
+  .tab.active > span { color: #71D369; font-weight: 700; }
+
+  /* Cards */
+  .list { width: 380px; display: flex; flex-direction: column; gap: 10px; }
+  .card { padding: 14px 16px; background: white; border-radius: 12px;
+          outline: 1px #DBDBDB solid; outline-offset: -1px;
+          display: flex; align-items: flex-start; gap: 18px; cursor: pointer; }
+  .card.manner { padding: 20px 16px; }
+  .card[hidden] { display: none; }
+  .card.manner .col { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+  .pin { flex: 0 0 auto; color: #DBDBDB; cursor: pointer; transition: color .2s ease; }
+  .pinned .pin { color: #499963; }
+  .cbody { width: 320px; display: flex; flex-direction: column; gap: 12px; }
+  .ctop { align-self: stretch; display: flex; flex-direction: column; gap: 8px; }
+  .head { align-self: stretch; display: flex; justify-content: space-between; align-items: center; }
+  .titlerow { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 10px; }
+  .titlerow > svg { flex: 0 0 auto; }
+  .titlerow b { min-width: 0; color: black; font-size: 18px; font-weight: 700;
+                white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .badge { height: 24px; padding: 0 8px; background: #DBDBDB; border-radius: 59.11px;
+           display: flex; align-items: center; color: white; font-size: 12px; line-height: 16.8px; flex: 0 0 auto; }
+  .desc { color: #7F7F7F; font-size: 15px; font-weight: 500;
+          overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chips { display: flex; align-items: flex-start; gap: 8px; }
+  .chip { padding: 6px 12px; background: #F2F7EA; border-radius: 50px;
+          outline: 1px #DAEAC1 solid; outline-offset: -1px;
+          color: #499963; font-size: 12px; font-weight: 500; }
+
+  /* ponytail: checkbox = 1 circle + CSS tick. Figma exported circle and check as siblings. */
+  .chk { width: 20px; height: 20px; border-radius: 50%; border: 1px solid #71D369;
+         position: relative; flex: 0 0 auto; cursor: pointer;
+         transition: background-color .2s ease; }
+  .chk:active { transform: scale(0.9); }
+  /* ponytail: 체크 표시는 Figma path 그대로. CSS border 틱은 각도(42도/36도)가 달라 중앙이 어긋나 보임. */
+  .chk::after { content: ""; position: absolute; inset: -1px;
+                background: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'><path d='M4.76631 10.0794L7.88937 12.8914C8.28999 13.2522 8.90443 13.2304 9.27853 12.8422L14.5387 7.38441' fill='none' stroke='white' stroke-width='2' stroke-linecap='round'/></svg>") center / 20px 20px no-repeat;
+                transform: scale(0); opacity: 0;
+                transition: transform .2s cubic-bezier(0.2,0.8,0.2,1), opacity .15s ease; }
+  .chk.on::after { transform: scale(1); opacity: 1; }
+  .chk.red { border-color: #FF9696; }
+  .chk.on { background: #71D369; }
+  .chk.on.red { background: #FF9696; }
+
+  /* 규칙 작성 화면 */
+  .compose[hidden] { display: none; }
+  .t-wrap { width: 380px; padding: 16px 20px; background: white; border-radius: 50px;
+            border: 1px solid #BABFCF; display: flex; align-items: center; gap: 10px;
+            transition: border-color .2s ease; }
+  /* ponytail: 값이 있는지 CSS가 직접 판단 — JS 없이 :placeholder-shown으로 충분 */
+  .t-wrap:has(.t-input:not(:placeholder-shown)) { border-color: #71D369; }
+  .t-icon { flex: 0 0 auto; display: flex; }
+  .t-input { flex: 1 1 0; min-width: 0; border: 0; padding: 0; background: transparent;
+             outline: none; color: black; font: 400 15px 'Pretendard', sans-serif; }
+  .t-area { width: 380px; height: 172px; padding: 16px 20px; background: white; border-radius: 12px;
+            border: 1px solid #DBDBDB; outline: none; resize: none; color: black;
+            font: 400 15px 'Pretendard', sans-serif; }
+  .t-input::placeholder { color: #BABFCF; }
+  .t-area::placeholder { color: #7F7F7F; }
+  /* 두 자리까지 들어가는 고정폭 — 숫자를 바꿔도 뒤의 '~마다'가 밀리지 않는다 */
+  /* ponytail: <u>의 밑줄은 글자 길이만큼만 그려져 자릿수마다 달라진다.
+     밑줄을 고정폭 박스의 border-bottom으로 대체해 항상 같은 길이. */
+  .num { display: inline-block; width: 28px; padding: 0 4px; text-align: center;
+         text-decoration: none; border-bottom: 1px solid currentColor;
+         outline: none; cursor: text; }
+  .rrow { display: flex; align-items: center; gap: 14px; color: black; font-size: 15px; cursor: pointer; }
+  .filters.day .filter { outline-color: #BABFCF; }
+  /* ponytail: outline은 그라데이션을 못 받아서 Figma가 단색으로 평탄화함.
+     border-box/padding-box 2겹 배경이 그라데이션 테두리를 내는 가장 짧은 방법. */
+  .ai-chip { flex: 0 0 auto; padding: 14px 25px; border-radius: 33px;
+             border: 1px solid transparent;
+             background: linear-gradient(white, white) padding-box,
+                         linear-gradient(180deg, var(--ai-from), var(--ai-to)) border-box;
+             display: flex; align-items: center; gap: 6px; color: #474747; font-size: 12px; cursor: pointer; }
+  .switch { width: 40px; height: 25px; border-radius: 12.5px; background: #D0D0D0;
+             position: relative; flex: 0 0 auto; cursor: pointer; transition: background .2s ease; }
+  .switch.on { background: #71D369; }
+  .switch::after { content: ""; position: absolute; top: 3.14px; left: 3.14px; width: 18.83px; height: 18.83px;
+                   border-radius: 50%; background: white; transition: transform .2s cubic-bezier(0.2,0.8,0.2,1); }
+  .switch.on::after { transform: translateX(14.9px); }
+  .filters { flex-wrap: wrap; }
+  .filters[hidden] { display: none; }
+  /* 조건부로 나타나는 칩 줄은 스르륵 — 단, 화면을 연 직후엔 재생하지 않는다 */
+  .compose.live .filters[data-when]:not([hidden]),
+  .compose.live .pick[data-g="alarm"]:not([hidden]) {
+    animation: reveal .22s cubic-bezier(0.2,0.8,0.2,1) both; }
+  @keyframes reveal { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+  /* 반복 옵션 3개는 한 줄 유지 — 넘치면 가로 스크롤 */
+  /* 화면 좌우 끝까지 이어지는 full-bleed 스트립: 내용은 16px 거터에서 시작하되
+     넘치는 칩은 화면 가장자리로 흘러나간다 (app_1의 .photo-strip과 같은 방식) */
+  .filters.rep, .pick[data-g="alarm"] { align-self: stretch; flex-wrap: nowrap; overflow-x: auto;
+                 margin-left: -16px; margin-right: -16px;
+                 padding-left: 16px; padding-right: 16px;
+                 scrollbar-width: none; -ms-overflow-style: none; }
+  .filters.rep::-webkit-scrollbar, .pick[data-g="alarm"]::-webkit-scrollbar { display: none; }
+  .filters.rep .filter, .pick[data-g="alarm"] .filter { flex: 0 0 auto; white-space: nowrap; }
+  .filter.add { background: #BABFCF; outline-color: #BABFCF; color: white; }
+  .filter.add:active { background: #B3B3B3; outline-color: #B3B3B3; }
+  .upload { width: 160px; height: 160px; background: white; border-radius: 12px;
+             outline: 1px #BABFCF solid; outline-offset: -1px; cursor: pointer;
+             display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 16.08px; }
+  /* 추가한 이미지가 Upload 박스 옆으로 쌓이는 가로 스트립 (화면 끝까지 이어짐) */
+  .uploads { align-self: stretch; display: flex; gap: 5px; overflow-x: auto;
+             margin-left: -16px; margin-right: -16px; padding-left: 16px; padding-right: 16px;
+             scrollbar-width: none; -ms-overflow-style: none; }
+  .uploads::-webkit-scrollbar { display: none; }
+  .uploads { cursor: grab; }
+  .uploads.dragging { cursor: grabbing; }
+  .upload { flex: 0 0 auto; }
+  .thumb { flex: 0 0 auto; width: 160px; height: 160px; position: relative; background: white center / cover no-repeat;
+           border-radius: 12px; outline: 1px #71D369 solid; outline-offset: -1px; }
+  .thumb-x { position: absolute; left: 130px; top: 7.4px; cursor: pointer; }
+  .upload span { color: #BABFCF; font-size: 15px; font-weight: 500; text-transform: uppercase; }
+  .home-indicator { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%);
+                    width: 108px; height: 4px; background: #1D1B20; border-radius: 12px;
+                    z-index: 9; pointer-events: none; }
+  .btn { height: 52px; border: 0; border-radius: 26px; cursor: pointer;
+         font: 500 18px 'Pretendard', sans-serif; }
+  .btn-cancel { width: 98px; background: white; color: #499963; }
+  .btn-submit { width: 268px; background: #F2F7EA; color: #499963;
+                outline: 1px rgba(113, 211, 105, 0.15) solid; outline-offset: -1px;
+                transition: background-color .2s ease, color .2s ease, outline-color .2s ease; }
+  .btn-submit.ready { background: #71D369; color: white; outline-color: #71D369; }
+
+  /* Filter chips (가사) */
+  .filters { display: flex; align-items: center; gap: 8px; }
+  .filter { padding: 6px 12px; background: white; border-radius: 20px; outline: 1px #DBDBDB solid; outline-offset: -1px;
+            color: #7F7F7F; font-size: 14px; line-height: 19.6px; cursor: pointer; }
+  .filter.on { background: #499963; outline-color: #499963; color: white; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="aiStar" viewBox="0 0 19 19" fill="none"><path d="M1.80715 1.80506C1.78435 3.80386 2.53295 5.81026 4.05865 7.33596C5.26515 8.54246 6.77375 9.26256 8.33935 9.50006C6.77375 9.73756 5.26705 10.4596 4.06055 11.6642C2.53675 13.188 1.78815 15.1906 1.80905 17.1856C3.80595 17.2065 5.80855 16.4579 7.33045 14.9341C8.53885 13.7257 9.25895 12.2171 9.49645 10.6477C9.73205 12.219 10.454 13.7295 11.6624 14.9398C13.1862 16.4636 15.1926 17.2141 17.1914 17.1913C17.2142 15.1925 16.4656 13.188 14.9399 11.6623C13.7334 10.4558 12.2248 9.73566 10.6592 9.49816C12.2248 9.26066 13.7315 8.53866 14.938 7.33406C16.4618 5.81026 17.2104 3.80576 17.1895 1.80886C15.1926 1.78606 13.1881 2.53656 11.6643 4.06036C10.4559 5.26876 9.73585 6.77736 9.49835 8.34676C9.26275 6.77546 8.54075 5.26496 7.33235 4.05466C5.80855 2.53086 3.80405 1.78226 1.80715 1.80316V1.80506Z" fill="#BABFCF"/><path d="M9.5 7.59668C10.5575 7.59675 11.415 8.4542 11.415 9.51172C11.415 10.5692 10.5575 11.4267 9.5 11.4268C8.44248 11.4268 7.58504 10.5692 7.58496 9.51172C7.58496 8.45415 8.44243 7.59668 9.5 7.59668Z" fill="white" stroke="#BABFCF"/></symbol></svg>
+<div class="app-wrapper">
+
+  <!-- Scrollable content (헤더 아래로 지나감) -->
+  <div class="hide-scrollbar" id="scroll" style="position: absolute; left: 0; top: 146px; width: 412px; height: 746px; overflow-y: auto; z-index: 0">
+
+    <!-- ===== 매너 ===== -->
+    <div data-panel="manner" style="padding: 18px 16px 120px 16px">
+      <div style="width: 205px; color: black; font-size: 20px; font-weight: 700; margin-bottom: 16px">우리 집 규칙서</div>
+      <div class="list">
+
+        <div class="card manner">
+          <svg class="pin" width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M13.3333 9.65L15 11.35V13.05H10.8333V18.15L10 19L9.16667 18.15V13.05H5V11.35L6.66667 9.65V3.7H5.83333V2H14.1667V3.7H13.3333V9.65Z" fill="currentColor"/></svg>
+          <div class="col">
+            <div class="titlerow">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path fill-rule="evenodd" clip-rule="evenodd" d="M0.251051 1.46323C-0.0836837 1.1285 -0.0836837 0.585786 0.251051 0.251051C0.585786 -0.0836838 1.1285 -0.0836838 1.46323 0.251051L5.88134 4.66915L9.95723 1.80582L9.96057 1.80347C11.0829 1.02691 12.5983 1.8444 12.5714 3.20526V11.3592L15.7489 14.5368C16.0837 14.8715 16.0837 15.4142 15.7489 15.7489C15.4142 16.0837 14.8715 16.0837 14.5368 15.7489L12.1829 13.395C12.181 13.3973 12.1791 13.3994 12.1773 13.4017L3.71347 4.93787C3.71695 4.93727 3.72043 4.93669 3.72392 4.9361L0.251051 1.46323ZM2.52167 5.76638L10.7927 14.0375C10.4733 14.0334 10.1495 13.9395 9.85773 13.7376L9.84933 13.7318L5.53025 10.6277H4C3.06193 10.6277 2.28571 9.85147 2.28571 8.91342V6.6277C2.28571 6.31503 2.37195 6.02034 2.52167 5.76638Z" fill="#7F7F7F"/>
+              </svg>
+              <b>소음 줄이는 시간</b>
+            </div>
+            <div class="desc">오후 11시 이후 세탁기/청소기 금지</div>
+          </div>
+        </div>
+
+        <div class="card manner">
+          <svg class="pin" width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M13.3333 9.65L15 11.35V13.05H10.8333V18.15L10 19L9.16667 18.15V13.05H5V11.35L6.66667 9.65V3.7H5.83333V2H14.1667V3.7H13.3333V9.65Z" fill="currentColor"/></svg>
+          <div class="col">
+            <div class="titlerow">
+              <svg width="16" height="18" viewBox="0 0 16 18" fill="none">
+                <path d="M3 18C2.45 18 1.97933 17.8043 1.588 17.413C1.196 17.021 1 16.55 1 16V3C0.716667 3 0.479 2.90433 0.287 2.713C0.0956668 2.521 0 2.28333 0 2C0 1.71667 0.0956668 1.479 0.287 1.287C0.479 1.09567 0.716667 1 1 1H5C5 0.716667 5.096 0.479 5.288 0.287C5.47933 0.0956666 5.71667 0 6 0H10C10.2833 0 10.521 0.0956666 10.713 0.287C10.9043 0.479 11 0.716667 11 1H15C15.2833 1 15.5207 1.09567 15.712 1.287C15.904 1.479 16 1.71667 16 2C16 2.28333 15.904 2.521 15.712 2.713C15.5207 2.90433 15.2833 3 15 3V16C15 16.55 14.8043 17.021 14.413 17.413C14.021 17.8043 13.55 18 13 18H3ZM7 8.85V12C7 12.2833 7.096 12.5207 7.288 12.712C7.47933 12.904 7.71667 13 8 13C8.28333 13 8.521 12.904 8.713 12.712C8.90433 12.5207 9 12.2833 9 12V8.85L9.9 9.725C10.1 9.90833 10.3377 9.996 10.613 9.988C10.8877 9.97933 11.1167 9.88333 11.3 9.7C11.4833 9.51667 11.575 9.28333 11.575 9C11.575 8.71667 11.4833 8.48333 11.3 8.3L8.7 5.7C8.51667 5.51667 8.28333 5.425 8 5.425C7.71667 5.425 7.48333 5.51667 7.3 5.7L4.7 8.3C4.51667 8.48333 4.425 8.71667 4.425 9C4.425 9.28333 4.51667 9.51667 4.7 9.7C4.88333 9.88333 5.11233 9.97933 5.387 9.988C5.66233 9.996 5.9 9.90833 6.1 9.725L7 8.85Z" fill="#7F7F7F"/>
+              </svg>
+              <b>음식 쓰레기 통 잘 닫기</b>
+            </div>
+            <div class="desc">음쓰 냄새 안 나게 잘 관리할 것 / 뼈, 씨앗은 일반 쓰레기</div>
+          </div>
+        </div>
+
+        <div class="card manner">
+          <svg class="pin" width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M13.3333 9.65L15 11.35V13.05H10.8333V18.15L10 19L9.16667 18.15V13.05H5V11.35L6.66667 9.65V3.7H5.83333V2H14.1667V3.7H13.3333V9.65Z" fill="currentColor"/></svg>
+          <div class="col">
+            <div class="titlerow">
+              <svg width="18" height="14" viewBox="0 0 18 14" fill="none">
+                <path d="M14.7273 8.18182C14.4955 8.18182 14.3013 8.10327 14.1447 7.94618C13.9876 7.78964 13.9091 7.59546 13.9091 7.36364V5.72727H12.2727C12.0409 5.72727 11.8467 5.64873 11.6902 5.49164C11.5331 5.33509 11.4545 5.14091 11.4545 4.90909C11.4545 4.67727 11.5331 4.48282 11.6902 4.32573C11.8467 4.16918 12.0409 4.09091 12.2727 4.09091H13.9091V2.45455C13.9091 2.22273 13.9876 2.02827 14.1447 1.87118C14.3013 1.71464 14.4955 1.63636 14.7273 1.63636C14.9591 1.63636 15.1533 1.71464 15.3098 1.87118C15.4669 2.02827 15.5455 2.22273 15.5455 2.45455V4.09091H17.1818C17.4136 4.09091 17.6078 4.16918 17.7644 4.32573C17.9215 4.48282 18 4.67727 18 4.90909C18 5.14091 17.9215 5.33509 17.7644 5.49164C17.6078 5.64873 17.4136 5.72727 17.1818 5.72727H15.5455V7.36364C15.5455 7.59546 15.4669 7.78964 15.3098 7.94618C15.1533 8.10327 14.9591 8.18182 14.7273 8.18182ZM6.54545 6.54545C5.64545 6.54545 4.875 6.225 4.23409 5.58409C3.59318 4.94318 3.27273 4.17273 3.27273 3.27273C3.27273 2.37273 3.59318 1.60227 4.23409 0.961364C4.875 0.320455 5.64545 0 6.54545 0C7.44545 0 8.21591 0.320455 8.85682 0.961364C9.49773 1.60227 9.81818 2.37273 9.81818 3.27273C9.81818 4.17273 9.49773 4.94318 8.85682 5.58409C8.21591 6.225 7.44545 6.54545 6.54545 6.54545ZM0.818182 13.0909C0.586364 13.0909 0.392182 13.0124 0.235636 12.8553C0.0785454 12.6987 0 12.5045 0 12.2727V10.8C0 10.3364 0.119455 9.91009 0.358364 9.52118C0.596727 9.13282 0.913636 8.83636 1.30909 8.63182C2.15455 8.20909 3.01364 7.89191 3.88636 7.68027C4.75909 7.46918 5.64545 7.36364 6.54545 7.36364C7.44545 7.36364 8.33182 7.46918 9.20455 7.68027C10.0773 7.89191 10.9364 8.20909 11.7818 8.63182C12.1773 8.83636 12.4942 9.13282 12.7325 9.52118C12.9715 9.91009 13.0909 10.3364 13.0909 10.8V12.2727C13.0909 12.5045 13.0124 12.6987 12.8553 12.8553C12.6987 13.0124 12.5045 13.0909 12.2727 13.0909H0.818182Z" fill="#7F7F7F"/>
+              </svg>
+              <b>외부인 초대</b>
+            </div>
+            <div class="desc">최소 1일 전 메이트에게 미리 알리기</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ===== 가사 ===== -->
+    <div data-panel="chore" hidden style="padding: 18px 16px 120px 16px">
+      <div style="width: 380px; display: flex; flex-direction: column; gap: 20px">
+        <div style="align-self: stretch; display: flex; flex-direction: column; gap: 12px">
+          <div style="color: black; font-size: 20px; font-weight: 700">우리 집 규칙서</div>
+
+          <div class="filters">
+            <div class="filter on" data-f="all">전체</div>
+            <div class="filter" data-f="mine">나</div>
+            <div class="filter" data-f="mate">서은민</div>
+            <div class="filter" data-f="done">완료</div>
+            <div class="filter" data-f="todo">미완료</div>
+          </div>
+
+          <div style="padding: 13px 21px; background: white; overflow: hidden; border-radius: 12px; outline: 1px #71D369 solid; outline-offset: -1px; display: flex; flex-direction: column; gap: 4px">
+            <div style="display: flex; justify-content: space-between; align-items: center">
+              <div style="color: #999999; font-size: 10px; font-weight: 500">이번 주 완료율</div>
+              <div id="pct" style="color: #999999; font-size: 10px; font-weight: 500">50%</div>
+            </div>
+            <div style="height: 6px; display: flex; background: #EEEEEE; overflow: hidden; border-radius: 100px">
+              <div id="barMine" style="background: #71D369; transition: width .35s cubic-bezier(0.2,0.8,0.2,1)"></div>
+              <div id="barMate" style="background: #FF9696; transition: width .35s cubic-bezier(0.2,0.8,0.2,1)"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="list">
+          <div class="card">
+            <svg class="pin" width="10" height="17" viewBox="0 0 10 17" fill="none"><path d="M8.33333 7.65L10 9.35V11.05H5.83333V16.15L5 17L4.16667 16.15V11.05H0V9.35L1.66667 7.65V1.7H0.833333V0H9.16667V1.7H8.33333V7.65Z" fill="currentColor"/></svg>
+            <div class="cbody">
+              <div class="ctop">
+                <div class="head">
+                  <div class="titlerow">
+                    <svg width="16" height="18" viewBox="0 0 16 18" fill="none"><path d="M3 18C2.45 18 1.97933 17.8043 1.588 17.413C1.196 17.021 1 16.55 1 16V3C0.716667 3 0.479 2.90433 0.287 2.713C0.0956668 2.521 0 2.28333 0 2C0 1.71667 0.0956668 1.479 0.287 1.287C0.479 1.09567 0.716667 1 1 1H5C5 0.716667 5.096 0.479 5.288 0.287C5.47933 0.0956666 5.71667 0 6 0H10C10.2833 0 10.521 0.0956666 10.713 0.287C10.9043 0.479 11 0.716667 11 1H15C15.2833 1 15.5207 1.09567 15.712 1.287C15.904 1.479 16 1.71667 16 2C16 2.28333 15.904 2.521 15.712 2.713C15.5207 2.90433 15.2833 3 15 3V16C15 16.55 14.8043 17.021 14.413 17.413C14.021 17.8043 13.55 18 13 18H3ZM7 8.85V12C7 12.2833 7.096 12.5207 7.288 12.712C7.47933 12.904 7.71667 13 8 13C8.28333 13 8.521 12.904 8.713 12.712C8.90433 12.5207 9 12.2833 9 12V8.85L9.9 9.725C10.1 9.90833 10.3377 9.996 10.613 9.988C10.8877 9.97933 11.1167 9.88333 11.3 9.7C11.4833 9.51667 11.575 9.28333 11.575 9C11.575 8.71667 11.4833 8.48333 11.3 8.3L8.7 5.7C8.51667 5.51667 8.28333 5.425 8 5.425C7.71667 5.425 7.48333 5.51667 7.3 5.7L4.7 8.3C4.51667 8.48333 4.425 8.71667 4.425 9C4.425 9.28333 4.51667 9.51667 4.7 9.7C4.88333 9.88333 5.11233 9.97933 5.387 9.988C5.66233 9.996 5.9 9.90833 6.1 9.725L7 8.85Z" fill="#7F7F7F"/></svg>
+                    <b>분리 수거</b>
+                    <div class="badge">나</div>
+                  </div>
+                  <span class="chk on"></span>
+                </div>
+                <div class="desc">쓰레기는 격주로 맡아 요일별로 분리하여 배출, 재활용은 종류별로 나눠 정해진 요일에 배출</div>
+              </div>
+              <div class="chips">
+              <div class="chip">1주마다</div>
+              <div class="chip">화,수,목</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <svg class="pin" width="10" height="17" viewBox="0 0 10 17" fill="none"><path d="M8.33333 7.65L10 9.35V11.05H5.83333V16.15L5 17L4.16667 16.15V11.05H0V9.35L1.66667 7.65V1.7H0.833333V0H9.16667V1.7H8.33333V7.65Z" fill="currentColor"/></svg>
+            <div class="cbody">
+              <div class="ctop">
+                <div class="head">
+                  <div class="titlerow">
+                    <svg width="19" height="17" viewBox="0 0 19 17" fill="none"><path d="M12.3229 0C12.5536 5e-05 12.7811 0.05375 12.987 0.15625L13.0732 0.202633L17.9202 3.02978C18.287 3.24391 18.4345 3.70038 18.262 4.08854L16.5954 7.8385C16.503 8.04642 16.3292 8.20758 16.1152 8.2845C15.901 8.36133 15.6644 8.34708 15.4609 8.24542L14.167 7.5985V15C14.167 15.9203 13.4206 16.6665 12.5003 16.6667H5.83363C4.91315 16.6667 4.16696 15.9205 4.16696 15V7.5985L2.87302 8.24542C2.66955 8.34717 2.43286 8.36125 2.21872 8.2845C2.0046 8.20767 1.831 8.04642 1.73858 7.8385L0.0719134 4.08854C-0.100649 3.70028 0.0467051 3.24387 0.413705 3.02978L5.26071 0.202633L5.34698 0.15625C5.55278 0.0537833 5.78025 0 6.01104 0L6.16811 0.00814168C6.93491 0.0853583 7.41063 0.719017 7.5573 1.26628C7.7478 1.97733 8.3973 2.5 9.16696 2.5C9.93655 2.49986 10.5861 1.97727 10.7766 1.26628C10.9331 0.682517 11.4635 3.33333e-05 12.3229 0Z" fill="#7F7F7F"/></svg>
+                    <b>빨래 널기</b>
+                    <div class="badge">서은민</div>
+                  </div>
+                  <span class="chk on red"></span>
+                </div>
+                <div class="desc">세탁기 다 돌아가면 건조기에 넣으면 안 되는 빨래는 따로 꺼내 건조대에 널기</div>
+              </div>
+              <div class="chips">
+              <div class="chip">1일마다</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <svg class="pin" width="10" height="17" viewBox="0 0 10 17" fill="none"><path d="M8.33333 7.65L10 9.35V11.05H5.83333V16.15L5 17L4.16667 16.15V11.05H0V9.35L1.66667 7.65V1.7H0.833333V0H9.16667V1.7H8.33333V7.65Z" fill="currentColor"/></svg>
+            <div class="cbody">
+              <div class="ctop">
+                <div class="head">
+                  <div class="titlerow">
+                    <svg width="20" height="20" viewBox="0 0 17 17" fill="none"><path d="M11.9167 11C13.4355 11 14.6667 12.2312 14.6667 13.75C14.6667 15.2688 13.4355 16.5 11.9167 16.5C10.3978 16.5 9.16667 15.2688 9.16667 13.75C9.16667 12.2312 10.3978 11 11.9167 11ZM3.66667 7.33333C5.69171 7.33333 7.33333 8.97499 7.33333 11C7.33333 13.025 5.69171 14.6667 3.66667 14.6667C1.64162 14.6667 0 13.025 0 11C0 8.97499 1.64162 7.33333 3.66667 7.33333ZM11.9167 0C14.448 0 16.5 2.05203 16.5 4.58333C16.5 7.11462 14.448 9.16667 11.9167 9.16667C9.38538 9.16667 7.33333 7.11462 7.33333 4.58333C7.33333 2.05203 9.38538 0 11.9167 0Z" fill="#7F7F7F"/></svg>
+                    <b>청소</b>
+                    <div class="badge">서은민</div>
+                  </div>
+                  <span class="chk red"></span>
+                </div>
+                <div class="desc">바닥 청소는 1주에 한 번 걸레질과 진공청소기로 진행</div>
+              </div>
+              <div class="chips">
+              <div class="chip">1주마다</div>
+              <div class="chip">수</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Fixed header -->
+  <div style="width: 412px; height: 146px; left: 0; top: 0; position: absolute; background: rgba(247, 248, 250, 0.80); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: 1; pointer-events: none"></div>
+  <div class="nps" style="left: 16px; top: 57px; position: absolute; color: black; font-size: 24px; font-weight: 700; z-index: 2">우리 규칙</div>
+  <div style="left: 372px; top: 62px; position: absolute; z-index: 2; cursor: pointer">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+      <path d="M2 20.5616L10.5737 11.9879L2 3.41421L3.41421 2L11.9879 10.5737L20.5174 2.04419L21.9316 3.45841L13.4021 11.9879L21.9316 20.5174L20.5174 21.9316L11.9879 13.4021L3.41421 21.9758L2 20.5616Z" fill="#BABFCF"/>
+    </svg>
+  </div>
+  <div class="tabs">
+    <div class="tab active" data-tab="manner"><span>매너</span></div>
+    <div class="tab" data-tab="chore"><span>가사</span></div>
+  </div>
+
+  <!-- FAB -->
+  <div id="fab" style="left: 324px; top: 798px; position: absolute; z-index: 4; cursor: pointer">
+    <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
+      <circle cx="32" cy="32" r="32" fill="#71D369"/>
+      <path d="M31.2433 43.4055V32.919H20.7568V31.1893H31.2433V20.7568H32.9731V31.1893H43.4055V32.919H32.9731V43.4055H31.2433Z" fill="#F8F8F8"/>
+    </svg>
+  </div>
+
+
+  <!-- ===== 규칙 작성 화면 ===== -->
+  <div class="compose" data-for="manner" hidden style="position: absolute; inset: 0; background: #F7F8FA; z-index: 5">
+    <input type="date" class="datepick" hidden>
+    <div class="hide-scrollbar" style="position: absolute; left: 0; top: 106px; width: 412px; height: 698px; overflow-y: auto">
+      <div style="padding: 8px 16px 40px 16px">
+        <div class="t-wrap"><span class="t-icon"></span><input class="t-input" placeholder="규칙 제목을 작성해주세요."></div>
+        <div style="margin-top: 22px; display: flex; flex-direction: column; gap: 16px">
+          <div style="color: #474747; font-size: 20px; font-weight: 700; line-height: 20px; letter-spacing: 0.10px">매너 규칙 작성</div>
+
+          <div class="uploads">
+            <div class="upload">
+            <input type="file" accept="image/*" multiple hidden>
+            <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+              <rect width="48" height="48" rx="24" fill="#71D369"/>
+              <path d="M23.9999 15.5L24 24M24 32.5L24 24M15.5 24L24 24M24 24L32.5 24" stroke="white" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            <span>Upload</span>
+            </div>
+          </div>
+
+          <div style="width: 380px; display: flex; flex-direction: column; gap: 12px">
+            <textarea class="t-area" placeholder="함께 지켜나갈 매너 규칙을 자세히 적어주세요."></textarea>
+            <div style="display: flex; flex-direction: column; gap: 6px">
+              <div class="hide-scrollbar" style="margin-right: -16px; padding-right: 16px; overflow-x: auto"><!-- app_3처럼 오른쪽 화면 끝까지 이어지는 칩 줄 -->
+                <div style="display: flex; align-items: center; gap: 12px; width: max-content">
+                  <div class="ai-chip"><svg width="19" height="19" style="flex:0 0 auto"><use href="#aiStar"/></svg><span>밤 11시 이후엔 세탁기·청소기<br>사용하지 않기</span></div>
+                  <div class="ai-chip"><svg width="19" height="19" style="flex:0 0 auto"><use href="#aiStar"/></svg><span>통화는 거실 말고 각자 방에서<br>조용히 해 주세요</span></div>
+                </div>
+              </div>
+              <div style="color: #7F7F7F; font-size: 12px">AI 규칙 추천</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+      <div style="width: 412px; height: 106px; left: 0; top: 0; position: absolute; background: rgba(247, 248, 250, 0.80); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); pointer-events: none"></div>
+      <div class="nps" style="left: 16px; top: 57px; position: absolute; color: black; font-size: 24px; font-weight: 700">매너 규칙 작성</div>
+      <div class="close" style="left: 372px; top: 62px; position: absolute; cursor: pointer">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+          <path d="M2 20.5616L10.5737 11.9879L2 3.41421L3.41421 2L11.9879 10.5737L20.5174 2.04419L21.9316 3.45841L13.4021 11.9879L21.9316 20.5174L20.5174 21.9316L11.9879 13.4021L3.41421 21.9758L2 20.5616Z" fill="#BABFCF"/>
+        </svg>
+      </div>
+
+      <div style="width: 412px; height: 88px; left: 0; top: 804px; position: absolute; background: rgba(247, 248, 250, 0.80); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px)">
+        <div style="width: 380px; left: 16px; top: 12px; position: absolute; display: flex; justify-content: space-between; align-items: center">
+          <button class="btn btn-cancel">취소</button>
+          <button class="btn btn-submit">등록하기</button>
+        </div>
+      </div>
+  </div>
+
+  <div class="compose" data-for="chore" hidden style="position: absolute; inset: 0; background: #F7F8FA; z-index: 5">
+    <input type="date" class="datepick" hidden>
+    <div class="hide-scrollbar" style="position: absolute; left: 0; top: 106px; width: 412px; height: 698px; overflow-y: auto">
+      <div style="padding: 8px 16px 40px 16px">
+        <div class="t-wrap"><span class="t-icon"></span><input class="t-input" placeholder="규칙 제목을 작성해주세요."></div>
+        <div style="margin-top: 22px; display: flex; flex-direction: column; gap: 24px">
+
+          <div style="display: flex; flex-direction: column; gap: 12px">
+            <div style="color: #474747; font-size: 20px; font-weight: 700; line-height: 20px; letter-spacing: 0.10px">담당자</div>
+          <div class="filters pick" data-g="who">
+            <div class="filter">나</div>
+            <div class="filter">서은민</div>
+          </div>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 16px">
+            <div style="display: flex; align-items: flex-end; gap: 6px">
+              <div style="color: black; font-size: 20px; font-weight: 700">담당 주기</div>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 12px">
+              <div class="rrow"><span class="chk"></span><span>반복 안 함</span></div>
+              <div class="rrow"><span class="chk"></span><span><u class="num" contenteditable="true" inputmode="numeric">1</u>일마다</span></div>
+              <div style="display: flex; flex-direction: column; gap: 12px">
+                <div class="rrow"><span class="chk"></span><span><u class="num" contenteditable="true" inputmode="numeric">1</u>주마다</span></div>
+                      <div class="filters day" data-when="주마다" hidden>
+                        <div class="filter">일</div>
+                        <div class="filter">월</div>
+                        <div class="filter on">화</div>
+                        <div class="filter">수</div>
+                        <div class="filter">목</div>
+                        <div class="filter">금</div>
+                        <div class="filter">토</div>
+                </div>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 12px">
+                <div class="rrow"><span class="chk"></span><span><u class="num" contenteditable="true" inputmode="numeric">1</u>개월마다</span></div>
+                <div class="filters rep" data-when="개월마다" hidden>
+                  <div class="filter" data-t="m1"></div>
+                  <div class="filter" data-t="m2"></div>
+                  <div class="filter pickdate">반복할 날짜 선택</div>
+                </div>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 12px">
+                <div class="rrow"><span class="chk"></span><span><u class="num" contenteditable="true" inputmode="numeric">1</u>년마다</span></div>
+                <div class="filters rep" data-when="년마다" hidden>
+                  <div class="filter" data-t="y1"></div>
+                  <div class="filter" data-t="y2"></div>
+                  <div class="filter pickdate">반복할 날짜 선택</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 12px">
+            <div style="align-self: stretch; display: flex; justify-content: space-between; align-items: center"><div style="display: flex; align-items: center; gap: 6px"><div style="color: #474747; font-size: 20px; font-weight: 700; line-height: 20px; letter-spacing: 0.10px">가사 규칙 알림</div><div style="color: #7F7F7F; font-size: 12px">(선택)</div></div><div class="switch"></div></div>
+          <div class="filters pick" data-g="alarm" hidden>
+            <div class="filter">5분 전</div>
+            <div class="filter">15분 전</div>
+            <div class="filter">30분 전</div>
+            <div class="filter">1시간 전</div>
+            <div class="filter">1일 전</div>
+          </div>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 12px">
+            <div style="color: #474747; font-size: 20px; font-weight: 700; line-height: 20px; letter-spacing: 0.10px">가사 규칙 작성</div>
+            <textarea class="t-area" placeholder="가사 분배 및 역할에 대한 자세한 설명을 적어주세요."></textarea>
+            <div style="display: flex; flex-direction: column; gap: 6px">
+              <div class="hide-scrollbar" style="margin-right: -16px; padding-right: 16px; overflow-x: auto"><!-- app_3처럼 오른쪽 화면 끝까지 이어지는 칩 줄 -->
+                <div style="display: flex; align-items: center; gap: 12px; width: max-content">
+                  <div class="ai-chip"><svg width="19" height="19" style="flex:0 0 auto"><use href="#aiStar"/></svg><span>설거지는 식사한 사람이 30분 안에<br>바로 해 주세요</span></div>
+                  <div class="ai-chip"><svg width="19" height="19" style="flex:0 0 auto"><use href="#aiStar"/></svg><span>욕실 청소는 주 1회 당번이 맡아서<br>깨끗하게 진행</span></div>
+                </div>
+              </div>
+              <div style="color: #7F7F7F; font-size: 12px">AI 규칙 추천</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+      <div style="width: 412px; height: 106px; left: 0; top: 0; position: absolute; background: rgba(247, 248, 250, 0.80); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); pointer-events: none"></div>
+      <div class="nps" style="left: 16px; top: 57px; position: absolute; color: black; font-size: 24px; font-weight: 700">가사 규칙 작성</div>
+      <div class="close" style="left: 372px; top: 62px; position: absolute; cursor: pointer">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+          <path d="M2 20.5616L10.5737 11.9879L2 3.41421L3.41421 2L11.9879 10.5737L20.5174 2.04419L21.9316 3.45841L13.4021 11.9879L21.9316 20.5174L20.5174 21.9316L11.9879 13.4021L3.41421 21.9758L2 20.5616Z" fill="#BABFCF"/>
+        </svg>
+      </div>
+
+      <div style="width: 412px; height: 88px; left: 0; top: 804px; position: absolute; background: rgba(247, 248, 250, 0.80); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px)">
+        <div style="width: 380px; left: 16px; top: 12px; position: absolute; display: flex; justify-content: space-between; align-items: center">
+          <button class="btn btn-cancel">취소</button>
+          <button class="btn btn-submit">등록하기</button>
+        </div>
+      </div>
+  </div>
+
+  <div class="home-indicator"></div>
+</div>
+
+<script>
+  const scroll = document.getElementById('scroll');
+  const choreChks = () => [...document.querySelectorAll('[data-panel="chore"] .chk')];
+  const isDone = c => !!c.querySelector('.chk.on');
+
+  // 정렬 우선순위: 핀 고정 > 완료 > 원래 순서(나 → 서은민)
+  const reorder = list => [...list.children]
+    .sort((a, b) => (b.classList.contains('pinned') - a.classList.contains('pinned'))
+                 || (isDone(b) - isDone(a))
+                 || a.dataset.i - b.dataset.i)
+    .forEach(c => list.append(c));
+
+  // 완료율: 체크된 개수 / 전체. 초록 = 나, 분홍 = 서은민.
+  const sync = () => {
+    const all = choreChks(), done = all.filter(c => c.classList.contains('on'));
+    const n = all.length || 1;
+    const mine = done.filter(c => !c.classList.contains('red')).length;
+    barMine.style.width = mine / n * 100 + '%';
+    barMate.style.width = (done.length - mine) / n * 100 + '%';
+    pct.textContent = Math.round(done.length / n * 100) + '%';
+  };
+
+  // 필터: 담당자(나/서은민)와 상태(완료/미완료) 중 하나만 선택
+  const applyFilter = () => {
+    const f = document.querySelector('[data-panel="chore"] .filter.on').dataset.f;
+    choreChks().forEach(chk => {
+      const mine = !chk.classList.contains('red'), done = chk.classList.contains('on');
+      chk.closest('.card').hidden = !(f === 'all' || (f === 'mine' && mine) || (f === 'mate' && !mine)
+                                   || (f === 'done' && done) || (f === 'todo' && !done));
+    });
+  };
+  document.querySelectorAll('[data-panel="chore"] .filter').forEach((f, _, all) =>
+    f.onclick = () => { all.forEach(x => x.classList.toggle('on', x === f)); applyFilter(); });
+
+  // 새로 추가된 카드에도 같은 동작을 붙일 수 있게 바인딩을 분리해 둔다
+  const bindChk = chk => chk.onclick = e => {
+    e.stopPropagation();
+    chk.classList.toggle('on');
+    sync(); applyFilter(); reorder(chk.closest('.list'));
+    // 가사 카드 체크박스를 켰을 때(분담 체크 완료) 부모 창(틈새살이 메인 화면)에 알려준다 -
+    // 부모가 상단 알림 팝업을 띄우고, 처음 체크되는 순간 아이소메트릭 부엌 배경을 전환한다.
+    if (chk.classList.contains('on')) {
+      try { window.parent.postMessage({ source: 'teum-app2', type: 'chore-checked' }, '*'); } catch (e) {}
+    }
+  };
+  const bindPin = pin => pin.onclick = e => {
+    e.stopPropagation();
+    const list = pin.closest('.list');
+    pin.closest('.card').classList.toggle('pinned');
+    reorder(list); scroll.scrollTop = 0;
+  };
+  const bindCard = card => card.onclick = () =>
+    openCompose(card.closest('[data-panel]').dataset.panel, card);
+
+  const bindAll = card => {
+    bindPin(card.querySelector('.pin'));
+    const chk = card.querySelector('.chk');
+    if (chk) bindChk(chk);
+    bindCard(card);
+  };
+
+  document.querySelectorAll('.list').forEach(list => {
+    [...list.children].forEach((c, i) => { c.dataset.i = i; bindAll(c); });
+    reorder(list);
+  });
+  sync();
+  applyFilter();
+
+  const PIN = {
+    manner: '<svg class="pin" width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M13.3333 9.65L15 11.35V13.05H10.8333V18.15L10 19L9.16667 18.15V13.05H5V11.35L6.66667 9.65V3.7H5.83333V2H14.1667V3.7H13.3333V9.65Z" fill="currentColor"/></svg>',
+    chore:  '<svg class="pin" width="10" height="17" viewBox="0 0 10 17" fill="none"><path d="M8.33333 7.65L10 9.35V11.05H5.83333V16.15L5 17L4.16667 16.15V11.05H0V9.35L1.66667 7.65V1.7H0.833333V0H9.16667V1.7H8.33333V7.65Z" fill="currentColor"/></svg>'
+  };
+  const makeThumb = url => {
+    const t = document.createElement('div');
+    t.className = 'thumb';
+    t.style.backgroundImage = 'url("' + url + '")';
+    t.innerHTML = '<span class="thumb-x"><svg width="24" height="24" viewBox="0 0 24 24" fill="none">'
+      + '<rect width="23.4479" height="23.4479" rx="11.7239" fill="#474747"/>'
+      + '<path d="M8.54163 8.54199L11.7236 11.724M14.9056 14.9059L11.7236 11.724M8.54165 14.9059L11.7236 11.724M11.7236 11.724L14.9056 8.54196" stroke="#F9F9F9" stroke-linecap="round"/>'
+      + '</svg></span>';
+    t.querySelector('.thumb-x').onclick = e => { e.stopPropagation(); t.remove(); };
+    return t;
+  };
+  const thumbUrls = cp => [...cp.querySelectorAll('.thumb')]
+    .map(t => (t.style.backgroundImage.match(/url\(["']?(.*?)["']?\)/) || [])[1])
+    .filter(Boolean);
+
+  const esc = t => t.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+  const cycleOf = cp => {
+    const row = cp.querySelector('.rrow .chk.on').closest('.rrow');
+    return row.querySelector('span:last-child').textContent.replace(/ /g, '').trim();
+  };
+
+  // 이미 있는 규칙을 열면 그 규칙에 맞춘 추천 문구를 보여준다
+  const SUGGEST = {
+    manner: {
+      '': ['밤 11시 이후엔 세탁기·청소기<br>사용하지 않기', '통화는 거실 말고 각자 방에서<br>조용히 해 주세요'],
+      '소음 줄이는 시간': ['밤 11시 이후엔 세탁기·청소기<br>사용하지 않기', '밤에는 TV와 음악은 이어폰으로<br>조용히 들어 주세요'],
+      '음식 쓰레기 통 잘 닫기': ['음식물 쓰레기통은 쓰고 나서 바로<br>뚜껑을 꼭 닫기', '뼈·씨앗은 음식물 쓰레기가 아니니<br>일반 쓰레기로'],
+      '외부인 초대': ['외부인을 초대할 때는 최소 하루 전<br>미리 알려 주세요', '자고 가는 손님은 서로 합의한 날에만<br>받기로 해요']
+    },
+    chore: {
+      '': ['설거지는 식사한 사람이 30분 안에<br>바로 해 주세요', '욕실 청소는 주 1회 당번이 맡아서<br>깨끗하게 진행'],
+      '분리 수거': ['재활용은 격주로 번갈아 맡아서<br>요일 맞춰 배출하기', '박스는 테이프와 송장을 떼고<br>납작하게 접어서 배출'],
+      '설거지': ['밥을 먹은 사람이 30분 안에<br>바로 설거지하기', '설거지 당번은 일주일 단위로<br>번갈아 가며 맡기'],
+      '세탁기 돌리기': ['빨래는 모아서 담당자가 일주일에<br>두 번 돌리기', '세탁이 끝나면 다음 사람을 위해<br>바로 꺼내 두기'],
+      '욕실 청소': ['욕실 청소는 주 1회 당번이 맡아서<br>깨끗하게 진행', '머리카락과 물기는 사용한 사람이<br>바로 정리하기'],
+      '빨래 널기': ['건조기에 못 넣는 옷은 따로 널어서<br>그날 바로 걷기', '빨래를 널고 걷는 일은 세탁기를<br>돌린 사람이 담당'],
+      '청소': ['바닥은 주 1회 청소기를 돌리고<br>걸레질까지 마무리', '거실 같은 공용 공간은 쓴 사람이<br>바로 정리하기']
+    }
+  };
+  // 제목 키워드로 아이콘을 고른다. 분류 선택 단계를 없애는 대신 자동으로 붙임.
+  const ICONS = {
+      "noise": "<svg width=\"16\" height=\"16\" viewBox=\"0 0 16 16\" fill=\"none\"> <path fill-rule=\"evenodd\" clip-rule=\"evenodd\" d=\"M0.251051 1.46323C-0.0836837 1.1285 -0.0836837 0.585786 0.251051 0.251051C0.585786 -0.0836838 1.1285 -0.0836838 1.46323 0.251051L5.88134 4.66915L9.95723 1.80582L9.96057 1.80347C11.0829 1.02691 12.5983 1.8444 12.5714 3.20526V11.3592L15.7489 14.5368C16.0837 14.8715 16.0837 15.4142 15.7489 15.7489C15.4142 16.0837 14.8715 16.0837 14.5368 15.7489L12.1829 13.395C12.181 13.3973 12.1791 13.3994 12.1773 13.4017L3.71347 4.93787C3.71695 4.93727 3.72043 4.93669 3.72392 4.9361L0.251051 1.46323ZM2.52167 5.76638L10.7927 14.0375C10.4733 14.0334 10.1495 13.9395 9.85773 13.7376L9.84933 13.7318L5.53025 10.6277H4C3.06193 10.6277 2.28571 9.85147 2.28571 8.91342V6.6277C2.28571 6.31503 2.37195 6.02034 2.52167 5.76638Z\" fill=\"#7F7F7F\"/> </svg>",
+      "trash": "<svg width=\"16\" height=\"18\" viewBox=\"0 0 16 18\" fill=\"none\"> <path d=\"M3 18C2.45 18 1.97933 17.8043 1.588 17.413C1.196 17.021 1 16.55 1 16V3C0.716667 3 0.479 2.90433 0.287 2.713C0.0956668 2.521 0 2.28333 0 2C0 1.71667 0.0956668 1.479 0.287 1.287C0.479 1.09567 0.716667 1 1 1H5C5 0.716667 5.096 0.479 5.288 0.287C5.47933 0.0956666 5.71667 0 6 0H10C10.2833 0 10.521 0.0956666 10.713 0.287C10.9043 0.479 11 0.716667 11 1H15C15.2833 1 15.5207 1.09567 15.712 1.287C15.904 1.479 16 1.71667 16 2C16 2.28333 15.904 2.521 15.712 2.713C15.5207 2.90433 15.2833 3 15 3V16C15 16.55 14.8043 17.021 14.413 17.413C14.021 17.8043 13.55 18 13 18H3ZM7 8.85V12C7 12.2833 7.096 12.5207 7.288 12.712C7.47933 12.904 7.71667 13 8 13C8.28333 13 8.521 12.904 8.713 12.712C8.90433 12.5207 9 12.2833 9 12V8.85L9.9 9.725C10.1 9.90833 10.3377 9.996 10.613 9.988C10.8877 9.97933 11.1167 9.88333 11.3 9.7C11.4833 9.51667 11.575 9.28333 11.575 9C11.575 8.71667 11.4833 8.48333 11.3 8.3L8.7 5.7C8.51667 5.51667 8.28333 5.425 8 5.425C7.71667 5.425 7.48333 5.51667 7.3 5.7L4.7 8.3C4.51667 8.48333 4.425 8.71667 4.425 9C4.425 9.28333 4.51667 9.51667 4.7 9.7C4.88333 9.88333 5.11233 9.97933 5.387 9.988C5.66233 9.996 5.9 9.90833 6.1 9.725L7 8.85Z\" fill=\"#7F7F7F\"/> </svg>",
+      "people": "<svg width=\"18\" height=\"14\" viewBox=\"0 0 18 14\" fill=\"none\"> <path d=\"M14.7273 8.18182C14.4955 8.18182 14.3013 8.10327 14.1447 7.94618C13.9876 7.78964 13.9091 7.59546 13.9091 7.36364V5.72727H12.2727C12.0409 5.72727 11.8467 5.64873 11.6902 5.49164C11.5331 5.33509 11.4545 5.14091 11.4545 4.90909C11.4545 4.67727 11.5331 4.48282 11.6902 4.32573C11.8467 4.16918 12.0409 4.09091 12.2727 4.09091H13.9091V2.45455C13.9091 2.22273 13.9876 2.02827 14.1447 1.87118C14.3013 1.71464 14.4955 1.63636 14.7273 1.63636C14.9591 1.63636 15.1533 1.71464 15.3098 1.87118C15.4669 2.02827 15.5455 2.22273 15.5455 2.45455V4.09091H17.1818C17.4136 4.09091 17.6078 4.16918 17.7644 4.32573C17.9215 4.48282 18 4.67727 18 4.90909C18 5.14091 17.9215 5.33509 17.7644 5.49164C17.6078 5.64873 17.4136 5.72727 17.1818 5.72727H15.5455V7.36364C15.5455 7.59546 15.4669 7.78964 15.3098 7.94618C15.1533 8.10327 14.9591 8.18182 14.7273 8.18182ZM6.54545 6.54545C5.64545 6.54545 4.875 6.225 4.23409 5.58409C3.59318 4.94318 3.27273 4.17273 3.27273 3.27273C3.27273 2.37273 3.59318 1.60227 4.23409 0.961364C4.875 0.320455 5.64545 0 6.54545 0C7.44545 0 8.21591 0.320455 8.85682 0.961364C9.49773 1.60227 9.81818 2.37273 9.81818 3.27273C9.81818 4.17273 9.49773 4.94318 8.85682 5.58409C8.21591 6.225 7.44545 6.54545 6.54545 6.54545ZM0.818182 13.0909C0.586364 13.0909 0.392182 13.0124 0.235636 12.8553C0.0785454 12.6987 0 12.5045 0 12.2727V10.8C0 10.3364 0.119455 9.91009 0.358364 9.52118C0.596727 9.13282 0.913636 8.83636 1.30909 8.63182C2.15455 8.20909 3.01364 7.89191 3.88636 7.68027C4.75909 7.46918 5.64545 7.36364 6.54545 7.36364C7.44545 7.36364 8.33182 7.46918 9.20455 7.68027C10.0773 7.89191 10.9364 8.20909 11.7818 8.63182C12.1773 8.83636 12.4942 9.13282 12.7325 9.52118C12.9715 9.91009 13.0909 10.3364 13.0909 10.8V12.2727C13.0909 12.5045 13.0124 12.6987 12.8553 12.8553C12.6987 13.0124 12.5045 13.0909 12.2727 13.0909H0.818182Z\" fill=\"#7F7F7F\"/> </svg>",
+      "recycle": "<svg width=\"16\" height=\"18\" viewBox=\"0 0 16 18\" fill=\"none\"><path d=\"M3 18C2.45 18 1.97933 17.8043 1.588 17.413C1.196 17.021 1 16.55 1 16V3C0.716667 3 0.479 2.90433 0.287 2.713C0.0956668 2.521 0 2.28333 0 2C0 1.71667 0.0956668 1.479 0.287 1.287C0.479 1.09567 0.716667 1 1 1H5C5 0.716667 5.096 0.479 5.288 0.287C5.47933 0.0956666 5.71667 0 6 0H10C10.2833 0 10.521 0.0956666 10.713 0.287C10.9043 0.479 11 0.716667 11 1H15C15.2833 1 15.5207 1.09567 15.712 1.287C15.904 1.479 16 1.71667 16 2C16 2.28333 15.904 2.521 15.712 2.713C15.5207 2.90433 15.2833 3 15 3V16C15 16.55 14.8043 17.021 14.413 17.413C14.021 17.8043 13.55 18 13 18H3ZM7 8.85V12C7 12.2833 7.096 12.5207 7.288 12.712C7.47933 12.904 7.71667 13 8 13C8.28333 13 8.521 12.904 8.713 12.712C8.90433 12.5207 9 12.2833 9 12V8.85L9.9 9.725C10.1 9.90833 10.3377 9.996 10.613 9.988C10.8877 9.97933 11.1167 9.88333 11.3 9.7C11.4833 9.51667 11.575 9.28333 11.575 9C11.575 8.71667 11.4833 8.48333 11.3 8.3L8.7 5.7C8.51667 5.51667 8.28333 5.425 8 5.425C7.71667 5.425 7.48333 5.51667 7.3 5.7L4.7 8.3C4.51667 8.48333 4.425 8.71667 4.425 9C4.425 9.28333 4.51667 9.51667 4.7 9.7C4.88333 9.88333 5.11233 9.97933 5.387 9.988C5.66233 9.996 5.9 9.90833 6.1 9.725L7 8.85Z\" fill=\"#7F7F7F\"/></svg>",
+      "dish": "<svg width=\"16\" height=\"16\" viewBox=\"0 0 16 16\" fill=\"none\"><path fill-rule=\"evenodd\" clip-rule=\"evenodd\" d=\"M0.857143 0C1.33053 0 1.71429 0.383755 1.71429 0.857143V3.71429C1.71429 4.24472 1.925 4.75343 2.30007 5.12849C2.46348 5.29191 2.65225 5.42412 2.85715 5.5213V0.857143C2.85715 0.383755 3.24089 0 3.71429 0C4.18767 0 4.57143 0.383755 4.57143 0.857143V5.5213C4.778 5.42332 4.96648 5.29052 5.12849 5.12849C5.31422 4.94278 5.46153 4.7223 5.56205 4.47965C5.66255 4.237 5.71429 3.97693 5.71429 3.71429V0.857143C5.71429 0.383755 6.09804 0 6.57143 0C7.04481 0 7.42857 0.383755 7.42857 0.857143V3.71429C7.42857 4.20205 7.33249 4.68504 7.14584 5.13568C6.95918 5.58632 6.68559 5.99577 6.34069 6.34068C5.99577 6.68559 5.58632 6.95918 5.13568 7.14584C5.04428 7.1837 4.95153 7.21783 4.8577 7.2482V14.8298C4.8577 15.4609 4.34603 15.9726 3.71485 15.9726C3.08366 15.9726 2.57199 15.4609 2.57199 14.8298V7.24856C2.01749 7.06933 1.50763 6.76043 1.08789 6.34068C0.391326 5.64412 0 4.69937 0 3.71429V0.857143C0 0.383755 0.383755 0 0.857143 0ZM12.3431 0C10.3182 0 8.9819 1.97353 8.9819 3.98727C8.9819 5.59214 9.83062 7.17145 11.2003 7.74664V14.8298C11.2003 15.461 11.7119 15.9726 12.3431 15.9726C12.9743 15.9726 13.486 15.461 13.486 14.8298V7.74666C14.8557 7.1715 15.7044 5.59216 15.7044 3.98727C15.7044 1.97353 14.3681 0 12.3431 0Z\" fill=\"#7F7F7F\"/></svg>",
+      "washer": "<svg width=\"15\" height=\"18\" viewBox=\"0 0 15 18\" fill=\"none\"><path fill-rule=\"evenodd\" clip-rule=\"evenodd\" d=\"M0 1.92857C0 0.863451 0.839463 0 1.875 0H13.125C14.1605 0 15 0.863451 15 1.92857V3.19011H0V1.92857ZM0 4.79726V16.0714C0 17.1365 0.839463 18 1.875 18H13.125C14.1605 18 15 17.1365 15 16.0714V4.79726H0ZM2.99061 10.9285C2.99061 10.6721 3.01094 10.42 3.0501 10.1742C3.05191 10.1615 3.05399 10.1489 3.05629 10.1363C3.09968 9.87741 3.16398 9.62548 3.24744 9.38257C3.86604 7.5824 5.5351 6.29034 7.49998 6.29034C9.99043 6.29034 12.0094 8.36694 12.0094 10.9285C12.0094 13.4901 9.99043 15.5668 7.49998 15.5668C5.00953 15.5668 2.99061 13.4901 2.99061 10.9285ZM4.37784 10.5435C4.42834 10.2338 4.68895 10.007 4.99423 10.007H5.43653C6.39234 10.007 6.95273 10.2468 7.45651 10.4624L7.5317 10.4946C8.00289 10.6953 8.47853 10.8843 9.42025 10.8843H10.0412C10.225 10.8843 10.3995 10.9676 10.5183 11.1119C10.637 11.2562 10.688 11.447 10.6576 11.6335C10.4049 13.1828 9.09593 14.3634 7.5177 14.3634C5.7593 14.3634 4.33384 12.8971 4.33384 11.0885C4.33384 10.9033 4.34885 10.7211 4.37784 10.5435Z\" fill=\"#7F7F7F\"/></svg>",
+      "bath": "<svg width=\"17\" height=\"17\" viewBox=\"0 0 17 17\" fill=\"none\"><path d=\"M11.9167 11C13.4355 11 14.6667 12.2312 14.6667 13.75C14.6667 15.2688 13.4355 16.5 11.9167 16.5C10.3978 16.5 9.16667 15.2688 9.16667 13.75C9.16667 12.2312 10.3978 11 11.9167 11ZM3.66667 7.33333C5.69171 7.33333 7.33333 8.97499 7.33333 11C7.33333 13.025 5.69171 14.6667 3.66667 14.6667C1.64162 14.6667 0 13.025 0 11C0 8.97499 1.64162 7.33333 3.66667 7.33333ZM11.9167 0C14.448 0 16.5 2.05203 16.5 4.58333C16.5 7.11462 14.448 9.16667 11.9167 9.16667C9.38538 9.16667 7.33333 7.11462 7.33333 4.58333C7.33333 2.05203 9.38538 0 11.9167 0Z\" fill=\"#7F7F7F\"/></svg>",
+      "hang": "<svg width=\"19\" height=\"17\" viewBox=\"0 0 19 17\" fill=\"none\"><path d=\"M12.3229 0C12.5536 5e-05 12.7811 0.05375 12.987 0.15625L13.0732 0.202633L17.9202 3.02978C18.287 3.24391 18.4345 3.70038 18.262 4.08854L16.5954 7.8385C16.503 8.04642 16.3292 8.20758 16.1152 8.2845C15.901 8.36133 15.6644 8.34708 15.4609 8.24542L14.167 7.5985V15C14.167 15.9203 13.4206 16.6665 12.5003 16.6667H5.83363C4.91315 16.6667 4.16696 15.9205 4.16696 15V7.5985L2.87302 8.24542C2.66955 8.34717 2.43286 8.36125 2.21872 8.2845C2.0046 8.20767 1.831 8.04642 1.73858 7.8385L0.0719134 4.08854C-0.100649 3.70028 0.0467051 3.24387 0.413705 3.02978L5.26071 0.202633L5.34698 0.15625C5.55278 0.0537833 5.78025 0 6.01104 0L6.16811 0.00814168C6.93491 0.0853583 7.41063 0.719017 7.5573 1.26628C7.7478 1.97733 8.3973 2.5 9.16696 2.5C9.93655 2.49986 10.5861 1.97727 10.7766 1.26628C10.9331 0.682517 11.4635 3.33333e-05 12.3229 0Z\" fill=\"#7F7F7F\"/></svg>",
+      "clean": "<svg width=\"20\" height=\"20\" viewBox=\"0 0 17 17\" fill=\"none\"><path d=\"M11.9167 11C13.4355 11 14.6667 12.2312 14.6667 13.75C14.6667 15.2688 13.4355 16.5 11.9167 16.5C10.3978 16.5 9.16667 15.2688 9.16667 13.75C9.16667 12.2312 10.3978 11 11.9167 11ZM3.66667 7.33333C5.69171 7.33333 7.33333 8.97499 7.33333 11C7.33333 13.025 5.69171 14.6667 3.66667 14.6667C1.64162 14.6667 0 13.025 0 11C0 8.97499 1.64162 7.33333 3.66667 7.33333ZM11.9167 0C14.448 0 16.5 2.05203 16.5 4.58333C16.5 7.11462 14.448 9.16667 11.9167 9.16667C9.38538 9.16667 7.33333 7.11462 7.33333 4.58333C7.33333 2.05203 9.38538 0 11.9167 0Z\" fill=\"#7F7F7F\"/></svg>"
+  };
+  const ICON_RULES = [
+    [/설거지|주방|그릇|식기/, 'dish'],
+    [/널|건조|개기/, 'hang'],
+    [/빨래|세탁/, 'washer'],
+    [/욕실|화장실|샤워|변기/, 'bath'],
+    [/분리\s*수거|재활용/, 'recycle'],
+    [/쓰레기|음쓰|음식물/, 'trash'],
+    [/청소|바닥|걸레|정리/, 'clean'],
+    [/소음|조용|시끄|소리/, 'noise'],
+    [/초대|손님|외부인|외박/, 'people']
+  ];
+  // 매칭되는 키워드가 없으면 기본 아이콘(집)
+  const ICON_DEFAULT = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1.2 0.8 7.2V15h5.2v-4.6h4V15h5.2V7.2z" fill="#7F7F7F"/></svg>';
+  const iconFor = t => { const m = ICON_RULES.find(([re]) => re.test(t)); return m ? ICONS[m[1]] : ICON_DEFAULT; };
+
+  // 오늘 날짜 기준으로 반복 옵션 문구를 만든다
+  (() => {
+    const now = new Date(), D = now.getDate(), M = now.getMonth() + 1;
+    const wd = '일월화수목금토'[now.getDay()];
+    const nth = ['첫 번째', '두 번째', '세 번째', '네 번째', '다섯 번째'][Math.ceil(D / 7) - 1];
+    const text = { m1: D + '일마다 반복', m2: nth + ' ' + wd + '요일마다 반복',
+                   y1: M + '월 ' + D + '일에 반복', y2: M + '월 ' + nth + ' ' + wd + '요일마다 반복' };
+    document.querySelectorAll('[data-t]').forEach(el => el.textContent = text[el.dataset.t]);
+  })();
+
+  // 밑줄 친 숫자는 직접 고칠 수 있다 (숫자만, 두 자리까지)
+  document.querySelectorAll('.num').forEach(n => {
+    n.oninput = () => {
+      const v = n.textContent.replace(/\D/g, '').slice(0, 2);
+      if (v !== n.textContent || n.children.length) n.textContent = v;   // <br> 등 섞여 들어온 태그도 걷어낸다
+    };
+    n.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); n.blur(); } };   // 숫자칸은 한 줄
+    n.onblur = () => { if (!n.textContent || n.textContent === '0') n.textContent = '1'; };
+  });
+
+  // 이미지 스트립: 드래그해서 좌우로 넘겨보기 (스크롤바는 CSS에서 숨김)
+  document.querySelectorAll('.uploads').forEach(strip => {
+    let x0 = 0, left0 = 0, moved = false, down = false;
+    strip.addEventListener('pointerdown', e => {
+      down = true; moved = false; x0 = e.clientX; left0 = strip.scrollLeft;
+    });
+    strip.addEventListener('pointermove', e => {
+      if (!down) return;
+      const dx = e.clientX - x0;
+      if (!moved && Math.abs(dx) > 4) {
+        // ponytail: 포인터 캡처는 '실제로 끌기 시작한 뒤'에만. 처음부터 잡으면
+        // 브라우저가 click을 스트립에 쏴서 Upload 버튼이 안 눌린다.
+        moved = true;
+        strip.classList.add('dragging');
+        strip.setPointerCapture(e.pointerId);
+      }
+      if (moved) strip.scrollLeft = left0 - dx;
+    });
+    const end = e => {
+      down = false;
+      strip.classList.remove('dragging');
+      if (strip.hasPointerCapture?.(e.pointerId)) strip.releasePointerCapture(e.pointerId);
+    };
+    strip.addEventListener('pointerup', end);
+    strip.addEventListener('pointercancel', end);
+    // 드래그로 끝난 동작은 클릭(=파일 선택/삭제)으로 이어지지 않게
+    strip.addEventListener('click', e => { if (moved) { e.stopPropagation(); e.preventDefault(); } }, true);
+  });
+
+  let seq = 1000;       // 새 카드는 항상 기존 카드 뒤 순서를 갖도록
+  let editing = null;   // 카드를 눌러서 연 경우 그 카드를 수정, 아니면 새로 추가
+
+  // 카드 -> 작성 화면 채우기
+  const openCompose = (kind, card) => {
+    const cp = document.querySelector('.compose[data-for="' + kind + '"]');
+    const title = cp.querySelector('.t-input'), area = cp.querySelector('.t-area');
+    editing = card || null;
+    cp.querySelector('.btn-submit').textContent = card ? '수정하기' : '등록하기';
+    cp.querySelector('.btn-cancel').textContent = card ? '삭제' : '취소';
+    title.value = card ? card.querySelector('b').textContent : '';
+    area.value = card ? card.querySelector('.desc').textContent : '';
+
+    cp.querySelectorAll('.thumb').forEach(t => t.remove());
+    if (cp.querySelector('.uploads'))
+      JSON.parse((card && card.dataset.imgs) || '[]')
+        .forEach(u => cp.querySelector('.uploads').append(makeThumb(u)));
+
+    const tips = SUGGEST[kind][title.value] || SUGGEST[kind][''];
+    cp.querySelectorAll('.ai-chip span').forEach((sp, i) => sp.innerHTML = tips[i]);
+    cp.querySelector('.t-icon').innerHTML = iconFor(title.value);
+
+    if (card && kind === 'chore') {
+      const who = card.querySelector('.badge').textContent;
+      cp.querySelectorAll('.pick[data-g="who"] .filter')
+        .forEach(f => f.classList.toggle('on', f.textContent === who));
+
+      const chips = [...card.querySelectorAll('.chip')].map(c => c.textContent);
+      cp.querySelectorAll('.rrow').forEach(r => r.querySelector('.chk')
+        .classList.toggle('on', r.querySelector('span:last-child').textContent.replace(/ /g, '').trim() === chips[0]));
+      const days = (chips[1] || '').split(',');
+      cp.querySelectorAll('.day .filter').forEach(d => d.classList.toggle('on', days.includes(d.textContent)));
+      cp.querySelectorAll('.rep .filter').forEach(r => r.classList.toggle('on', r.textContent === chips[1]));
+    } else if (kind === 'chore') {
+      cp.querySelectorAll('.pick .filter, .day .filter, .rrow .chk').forEach(x => x.classList.remove('on'));
+      cp.querySelector('.switch').classList.remove('on');
+      cp.querySelectorAll('.rep .filter').forEach(x => x.classList.remove('on'));
+      cp.querySelectorAll('.pickdate').forEach(x => x.textContent = '반복할 날짜 선택');
+    }
+    cp.classList.remove('live');   // 이미 채워진 값이 애니메이션으로 튀지 않게
+    if (cp._syncCond) cp._syncCond();
+    title.dispatchEvent(new Event('input'));
+    cp.hidden = false;
+  };
+
+  // 등록하기 -> 카드 새로 추가하거나, 열어둔 카드를 수정
+  const saveRule = (cp, t, b) => {
+    const kind = cp.dataset.for;
+    const list = document.querySelector('[data-panel="' + kind + '"] .list');
+    const isNew = !editing;
+    const card = editing || document.createElement('div');
+    const wasOn = !!card.querySelector && !!card.querySelector('.chk.on');
+    const icon = iconFor(t) || (card.querySelector && card.querySelector('.titlerow svg') || {}).outerHTML || '';
+    if (isNew) {
+      card.dataset.i = seq++;
+      card.className = kind === 'manner' ? 'card manner' : 'card';
+    }
+    b = esc(b.replace(/\n/g, ' '));
+
+    if (kind === 'manner') {
+      card.innerHTML = PIN.manner
+        + '<div class="col"><div class="titlerow">' + icon + '<b>' + esc(t) + '</b></div>'
+        + '<div class="desc">' + b + '</div></div>';
+    } else {
+      const who = (cp.querySelector('.pick[data-g="who"] .filter.on') || { textContent: '나' }).textContent;
+      const cycle = cycleOf(cp);
+      const open = [...cp.querySelectorAll('[data-when]')].find(r => !r.hidden);
+      const extra = !open ? ''
+        : open.classList.contains('day') ? [...open.querySelectorAll('.filter.on')].map(d => d.textContent).join(',')
+        : (open.querySelector('.filter.on') || {}).textContent || '';
+      const chips = (cycle ? [cycle] : []).concat(extra ? [extra] : [])
+        .map(c => '<div class="chip">' + c + '</div>').join('');
+      card.innerHTML = PIN.chore
+        + '<div class="cbody"><div class="ctop"><div class="head">'
+        + '<div class="titlerow">' + icon + '<b>' + esc(t) + '</b><div class="badge">' + who + '</div></div>'
+        + '<span class="chk' + (who === '나' ? '' : ' red') + (wasOn ? ' on' : '') + '"></span>'
+        + '</div><div class="desc">' + b + '</div></div>'
+        + '<div class="chips">' + chips + '</div></div>';
+    }
+    if (cp.querySelector('.uploads')) card.dataset.imgs = JSON.stringify(thumbUrls(cp));
+    bindAll(card);
+    if (isNew) {
+      list.append(card);
+      const all = document.querySelector('[data-panel="chore"] .filter[data-f="all"]');
+      all.parentElement.querySelectorAll('.filter').forEach(f => f.classList.toggle('on', f === all));
+      // 새 가사 규칙을 처음 등록했을 때 부모 창(틈새살이 메인 화면)에 알려준다.
+      if (kind === 'chore') {
+        try { window.parent.postMessage({ source: 'teum-app2', type: 'chore-rule-added' }, '*'); } catch (e) {}
+      }
+    }
+    sync(); applyFilter(); reorder(list);
+  };
+
+  // + 버튼: 빈 폼으로 열기
+  fab.onclick = () => openCompose(document.querySelector('.tab.active').dataset.tab, null);
+
+  document.querySelectorAll('.compose').forEach(cp => {
+    const area = cp.querySelector('.t-area'), title = cp.querySelector('.t-input');
+    const submit = cp.querySelector('.btn-submit');
+    // 등록/수정 가능 조건: 매너는 제목+본문, 가사는 담당자·담당 주기(+세부 옵션)까지
+    const ready = () => {
+      if (!title.value.trim() || !area.value.trim()) return false;
+      if (cp.dataset.for !== 'chore') return true;
+      if (!cp.querySelector('.pick[data-g="who"] .filter.on')) return false;
+      if (!cp.querySelector('.rrow .chk.on')) return false;
+      const alarm = cp.querySelector('.pick[data-g="alarm"]');
+      if (!alarm.hidden && !alarm.querySelector('.filter.on')) return false;   // 알림 켰으면 시점도 골라야
+      const open = [...cp.querySelectorAll('[data-when]')].find(r => !r.hidden);
+      const opt = open && open.querySelector('.filter.on');
+      return !open || (!!opt && !(opt.classList.contains('pickdate') && opt.textContent === '반복할 날짜 선택'));   // 날짜 칩은 날짜를 골라야
+    };
+    const check = () => submit.classList.toggle('ready', ready());
+    cp.addEventListener('click', () => { cp.classList.add('live'); check(); });
+    const close = () => { cp.hidden = true; title.value = area.value = ''; editing = null; check(); };
+
+    const tIcon = cp.querySelector('.t-icon');
+    // 제목이 추천 목록에 있는 이름('설거지' 등)이 되면 AI 추천 칩도 그 규칙에 맞는 문구로 바꾼다
+    title.oninput = () => {
+      tIcon.innerHTML = iconFor(title.value);
+      const tips = (SUGGEST[cp.dataset.for] || {})[title.value];
+      if (tips) cp.querySelectorAll('.ai-chip span').forEach((sp, i) => sp.innerHTML = tips[i]);
+      check();
+    };
+    area.oninput = check;
+    cp.querySelector('.close').onclick = close;
+    cp.querySelector('.btn-cancel').onclick = () => {      // 기존 항목이면 삭제, 새 규칙이면 취소
+      if (editing) { editing.remove(); sync(); applyFilter(); }
+      close();
+    };
+    submit.onclick = () => {
+      if (!submit.classList.contains('ready')) return;
+      saveRule(cp, title.value.trim(), area.value.trim());
+      close();
+    };
+
+    const rows = [...cp.querySelectorAll('.rrow')];                        // 담당 주기: 줄 전체가 선택 영역
+    rows.forEach(r => r.onclick = () => {
+      rows.forEach(x => x.querySelector('.chk').classList.toggle('on', x === r));
+      syncCond();
+    });
+    cp.querySelectorAll('.day .filter').forEach(d => d.onclick = () => d.classList.toggle('on'));
+    cp.querySelectorAll('.rep').forEach(g => {                             // 반복 옵션: 1개 선택
+      const opts = [...g.querySelectorAll('.filter')];
+      opts.forEach(o => o.onclick = () => opts.forEach(x => x.classList.toggle('on', x === o)));
+    });
+    cp.querySelectorAll('.pick').forEach(g => {                            // 분류/담당자/알림: 1개 선택
+      const opts = [...g.querySelectorAll('.filter:not(.add)')];
+      opts.forEach(o => o.onclick = () => opts.forEach(x => x.classList.toggle('on', x === o)));
+    });
+    // 요일 칩은 '주마다'일 때만, 알림 칩은 토글이 켜졌을 때만 보인다
+    // Upload: 네이티브 파일 선택 + 미리보기
+    const up = cp.querySelector('.upload');
+    if (up) {
+      const file = up.querySelector('input'), strip = up.parentElement;
+      up.onclick = () => file.click();
+      file.onchange = () => {
+        [...file.files].forEach(f => strip.append(makeThumb(URL.createObjectURL(f))));
+        file.value = '';   // 같은 파일을 다시 골라도 change가 뜨도록
+      };
+    }
+
+    // 반복할 날짜 선택: 네이티브 date input
+    const dp = cp.querySelector('.datepick');
+    let dpChip = null;
+    cp.querySelectorAll('.pickdate').forEach(c => c.addEventListener('click', () => {
+      dpChip = c;
+      try { dp.showPicker(); } catch (_) { dp.click(); }
+    }));
+    if (dp) dp.onchange = () => {
+      if (!dpChip || !dp.value) return;
+      const [, m, d] = dp.value.split('-');
+      dpChip.textContent = (dpChip.closest('[data-when="개월마다"]') ? '' : +m + '월 ') + +d + '일 반복';   // 매월 반복엔 월이 필요 없다
+      check();
+    };
+
+    const sw = cp.querySelector('.switch');
+    const alarmRow = cp.querySelector('.pick[data-g="alarm"]');
+    const syncCond = cp._syncCond = () => {
+      const row = cp.querySelector('.rrow .chk.on');
+      const cycle = row ? row.closest('.rrow').textContent : '';
+      cp.querySelectorAll('[data-when]').forEach(r => r.hidden = !cycle.includes(r.dataset.when));
+      if (alarmRow) alarmRow.hidden = !sw.classList.contains('on');
+    };
+    if (sw) sw.onclick = () => {
+      sw.classList.toggle('on');
+      if (!sw.classList.contains('on')) alarmRow.querySelectorAll('.filter').forEach(f => f.classList.remove('on'));
+      syncCond();
+    };
+
+    // AI 추천 칩 -> 본문에 문구 채우기
+    cp.querySelectorAll('.ai-chip').forEach(chip => chip.onclick = () => {
+      area.value = chip.querySelector('span').innerHTML.replace(/<br\s*\/?>/gi, ' ');
+      area.focus();
+      check();
+    });
+  });
+
+  document.querySelectorAll('.tab').forEach(tab => tab.onclick = () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t === tab));
+    document.querySelectorAll('[data-panel]').forEach(p => p.hidden = p.dataset.panel !== tab.dataset.tab);
+    scroll.scrollTop = 0;
+  });
+</script>
+<!-- 틈새살이 체험용 미션 가이드 연결 (화면 구성은 그대로, 가이드 대상/자동입력만 등록) -->
+<script src="../app-guide-bridge.js"></script>
+<script>
+  (() => {
+    const cpChore = () => document.querySelector('.compose[data-for="chore"]');
+    const choreCard = title => [...document.querySelectorAll('[data-panel="chore"] .list .card')]
+      .filter(c => (c.querySelector('b') || {}).textContent === title).pop() || null;
+    const cycleRow = () => cpChore().querySelectorAll('.rrow')[1];   // "1일마다"
+
+    TeumGuide.register({
+      choreTab:    () => document.querySelector('.tab[data-tab="chore"]'),
+      fab:         () => document.getElementById('fab'),
+      title:       () => cpChore().querySelector('.t-wrap'),
+      who:         () => cpChore().querySelector('.pick[data-g="who"]'),
+      cycle:       () => cycleRow(),
+      content:     () => cpChore().querySelector('.t-area'),
+      aiChip:      () => cpChore().querySelector('.ai-chip'),   // AI 규칙 추천 첫 칩 - 누르면 규칙 내용이 채워진다
+      submit:      () => cpChore().querySelector('.btn-submit'),
+      dishCard:    () => choreCard('설거지'),
+      recycleCard: () => choreCard('분리 수거'),
+      recycleChk:  () => { const c = choreCard('분리 수거'); return c && c.querySelector('.chk'); },
+      rate:        () => document.getElementById('pct').parentElement.parentElement
+    }, {
+      // 미션 시작 전: 열려 있던 작성 화면을 닫고 목록 맨 위로
+      'reset-view': () => {
+        document.querySelectorAll('.compose').forEach(cp => { if (!cp.hidden) TeumGuide.click(cp.querySelector('.close')); });
+        const all = document.querySelector('[data-panel="chore"] .filter[data-f="all"]');
+        if (all && !all.classList.contains('on')) TeumGuide.click(all);   // 필터 때문에 카드가 숨지 않게
+        scroll.scrollTop = 0;
+      },
+      // 마크업의 메이트 이름(서은민)을 게임 메이트 이름으로 - 남성 관람객이면 서민호 (app_3 set-names·app_4 set-mate와 같은 일)
+      'set-mate': v => {
+        if (!v) return;
+        if (!window.__mateNodes) {
+          window.__mateNodes = [];
+          const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+          for (let n; (n = w.nextNode());) if (n.nodeValue.includes('서은민')) window.__mateNodes.push([n, n.nodeValue]);
+        }
+        window.__mateNodes.forEach(([n, o]) => { n.nodeValue = o.replaceAll('서은민', v); });
+      },
+      'type-title':   v => TeumGuide.type(cpChore().querySelector('.t-input'), v),
+      'pick-who':     v => TeumGuide.click([...cpChore().querySelectorAll('.pick[data-g="who"] .filter')].find(f => f.textContent === v)),
+      'pick-cycle':   () => TeumGuide.click(cycleRow()),
+      'type-content': v => TeumGuide.type(cpChore().querySelector('.t-area'), v, 45),
+      // 분리수거 체크 미션은 '아직 안 한 상태'에서 시작해야 하므로 체크를 풀어둔다
+      'uncheck-recycle': () => {
+        const c = choreCard('분리 수거'), chk = c && c.querySelector('.chk');
+        if (chk && chk.classList.contains('on')) TeumGuide.click(chk);
+        scroll.scrollTop = 0;
+      }
+    });
+  })();
+</script>
+</body>
+</html>

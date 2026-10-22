@@ -1,0 +1,1415 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<!-- 폰 프레임(412) + 여백(20×2) = 452. 폰에서는 이 폭 전체가 화면에 맞게 축소된다 -->
+<meta name="viewport" content="width=452">
+<title>홈</title>
+<link rel="stylesheet" href="../teum-cursor.css">
+<style>
+  @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+  @font-face {
+    font-family: 'NationalPension';
+    src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2310@1.0/NPSfontBold.woff2') format('woff2');
+    font-weight: 700;
+    font-display: swap;
+  }
+  /* 게임 화면 폰 안(iframe)은 해상도에 따라 축소 반올림으로 412x892보다 1px 작아질 때가 있다 → 페이지가 넘쳐 가로·세로 스크롤바가 생기며
+     화면이 작아 보였다(합의서와 같은 문제). 페이지 자체는 스크롤하지 않는다 (앱 안 스크롤 영역은 그대로) */
+  html, body { overflow: hidden; }
+  body {
+    margin: 0; padding: 0;   /* 게임 폰 프레임(412x892 iframe)에 딱 맞게 - 여백이 있으면 가로·세로 스크롤이 생겼다 */
+    display: flex; justify-content: center; align-items: center;
+    background: #e2e8f0;
+    font-family: 'Pretendard', sans-serif;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+  .app-wrapper {
+    position: relative;
+    width: 412px; height: 892px; flex-shrink: 0;   /* 창이 좁아도 폰 프레임이 찌그러지지 않게 */
+    border-radius: 30px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.15);
+    background: #F7F8FA;
+    overflow: hidden;
+    user-select: none; -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    /* 한글은 어절 단위로만 줄바꿈, 띄어쓰기 없는 긴 문자열(URL 등)만 칸 끝에서 끊는다 */
+    word-break: keep-all; overflow-wrap: break-word;
+  }
+  /* ponytail: Figma dev-mode CSS emits width = full visual width with padding inside. */
+  .app-wrapper, .app-wrapper * { box-sizing: border-box; }
+  .nps { font-family: 'NationalPension', 'Pretendard', sans-serif; }
+
+  .card { background: white; border-radius: 12px; outline: 1px #F0F0F0 solid; outline-offset: -1px;
+          position: relative; }
+
+  /* ponytail: Figma 프레임이 1344px — 892 화면에 안 들어가니 본문만 스크롤시킨다.
+     .page 안은 Figma 좌표 그대로 쓰고, 헤더/탭바만 wrapper에 고정. */
+  .scroll { position: absolute; inset: 0; overflow-y: auto; overflow-x: hidden; }
+  .scroll::-webkit-scrollbar { width: 0; }
+  /* ponytail: 카드를 Figma 좌표로 박아두면 일정이 접혀도 아래가 안 따라 올라온다.
+     세로 흐름으로 바꾸고, 원래 좌표 차이를 그대로 margin으로 옮겼다 (108/24/9/15/15/20/114). */
+  .page { width: 412px; padding: 108px 16px 114px; position: relative;
+          display: flex; flex-direction: column; }
+  .page > * + * { margin-top: 15px; }
+  .today { margin-top: 24px; }
+  .rules { margin-top: 7px; }   /* today의 그라데이션 테두리 1px×2 만큼 뺀다 */
+  .edit  { margin-top: 20px; }
+  .grid  { display: flex; gap: 14px; }   /* 183 + 14 + 183 = 380 */
+
+  /* 카드 제목 + 오른쪽 화살표 — 6장이 같은 머리를 쓴다 */
+  .hd { display: flex; justify-content: space-between; align-items: center; }
+  .hd b { color: black; font-size: 18px; font-weight: 700; }
+  .chev { width: 6px; height: 10px; flex: 0 0 auto; }
+
+  /* ===== 안건 ===== */
+  .notice { width: 380px; height: 78px; background: white; border-radius: 10px; padding: 15px 17px;
+            display: flex; flex-direction: column; gap: 8px; }
+  .notice .top { display: flex; align-items: center; gap: 9px; }
+  .notice .top b { color: black; font-size: 20px; font-weight: 700; }
+  .notice .top svg:last-child { margin-left: auto; }
+  .notice p { margin: 0; color: black; font-size: 14px;
+              white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* ===== 오늘의 일정 ===== */
+  /* 유일하게 높이가 내용 따라 늘어나는 카드 — 나머지는 Figma 고정 크기라 절대배치 */
+  /* 테두리가 위→아래 초록→분홍 그라데이션. outline은 그라데이션을 못 받으므로
+     app_3의 .pay와 같은 2겹 배경 기법을 쓴다 (padding-box 흰 면 + border-box 그라데이션). */
+  .today { width: 380px; padding: 20px;
+           outline: 0; border: 1px solid transparent;
+           background: linear-gradient(white, white) padding-box,
+                       linear-gradient(180deg, #71D369 0%, #FF9696 100%) border-box;
+           display: flex; flex-direction: column; gap: 12px; }
+  .today .hd { margin-bottom: 6px; }   /* 제목 아래만 18 */
+
+  /* 7칸 × 41px + 간격 = 338.9 ≒ 안쪽 340. gap 8.65 대신 space-between으로 맡긴다 */
+  .week { display: flex; justify-content: space-between; }
+  .week > div { width: 41px; height: 54px; border-radius: 12px; cursor: pointer;
+                display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; }
+  .week .d { color: #7F7F7F; font-size: 12px; line-height: 1; }
+  .week .n { color: black; font-size: 15px; font-weight: 600; line-height: 1; letter-spacing: 0.5px; }
+  /* 일정 없는 날도 4px 점자리를 비워 둔다 — 안 그러면 날짜가 위아래로 튄다 */
+  .week i { width: 4px; height: 4px; border-radius: 50%; }
+  .week .dot i { background: #71D369; }
+  .week .on { background: #71D369; }
+  .week .on .d, .week .on .n { color: white; }
+  .week .on.dot i { background: white; }   /* 점이 있는 날만 흰 점 */
+
+  .chips { display: flex; gap: 8px; }
+  .chips span { padding: 6px 12px; border-radius: 20px; cursor: pointer;
+                outline: 1px #BABFCF solid; outline-offset: -1px;
+                color: #7F7F7F; font-size: 12px; line-height: 16.8px; }
+  .chips .on { background: #499963; outline-color: #499963; color: white; }
+
+  /* ponytail: gap 대신 margin-bottom — 접힌 행이 gap까지 같이 0으로 만들 수 있다 */
+  .sched { display: flex; flex-direction: column; }
+  .sched > div { height: 60px; margin-bottom: 6px; overflow: hidden;
+                 padding: 12px 20px 12px 12px; background: #F7F8FA; border-radius: 12px;
+                 display: flex; justify-content: space-between; align-items: center;
+                 transition: height .28s cubic-bezier(.4, 0, .2, 1), margin-bottom .28s cubic-bezier(.4, 0, .2, 1),
+                             padding .28s cubic-bezier(.4, 0, .2, 1), opacity .18s ease; }
+  .sched > div:last-child { margin-bottom: 0; }
+  .sched > div.out { height: 0; margin-bottom: 0; padding-top: 0; padding-bottom: 0; opacity: 0; }
+  .sched .when { display: flex; align-items: center; gap: 12px; }
+  /* 3×36 세로선은 SVG 대신 div — stroke-linecap round = border-radius 1.5 */
+  .sched .bar { width: 3px; height: 36px; border-radius: 1.5px; flex: 0 0 auto; }
+  .sched .txt { display: flex; flex-direction: column; gap: 6px; line-height: 1.2; }
+  .sched .t { color: #474747; font-size: 10px; }
+  .sched .n { color: black; font-size: 15px; font-weight: 600; }
+  /* ponytail: padding-top 1px = 글자만 0.5px 아래로 (border-box라 알약 높이는 24 그대로).
+     Pretendard 세로 메트릭이 0.41px 위로 치우친 데다 한글은 디센더가 없어 더 떠 보인다. */
+  .sched .who { height: 24px; padding: 1px 8px 0; background: #DBDBDB; border-radius: 59px; flex: 0 0 auto;
+                display: flex; align-items: center; justify-content: center;
+                color: white; font-size: 12px; line-height: 16.8px; }
+
+  /* ===== 우리 규칙 ===== */
+  .rules { width: 380px; height: 183px; overflow: hidden; }
+  .rules .hd { position: absolute; left: 21px; top: 21px; width: 338px; }
+  .rules .cols { position: absolute; left: 21px; top: 52px; width: 338px;
+                 display: flex; justify-content: space-between; }
+  .rules ul { margin: 0; padding: 0; list-style: none; width: 141px;
+              display: flex; flex-direction: column; gap: 6px; }
+  .rules .mine { color: #71D369; }   /* chk 테두리/채움이 currentColor를 따라간다 */
+  .rules .mate { color: #FF9696; }
+  .rules li { height: 20px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+  .rules li span { color: black; font-size: 15px; font-weight: 500; }
+  .rules li.done span { color: #B3B3B3; text-decoration: line-through; }
+  .chk { width: 20px; height: 20px; flex: 0 0 auto; }
+  .chk circle { fill: none; stroke: currentColor; }
+  .chk path { display: none; }
+  .chk.done circle { fill: currentColor; }
+  .chk.done path { display: inline; fill: none; stroke: white; stroke-width: 2; stroke-linecap: round; }
+  .rules .pct { position: absolute; left: 21px; top: 148px; width: 338px;
+                display: flex; justify-content: space-between;
+                color: #999999; font-size: 10px; font-weight: 500; }
+  .rules .gauge { position: absolute; left: 21px; top: 164px; width: 338px; height: 6px;
+                  background: #EEEEEE; border-radius: 100px; overflow: hidden; display: flex; }
+  /* 두 칸이 같은 flex 줄에 있어서 앞칸 width만 바뀌어도 뒷칸이 따라 민다 — width 하나만 애니메이션 걸면 끝 */
+  .rules .gauge div { transition: width .45s cubic-bezier(.4, 0, .2, 1); }
+  .rules .gauge div:first-child { background: #71D369; }
+  .rules .gauge div:last-child  { background: #FF9696; }
+
+  /* ===== 메이트 관리 / 스마트 제어 / 금액 정산 =====
+     183×183 고정 카드 3장은 Figma 좌표 그대로 절대배치 — flex로 재현하면 여백 산수만 늘어난다. */
+  .mgmt { width: 183px; height: 183px; }
+  .mgmt .hd { position: absolute; left: 21px; top: 21px; width: 141px; }
+  .mgmt .box { position: absolute; left: 21px; top: 46px; width: 141px; height: 114px;
+               padding: 12px 16px; border-radius: 12px;
+               background: rgba(238,238,238,0.15); outline: 1px #EEEEEE solid; outline-offset: -1px;
+               display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; }
+  /* ponytail: Figma는 회색 원 placeholder. 사진 넣으려면 img.avatar로 갈아끼우면 된다. */
+  /* 흰 테두리는 55px 안쪽 2px(border-box), 그림자는 Figma의 dy1/stdDeviation1 = blur 2px */
+  .mgmt .avatar { width: 55px; height: 55px; border-radius: 50%; background: #C4C4C4;
+                  border: 2px solid white; box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+                  object-fit: cover; flex: 0 0 auto; }   /* 배경색은 이미지 로딩 전 자리잡이 */
+  .mgmt .nm { color: black; font-size: 12px; font-weight: 700; }
+  .mgmt .sub { margin-top: 2px; color: #7F7F7F; font-size: 10px; font-weight: 500; }
+
+  .smart { width: 183px; height: 183px; }
+  .smart .hd { position: absolute; left: 21px; top: 20px; width: 141px; }
+  /* 손잡이(42) 안에 아이콘이 들어가는 진짜 토글.
+     ponytail: flex-direction은 애니메이션이 안 먹는다. 손잡이를 absolute로 띄워 transform으로 밀고,
+     라벨은 padding만 바뀌게 뒀다 — 좌우 여백 두 값이 곧 Figma의 OFF/ON 라벨 위치다. */
+  .toggle { position: absolute; left: 21px; width: 141px; height: 56px;
+            border-radius: 28px; cursor: pointer;
+            background: rgba(199,199,199,0.15);
+            padding: 7px 18px 7px 61px;
+            display: flex; align-items: center; justify-content: flex-end;
+            transition: background-color .32s ease, padding .32s cubic-bezier(.4, 0, .2, 1); }
+  .toggle .knob { position: absolute; left: 9px; top: 7px;
+                  width: 42px; height: 42px; border-radius: 50%; background: white;
+                  display: flex; align-items: center; justify-content: center;
+                  transition: transform .32s cubic-bezier(.4, 0, .2, 1); }
+  .toggle b { color: black; font-size: 12px; font-weight: 600; white-space: nowrap;
+              transition: color .2s ease; }
+  .toggle.on { background: #71D369; padding: 7px 72px 7px 9px; }
+  .toggle.on .knob { transform: translateX(80px); }   /* 9 → 89, Figma ON 손잡이 위치 */
+  .toggle.on b { color: white; }
+
+  .pay { width: 183px; height: 183px; }
+  .pay .hd  { position: absolute; left: 21px; top: 20px; width: 141px; }
+  .pay .lbl { position: absolute; left: 21px; top: 53px; color: #999999; font-size: 14px; font-weight: 600; }
+  .pay .amt { position: absolute; left: 21px; top: 72px; color: black; font-size: 20px; font-weight: 700; }
+  .pay .of  { position: absolute; left: 21px; top: 106px; color: #999999; font-size: 10px; }
+  .pay button { position: absolute; left: 21px; top: 137px; width: 141px; height: 32px;
+                border: 0; background: #71D369; border-radius: 30px; cursor: pointer;
+                color: white; font-size: 12px; font-weight: 600; font-family: inherit; }
+
+  /* ===== 공용공간 예약 ===== */
+  .room { width: 183px; height: 183px; padding: 18px 21px;
+          display: flex; flex-direction: column; justify-content: space-between; }
+  /* 두 칸이 같은 규칙 하나를 쓴다 — 상태 점 있는 칸만 <i>가 하나 더 붙을 뿐 */
+  .room .slot { height: 54px; padding: 9px 12px; background: #F7F8FA; border-radius: 12px;
+                display: flex; align-items: center; justify-content: space-between; }
+  .room .slot .txt { display: flex; flex-direction: column; gap: 4px; }
+  .room .slot .k { color: #999999; font-size: 12px; }
+  .room .slot .v { color: black; font-size: 15px; font-weight: 700; }
+  .room .slot i { width: 8px; height: 8px; border-radius: 50%; background: #FF9696; flex: 0 0 auto; }
+
+  /* ===== + 편집 ===== */
+  .edit { width: 380px; padding: 6px 16px; background: #B3B3B3; border-radius: 50px; border: 0; cursor: pointer;
+          color: white; font-size: 12px; font-weight: 600; line-height: 22px; font-family: inherit; }
+
+
+  /* ===== 채팅 (감정형 미션1: 메이트와 전기값 이야기 → 안건 등록) ===== */
+  .chats, .chatroom { position: absolute; inset: 0; background: #F7F8FA; z-index: 6; overflow: hidden; }
+  .chats[hidden], .chatroom[hidden] { display: none; }
+  .chats .bell { position: absolute; left: 372px; top: 62px; z-index: 2; }
+  .chats .list { position: absolute; inset: 106px 0 0; overflow-y: auto; scrollbar-width: none; padding: 4px 16px 120px; }
+  .chats .list::-webkit-scrollbar { width: 0; }
+  .chats h3 { margin: 6px 0 0; color: black; font-size: 20px; font-weight: 700; }
+  .chats h3 + .crow { margin-top: 2px; }
+  .chats h3:not(:first-child) { margin-top: 48px; }
+  .crow { height: 95px; border-bottom: 1px solid #DBDBDB; display: flex; align-items: center; gap: 16px; cursor: pointer; }
+  .crow .face { width: 55px; height: 55px; }
+  .crow .duo { width: 55px; height: 55px; position: relative; flex: 0 0 auto; }
+  .crow .duo .face { width: 40px; height: 40px; position: absolute; }
+  .crow .duo .face + .face { left: 15px; top: 15px; }
+  .crow .txt { flex: 1; min-width: 0; }
+  .crow .nm { display: flex; align-items: center; gap: 8px; color: black; font-size: 20px; font-weight: 700; }
+  .crow .pv { margin-top: 6px; color: #7F7F7F; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .crow .side { align-self: stretch; padding-top: 25px; display: flex; flex-direction: column; align-items: flex-end; gap: 12px; flex: 0 0 auto; }
+  .crow time { color: #B2B6C5; font-size: 12px; }
+  .crow .badge { min-width: 23px; height: 21px; padding: 0 7px; box-sizing: border-box; border-radius: 10.5px; background: #FF9696;
+                 color: #F7F8FA; font-size: 12px; display: flex; align-items: center; justify-content: center; }
+  .chatroom .head img { width: 38px; height: 38px; margin-left: 10px; }
+  .chatroom .head span { margin-left: 8px; }
+  .chatroom .search { position: absolute; left: 376px; top: 64px; z-index: 2; }
+  .chatroom .msgs { position: absolute; left: 0; right: 0; top: 106px; bottom: 88px; padding: 33px 16px 20px;
+                    overflow-y: auto; scrollbar-width: none; display: flex; flex-direction: column; gap: 25px;
+                    transition: bottom .26s cubic-bezier(.4, 0, .2, 1); }
+  .chatroom .msgs::-webkit-scrollbar { width: 0; }
+  .chatroom.tray-on .msgs { bottom: 185px; }
+  .cm { display: flex; align-items: flex-end; gap: 10px; }
+  .cm .b { max-width: 300px; padding: 14px 25px; background: white; border-radius: 33px 24px 24px 0;
+           color: #1A1A1A; font-size: 15px; line-height: 20px; text-wrap: pretty; }
+  .cm time { color: #B2B6C5; font-size: 12px; flex: 0 0 auto; }
+  .cm.me { flex-direction: row-reverse; }
+  .cm.me .b { background: #71D369; color: white; border-radius: 24px 33px 0 24px; }
+  /* 안건 등록 알림 줄 (가운데 회색 알약) */
+  .cm-sys { align-self: center; padding: 8px 16px; border-radius: 100px; background: #E3E5EB; color: #575757; font-size: 13px; }
+  .cm-sys b { color: #499963; }
+
+  /* ===== 하단 탭바 ===== */
+  /* ponytail: 탭바(64px) + 홈 인디케이터를 세로 flex로 쌓는다.
+     각각 절대좌표로 두면 탭바 실제 높이와 어긋나 겹친다. */
+  .bottom { width: 412px; left: 0; top: 798px; position: absolute;
+            display: flex; flex-direction: column; align-items: center; gap: 6px; z-index: 3; }
+  /* 탭바 뒤·아래로 카드가 비쳐 보이던 것 - 탭바 뒤에 바탕색을 깔고(위쪽 24px는 서서히) 그 아래는 가린다 (app_1과 같음) */
+  .bottom::before { content: ''; position: absolute; left: 0; right: 0; top: -24px; bottom: 0; z-index: -1; pointer-events: none;
+    background: linear-gradient(to bottom, rgba(247,248,250,0), #F7F8FA 24px); }
+  /* ponytail: 본문이 탭바 밑으로 흘러가는 화면이라 헤더와 같은 blur를 걸어야 글씨가 안 겹쳐 보인다. */
+  .tabbar { width: 386px;
+            background: rgba(247, 248, 250, 0.75); border-radius: 60px;
+            backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+            display: flex; justify-content: center; align-items: center; gap: 20px; }
+  .tabbar > a { width: 56px; padding: 6px 0; text-decoration: none;
+                display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .tabbar .ico { align-self: stretch; height: 32px; position: relative;
+                 display: flex; justify-content: center; align-items: center; }
+  .tabbar span { color: #8FA18F; font-size: 12px; font-weight: 500; line-height: 16px;
+                 letter-spacing: 0.5px; text-align: center; }
+  /* ponytail: 채팅 아이콘만 중앙에서 1px 왼쪽 — Figma 배치 오차지만
+     app_1 하단 네비(left:17px)가 그대로 쓰고 있어서 두 화면을 맞춘다. */
+  .tabbar .chat svg { transform: translateX(-1px); }
+  .tabbar .on .ico { background: rgba(113, 211, 105, 0.25); border-radius: 39px; }
+  .tabbar .on span { color: #71D369; }
+  .home-ind { align-self: stretch; height: 24px; position: relative; }
+  .home-ind > div { width: 108px; height: 4px; left: 152px; top: 10px; position: absolute;
+                    background: #1D1B20; border-radius: 12px; }
+  /* ponytail: 아이콘 색을 CSS가 쥔다 — 활성 탭을 옮길 때 svg의 fill을 손댈 필요가 없다.
+     presentation attribute(fill="...")는 CSS보다 우선순위가 낮아 그대로 덮인다. */
+  .tabbar .ico path { fill: #8FA18F; }
+  .tabbar .on .ico path { fill: #71D369; }
+
+  /* ===== 안건 상세 (안건 카드 탭) ===== */
+  .notice { cursor: pointer; }
+  .agenda { position: absolute; inset: 0; background: #F7F8FA; z-index: 5; overflow: hidden; }
+  .agenda[hidden] { display: none; }
+
+  /* 스레드는 헤더(106)와 입력바(88) 사이. 트레이가 열리면 그만큼(97) 더 좁아진다. */
+  .agenda .thread { position: absolute; left: 0; right: 0; top: 106px; bottom: 88px;
+                    overflow-y: auto; scrollbar-width: none; padding-bottom: 16px;
+                    transition: bottom .26s cubic-bezier(.4, 0, .2, 1); }
+  .agenda .thread::-webkit-scrollbar { width: 0; }
+  .agenda.tray-on .thread { bottom: 185px; }
+
+  /* ---- 본문 ---- */
+  .post { margin: 6px 16px 0; display: flex; flex-direction: column; gap: 20px; }
+  .post .by { display: flex; align-items: center; gap: 10px; }
+  /* ponytail: Figma의 width:214는 4월 3일짜리 짧은 날짜 기준 — 실제 날짜가 들어가면 두 줄이 된다.
+     이 줄에 281px가 남으니 고정폭을 떼고 남은 자리를 쓰게 한다. */
+  .post .meta { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+  .post .meta b { color: black; font-size: 15px; font-weight: 700; }
+  .post .meta span { color: #7F7F7F; font-size: 12px; }
+  .post .kebab { margin-left: auto; padding: 0; border: 0; background: none; cursor: pointer; display: flex; }
+  .post p { margin: 0; color: black; font-size: 15px; line-height: 21px; }
+  /* 금전형 세 번째 미션: 내가 올린 구독권 글 (분류 줄 + 의견 나눔 목록과 같은 구독권 카드) */
+  .agenda .kind { display: flex; align-items: center; gap: 6px; margin-bottom: -6px; color: black; font-size: 16px; font-weight: 700; }
+  .agenda .kind svg { width: 24px; height: 24px; flex: 0 0 auto; }
+  .post .plan .desc { line-height: 20px; }
+  /* 줄바꿈 공통 규칙(게임 teumWrap과 같은 생각): 문장 끝(. ! ? …) 뒤에서 먼저 바꾸고, 한 단어만 남는 줄은 만들지 않는다 */
+  .ws { display: inline-block; max-width: 100%; }
+  .agenda .post p, .agenda .bubble { text-wrap: pretty; }
+  /* 규칙형 세 번째 미션: 메이트가 올린 새 규칙 투표 (투표 전 = 동그라미 고르기, 투표 후 = 체크·표 수·막대) */
+  .poll { background: white; border-radius: 12px; outline: 1px #FF9696 solid; outline-offset: -1px; overflow: hidden; padding-bottom: 23px; }
+  .poll .end { height: 36px; padding: 0 16px; box-sizing: border-box; background: #FF9696; display: flex; align-items: center; gap: 6px; color: #F8F8F8; font-size: 13px; }
+  .poll .end svg { width: 14px; height: 14px; flex: 0 0 auto; }
+  .poll .in { padding: 17px 10px 0; }
+  .poll h4 { margin: 0; color: black; font-size: 16px; font-weight: 700; line-height: 20px; }
+  .poll .anon { display: block; margin-top: 4px; color: #7F7F7F; font-size: 12px; }
+  .poll ul { margin: 20px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 24px; }
+  .poll li { cursor: pointer; }
+  .poll .opt { display: flex; align-items: center; gap: 6px; min-height: 20px; }
+  .poll .opt b { flex: 1; color: black; font-size: 13px; font-weight: 400; }
+  .poll .radio { width: 20px; height: 20px; box-sizing: border-box; border: 1px solid #FF9696; border-radius: 50%; flex: 0 0 auto; }
+  .poll li.on .radio { background: #FF9696; box-shadow: inset 0 0 0 4px white; }
+  .poll .pchk, .poll .cnt, .poll .bar { display: none; }
+  .poll .pchk { width: 16px; height: 12px; flex: 0 0 auto; margin: 0 2px; }
+  .poll .cnt { color: #7F7F7F; font-size: 13px; flex: 0 0 auto; }
+  .poll .bar { height: 6px; margin-top: 11px; background: #F9F9F9; border-radius: 3px; overflow: hidden; }
+  .poll .bar i { display: block; height: 100%; width: 0; background: #FFD3D7; transition: width .5s ease; }
+  .poll li.top .bar i { background: #FF9696; }
+  .poll.done .radio { display: none; }
+  .poll.done li { cursor: default; }
+  .poll.done li.on .pchk, .poll.done .cnt, .poll.done .bar { display: block; }
+  .poll.done li:not(.on) .opt b { padding-left: 24px; }
+  .poll .go { width: 100%; height: 39px; margin-top: 20px; border: 0; border-radius: 19.5px; background: #FF9696; color: white;
+              font: inherit; font-size: 15px; cursor: pointer; }
+  /* Figma의 height:0 + outline .5px = 헤어라인 한 줄 */
+  .post hr { margin: 4px 0 0; border: 0; border-top: .5px solid #D5D5D5; }
+
+  /* 아바타는 메이트 관리와 같은 처리 — 흰 링 2px은 안쪽, 그림자는 dy1/blur2 */
+  .face { border-radius: 50%; background: #C4C4C4; border: 2px solid white;
+          box-shadow: 0 1px 2px rgba(0,0,0,0.05); object-fit: cover; flex: 0 0 auto; }
+  .post .face { width: 49px; height: 49px; }
+
+  /* ---- 댓글 ---- */
+  /* 아바타+이름 묶음이 왼쪽, 말풍선이 오른쪽. 둘은 아래쪽 기준으로 맞춘다 —
+     그래야 말풍선의 각진 왼쪽 아래 모서리가 아바타를 가리킨다. */
+  /* 오른쪽 끝을 .sent(초록)와 맞춘다: 380 = 아바타 40 + 10 + 말풍선 285 + 6 + 시간 39 */
+  .comment { margin: 33px 16px 0; width: 380px;
+             display: flex; align-items: flex-end; gap: 10px; }
+  .comment .who { width: 40px; flex: 0 0 auto;
+                  display: flex; flex-direction: column; align-items: center; gap: 3px; }
+  .comment .who span { color: black; font-size: 10px; text-align: center; }
+  .comment .face { width: 40px; height: 40px; }
+  .comment .row { display: flex; align-items: flex-end; gap: 6px; }
+  /* 왼쪽 아래만 각진 말풍선 */
+  /* 짧으면 글에 맞춰 줄고, 길면 285에서 멈춘다 (border-box라 285가 곧 총폭) */
+  .comment .bubble { max-width: 285px; padding: 14px 25px; background: white;
+                     border-radius: 33px 33px 33px 0; color: black; font-size: 15px; }
+  .comment time { color: #B2B6C5; font-size: 10px; flex: 0 0 auto; }
+
+  /* ---- 내가 보낸 메시지 ---- */
+  /* 시간이 왼쪽, 초록 말풍선이 오른쪽. 오른쪽 아래만 각져서 꼬리가 내 쪽을 가리킨다.
+     Figma의 left:72는 내용이 줄어든 결과라 좌표로 박지 않고 오른쪽 정렬 + max-width로 둔다. */
+  .sent { margin: 29px 16px 0; display: flex; justify-content: flex-end; align-items: flex-end; gap: 6px; }
+  .sent time { color: #B2B6C5; font-size: 10px; text-align: right; flex: 0 0 auto; }
+  .sent .bubble { max-width: 278px; padding: 14px 25px; background: #71D369;
+                  border-radius: 33px 33px 0 33px; color: white; font-size: 15px; }
+
+  /* ---- AI 도우미 (생각 중) ---- */
+  /* 강은지 댓글과 같은 구조(아바타 묶음 + 말풍선). 폭만 다르다 — 375 = 40 + gap 5 + 말풍선 330. */
+  .comment.ai { margin-top: 25px; width: 380px; gap: 5px; }   /* 40 + 5 + 말풍선 290 + 6 + 시간 39 */
+  .comment.ai .who svg { width: 40px; height: 40px; flex: 0 0 auto; }
+  .comment.ai .who span { white-space: nowrap; }   /* 'AI 도우미'가 40px보다 넓어 양쪽으로 삐져나온다 */
+  /* 테두리가 위→아래 초록→분홍. .today와 같은 2겹 배경 기법 (outline은 그라데이션을 못 받는다) */
+  /* max-width: none — .comment의 285 제한을 풀어야 '생각 중'이 한 줄로 남는다 */
+  .comment.ai .bubble { width: auto; max-width: none; outline: 0; border: 1px solid transparent;
+                        background: linear-gradient(white, white) padding-box,
+                                    linear-gradient(180deg, #71D369 0%, #FF9696 100%) border-box;
+                        color: #B2B2B2; display: flex; align-items: center; gap: 6px; }
+  /* 별 아이콘도 점처럼 박자를 탄다: 0.9초 멈췄다 0.5초 돌기를 반복(한 박 = 점 주기와 같은 1.4s).
+     45°씩 끊어야 ×↔+로 정지 상태가 눈에 보이고, 4방향 대칭이라 90°에서 0°와 같은 모양이 되어
+     두 박(2.8s)만으로 루프가 매끄럽게 이어진다. */
+  .comment.ai .bubble svg { flex: 0 0 auto; animation: spin 2.8s cubic-bezier(.4, 0, .2, 1) infinite; }
+  @keyframes spin {
+    0%,  32% { transform: rotate(0deg); }
+    50%, 82% { transform: rotate(45deg); }
+    100%     { transform: rotate(90deg); }
+  }
+  /* 4초 뒤 같은 말풍선이 답변으로 바뀐다 */
+  /* 폭은 글에 맞춰 늘어나고 290에서 멈춘다 — 그때부터 줄바꿈으로 아래로 큰다 (border-box: 290이 총폭) */
+  .comment.ai .bubble.answer { display: block; max-width: 290px; padding: 14px 22px;
+                               color: black; line-height: 18px; white-space: pre-wrap; }
+  .comment.ai .bubble.answer i { font-style: normal; }
+  /* 글자가 한 줄씩 늘 때마다 높이가 계단처럼 튄다 — interpolate-size가 height:auto 전환을 열어 그 사이를 잇는다.
+     ponytail: 줄 수를 세서 px를 계산하지 않는다. 브라우저가 이미 아는 값이다. */
+  .comment.ai .bubble { interpolate-size: allow-keywords;
+                        transition: height .3s cubic-bezier(.4, 0, .2, 1); }
+
+  /* 생각 중 점 3개: 순서대로 살짝 뜨면서 진해진다. inline-block이어야 transform이 먹는다. */
+  .ai .dots i { display: inline-block; animation: think 1.4s ease-in-out infinite; }
+  .ai .dots i:nth-child(2) { animation-delay: .18s; }
+  .ai .dots i:nth-child(3) { animation-delay: .36s; }
+  @keyframes think {
+    0%, 60%, 100% { opacity: .3; transform: translateY(0); }
+    30%           { opacity:  1; transform: translateY(-2px); }
+  }
+
+  /* ---- 첨부 트레이 ---- */
+  /* 입력바 바로 위 707~804. 닫힐 때 아래로 내려가 입력바 뒤로 숨는다(그래서 DOM 순서가 입력바보다 앞). */
+  .tray { position: absolute; left: 0; top: 707px; width: 412px; height: 97px; padding: 10px 15px;
+          background: rgba(247, 248, 250, 0.80); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+          border-top: 1px solid #F9F9F9; border-bottom: 1px solid #F9F9F9;
+          display: flex; align-items: center; gap: 6px;
+          transform: translateY(100%); opacity: 0; pointer-events: none;
+          transition: transform .26s cubic-bezier(.4, 0, .2, 1), opacity .2s ease; }
+  :is(.agenda, .chatroom).tray-on .tray { transform: none; opacity: 1; pointer-events: auto; }
+  .tray button { width: 123px; height: 77px; padding: 16px; background: white; border-radius: 10px;
+                 border: 1px solid #BABFCF; cursor: pointer; font-family: inherit;
+                 color: black; font-size: 15px; text-align: left;
+                 display: flex; flex-direction: column; align-items: flex-start; gap: 5px;
+                 transition: border-color .15s ease; }
+  /* 눌린 카드: 테두리와 아이콘만 초록으로, 글자는 검정 그대로.
+     ponytail: 타이머로 초록을 잡아두지 않고 :active에 맡긴다 — 누르는 동안만 초록, 떼면 즉시 진행. */
+  .tray button:active { border-color: #71D369; }
+  .tray button:active path { fill: #71D369; }
+
+  /* ---- 입력바 ---- */
+  .composer { position: absolute; left: 0; top: 804px; width: 412px; height: 88px;
+              background: rgba(247, 248, 250, 0.80); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+  .composer .plus { position: absolute; left: 16px; top: 10px; width: 44px; height: 44px;
+                    border-radius: 50%; background: #71D369; border: 0; cursor: pointer;
+                    display: flex; align-items: center; justify-content: center; }
+  /* ponytail: 트레이가 열리면 +가 X로 바뀐다 — Figma는 회전 결과를 별도 path로 내보냈지만
+     같은 +를 45° 돌린 것이라(15.57/√2 + 1.19/√2 = 11.85 = X path 크기) 회전으로 처리한다.
+     그래야 원 중심도 안 틀어지고 전환도 이어진다. */
+  .composer .plus svg { transition: transform .26s cubic-bezier(.4, 0, .2, 1); }
+  :is(.agenda, .chatroom).tray-on .plus svg { transform: rotate(45deg); }
+  .composer .field { position: absolute; left: 72px; top: 10px; width: 324px; height: 44px;
+                     background: white; border-radius: 100px;
+                     outline: 1px #BABFCF solid; outline-offset: -0.5px;
+                     display: flex; align-items: center; padding: 0 46px 0 18px;
+                     transition: outline-color .2s ease; }
+  /* 전송 버튼은 absolute라 흐름 밖 — padding-right 46이 그 자리를 비워둔다 */
+  .composer .field input { flex: 1; min-width: 0; padding: 0; border: 0; outline: 0; background: none;
+                           font-family: inherit; font-size: 15px; line-height: 18px; color: black; }
+  .composer .field input::placeholder { color: #BABFCF; }
+  /* ponytail: 활성 조건은 '포커스됐거나 값이 있거나' 둘뿐 — :focus-within과
+     :placeholder-shown이 그대로 알려주니 JS로 이벤트를 걸 필요가 없다. */
+  .composer .field:is(:focus-within, :has(input:not(:placeholder-shown))) { outline-color: #71D369; }
+  .composer .field:is(:focus-within, :has(input:not(:placeholder-shown))) .send { background: #71D369; }
+  .composer .send { position: absolute; right: 4px; top: 3px; width: 38px; height: 38px;
+                    border-radius: 50%; background: #DBDBDB; border: 0; cursor: pointer;
+                    display: flex; align-items: center; justify-content: center;
+                    transition: background-color .2s ease; }
+
+  /* ---- 헤더 ---- */
+  :is(.agenda, .feed, .chats, .chatroom) .topbar { position: absolute; left: 0; top: 0; width: 412px; height: 106px; z-index: 1;
+                    background: rgba(247, 248, 250, 0.80); backdrop-filter: blur(8px);
+                    -webkit-backdrop-filter: blur(8px); pointer-events: none; }
+  :is(.agenda, .feed, .chats, .chatroom) .head { position: absolute; left: 16px; top: 57px; z-index: 2;
+                  display: flex; align-items: center; gap: 16px; }
+  :is(.agenda, .feed, .chats, .chatroom) .head button { padding: 0; border: 0; background: none; cursor: pointer; display: flex; }
+  :is(.agenda, .feed, .chats, .chatroom) .head span { color: black; font-size: 24px; font-weight: 700; }
+  :is(.agenda, .feed, .chats, .chatroom) .close { position: absolute; left: 372px; top: 62px; z-index: 2;
+                   padding: 0; border: 0; background: none; cursor: pointer; display: flex; }
+
+  /* ===== 의견 나눔 (안건 상세의 ‹) ===== */
+  /* .agenda보다 DOM 앞 = 같은 z에서 아래. 뒤로가기로 안건을 숨기면 바로 이 화면이 드러난다. */
+  .feed { position: absolute; inset: 0; background: #F7F8FA; z-index: 5; overflow: hidden; }
+  .feed[hidden] { display: none; }
+  /* 헤더만 고정, 칩은 목록과 같이 스크롤된다 (Figma 1564 프레임 그대로) */
+  .feed .list { position: absolute; inset: 106px 0 0; overflow-y: auto; scrollbar-width: none;
+                padding: 8px 16px 40px; }
+  .feed .list::-webkit-scrollbar { width: 0; }
+  .feed .chips { margin-bottom: 28px; }   /* 칩 114 → 첫 글 171 */
+  /* 구분선은 '보이는 첫 글'만 빼고 붙는다 — 필터가 바뀌면 JS가 .line을 옮긴다 */
+  .feed .post.line { margin-top: 28px; padding-top: 28px; border-top: 1px solid #DBDBDB; }
+  .feed .post[hidden] { display: none; }   /* .post의 display:flex가 [hidden]을 덮는다 */
+
+  /* 안건 상세의 .post를 그대로 쓴다 — 아바타·이름·케밥 구조가 같다 */
+  .feed .post { margin: 0; gap: 12px; }
+  .feed .post .body { padding: 0 10px; display: flex; flex-direction: column; gap: 4px; }
+  .feed .kind { display: flex; align-items: center; gap: 6px; color: black; font-size: 15px; font-weight: 700; }
+  .feed .kind svg { width: 24px; height: 24px; flex: 0 0 auto; }
+  /* Figma는 .by→본문 12, 본문→댓글쓰기 20. gap 12에 8을 더해 맞춘다 */
+  .feed .cmt { margin-top: 8px; height: 35px; padding: 0; border: 0; background: #E3E5EB; border-radius: 17.5px;
+               cursor: pointer; font-family: inherit; color: #BABFCF; font-size: 12px; font-weight: 500;
+               display: flex; align-items: center; justify-content: center; gap: 10px; }
+  .feed .cmt svg { width: 14px; height: 14px; }
+
+  /* ---- 투표 ---- */
+  .vote { background: white; border-radius: 12px; outline: 1px #FF9696 solid; outline-offset: -1px;
+          padding-bottom: 24px; display: flex; flex-direction: column; gap: 16px; }
+  /* Figma의 height:36 + padding 12는 14px 아이콘과 2px 어긋난다 — padding 11로 높이 36을 맞춘다 */
+  .vote .end { padding: 11px 16px; background: #FF9696; border-radius: 12px 12px 0 0;
+               display: flex; align-items: center; gap: 6px; color: #F8F8F8; font-size: 12px; }
+  .vote .in { padding: 0 10px; display: flex; flex-direction: column; gap: 20px; }
+  .vote h4 { margin: 0; color: black; font-size: 15px; font-weight: 700; }
+  .vote .anon { display: block; margin-top: 2px; color: #7F7F7F; font-size: 10px; }
+  .vote ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 24px; }
+  .vote li { display: flex; flex-direction: column; gap: 7px; }
+  .vote .opt { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+  .vote .opt b { display: flex; align-items: center; gap: 6px; color: black; font-size: 12px; font-weight: 400; }
+  .vote .opt span { color: #7F7F7F; font-size: 12px; flex: 0 0 auto; }
+  /* 막대 폭 = 득표 비율. 1표/0표/1표 = 50/0/50 */
+  .vote .bar { height: 6px; background: #F9F9F9; border-radius: 100px; }
+  .vote .bar i { display: block; height: 6px; border-radius: 100px 0 0 100px; background: #FF9696; }
+
+  /* ---- 구독권 ---- */
+  .plan { padding: 14px 16px; background: white; border-radius: 12px;
+          outline: 1px #DBDBDB solid; outline-offset: -1px;
+          display: flex; flex-direction: column; gap: 14px; }
+  .plan .row { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .plan .row > div { display: flex; align-items: center; gap: 21px; min-width: 0; }
+  .plan .thumb { width: 71px; height: 71px; background: #C4C4C4; border-radius: 8px; flex: 0 0 auto;
+                 object-fit: cover; }
+  .plan .shop { color: #7F7F7F; font-size: 12px; }
+  .plan .nm { margin-top: 3px; color: black; font-size: 20px; font-weight: 700; }
+  .plan .price { margin-top: 6px; color: #499963; font-size: 20px; font-weight: 700; }
+  .plan hr { margin: 0; border: 0; border-top: 1px solid #EBEBEB; }
+  .plan .desc { margin: 0; color: #575757; font-size: 12px; line-height: 20px; }
+  .plan .join { padding: 10px 8px; background: #71D369; border: 0; border-radius: 23px; cursor: pointer;
+                font-family: inherit; color: white; font-size: 16px; }
+
+  /* ===== 모션 줄이기 =====
+     ponytail: 선택자마다 해제 규칙을 두면 특이도 싸움에서 진다 (.comment.ai .bubble svg 가
+     .ai .bubble svg 를 이겨서 별이 계속 돌던 버그). 여기 한 곳에서 전부 끈다. */
+  @media (prefers-reduced-motion: reduce) {
+    .app-wrapper *, .app-wrapper *::before, .app-wrapper *::after {
+      animation-duration: .01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: .01ms !important;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="app-wrapper">
+
+<!-- 6번 반복되는 6×10 화살표는 symbol 하나로 -->
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="kind" viewBox="0 0 24 24"><path d="M20 13.4858H18C17.7167 13.4858 17.4792 13.3913 17.2875 13.2024C17.0958 13.0134 17 12.7793 17 12.5C17 12.2207 17.0958 11.9866 17.2875 11.7976C17.4792 11.6087 17.7167 11.5142 18 11.5142H20C20.2833 11.5142 20.5208 11.6087 20.7125 11.7976C20.9042 11.9866 21 12.2207 21 12.5C21 12.7793 20.9042 13.0134 20.7125 13.2024C20.5208 13.3913 20.2833 13.4858 20 13.4858ZM15.6 17.2317C15.7667 17.0016 15.9833 16.8702 16.25 16.8373C16.5167 16.8045 16.7667 16.8702 17 17.0345L18.6 18.2174C18.8333 18.3817 18.9667 18.5953 19 18.8582C19.0333 19.121 18.9667 19.3675 18.8 19.5975C18.6333 19.8275 18.4167 19.9589 18.15 19.9918C17.8833 20.0246 17.6333 19.9589 17.4 19.7946L15.8 18.6117C15.5667 18.4474 15.4333 18.2338 15.4 17.971C15.3667 17.7081 15.4333 17.4617 15.6 17.2317ZM18.6 6.78258L17 7.9655C16.7667 8.12979 16.5167 8.19551 16.25 8.16265C15.9833 8.12979 15.7667 7.99836 15.6 7.76835C15.4333 7.53834 15.3667 7.29189 15.4 7.02903C15.4333 6.76616 15.5667 6.55257 15.8 6.38828L17.4 5.20537C17.6333 5.04107 17.8833 4.97536 18.15 5.00821C18.4167 5.04107 18.6333 5.17251 18.8 5.40252C18.9667 5.63253 19.0333 5.87897 19 6.14184C18.9667 6.40471 18.8333 6.61829 18.6 6.78258ZM8 15.4573H5C4.71667 15.4573 4.47917 15.3628 4.2875 15.1739C4.09583 14.9849 4 14.7508 4 14.4715V10.5285C4 10.2492 4.09583 10.0151 4.2875 9.82612C4.47917 9.63718 4.71667 9.54272 5 9.54272H8L11.3 6.2897C11.6167 5.97755 11.9792 5.90772 12.3875 6.08023C12.7958 6.25274 13 6.56079 13 7.00438V17.9956C13 18.4392 12.7958 18.7473 12.3875 18.9198C11.9792 19.0923 11.6167 19.0225 11.3 18.7103L8 15.4573Z" fill="#DBDBDB"/></symbol>
+  <symbol id="cmt" viewBox="0 0 14 14"><path fill-rule="evenodd" clip-rule="evenodd" d="M6.99794 1.12951e-06C8.05109 -0.000597177 9.09079 0.236507 10.0395 0.693642C10.9884 1.15079 11.8218 1.81622 12.4776 2.64029C13.1334 3.46436 13.5948 4.42584 13.8273 5.45305C14.0598 6.48026 14.0575 7.54671 13.8205 8.57289C13.5835 9.59907 13.1179 10.5585 12.4585 11.3798C11.7991 12.201 10.9628 12.8627 10.012 13.3158C9.06123 13.7688 8.02045 14.0013 6.96727 13.9961C5.97002 13.9912 4.986 13.7732 4.08092 13.3574L0.592746 13.9881C0.414527 14.0204 0.232739 13.9543 0.116749 13.8152C0.000757664 13.6762 -0.0315398 13.4855 0.0321799 13.316L1.03278 10.6538C0.41852 9.65113 0.0660561 8.50849 0.00995911 7.33116C-0.0502871 6.06673 0.233558 4.80964 0.831261 3.69378C1.42897 2.57792 2.31814 1.64508 3.40409 0.994611C4.48999 0.34416 5.73213 0.000422913 6.99794 1.12951e-06ZM4.9872 6.99808C4.9872 7.55389 4.53662 8.00448 3.9808 8.00448C3.42499 8.00448 2.9744 7.55389 2.9744 6.99808C2.9744 6.44226 3.42499 5.99167 3.9808 5.99167C4.53662 5.99167 4.9872 6.44226 4.9872 6.99808ZM7.00001 8.00448C7.55583 8.00448 8.00641 7.55389 8.00641 6.99808C8.00641 6.44226 7.55583 5.99167 7.00001 5.99167C6.44419 5.99167 5.99361 6.44226 5.99361 6.99808C5.99361 7.55389 6.44419 8.00448 7.00001 8.00448ZM10.0192 8.00448C10.5751 8.00448 11.0256 7.55389 11.0256 6.99808C11.0256 6.44226 10.5751 5.99167 10.0192 5.99167C9.4634 5.99167 9.01282 6.44226 9.01282 6.99808C9.01282 7.55389 9.4634 8.00448 10.0192 8.00448Z" fill="#BABFCF"/></symbol>
+  <symbol id="kebab" viewBox="0 0 30 30">
+    <circle cx="15" cy="8" r="2" fill="#7F7F7F"/><circle cx="15" cy="15" r="2" fill="#7F7F7F"/><circle cx="15" cy="22" r="2" fill="#7F7F7F"/>
+  </symbol>
+  <symbol id="chev" viewBox="0 0 6 10">
+    <path d="M3.49154 4.6582L0.241536 1.4082C-0.08063 1.08604 -0.08063 0.563703 0.241536 0.241536C0.563703 -0.08063 1.08604 -0.08063 1.4082 0.241537L5.11776 3.9511C5.50829 4.34162 5.50829 4.97479 5.11776 5.36531L1.4082 9.07487C1.08604 9.39704 0.563703 9.39704 0.241536 9.07487C-0.08063 8.7527 -0.08063 8.23037 0.241537 7.9082L3.49154 4.6582Z" fill="#DBDBDB"/>
+  </symbol>
+</svg>
+
+<div class="scroll">
+<div class="page">
+
+  <!-- ===== 안건 ===== -->
+  <div class="notice">
+    <div class="top">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+        <path d="M20 13.4858H18C17.7167 13.4858 17.4792 13.3913 17.2875 13.2024C17.0958 13.0134 17 12.7793 17 12.5C17 12.2207 17.0958 11.9866 17.2875 11.7976C17.4792 11.6087 17.7167 11.5142 18 11.5142H20C20.2833 11.5142 20.5208 11.6087 20.7125 11.7976C20.9042 11.9866 21 12.2207 21 12.5C21 12.7793 20.9042 13.0134 20.7125 13.2024C20.5208 13.3913 20.2833 13.4858 20 13.4858ZM15.6 17.2317C15.7667 17.0016 15.9833 16.8702 16.25 16.8373C16.5167 16.8045 16.7667 16.8702 17 17.0345L18.6 18.2174C18.8333 18.3817 18.9667 18.5953 19 18.8582C19.0333 19.121 18.9667 19.3675 18.8 19.5975C18.6333 19.8275 18.4167 19.9589 18.15 19.9918C17.8833 20.0246 17.6333 19.9589 17.4 19.7946L15.8 18.6117C15.5667 18.4474 15.4333 18.2338 15.4 17.971C15.3667 17.7081 15.4333 17.4617 15.6 17.2317ZM18.6 6.78258L17 7.9655C16.7667 8.12979 16.5167 8.19551 16.25 8.16265C15.9833 8.12979 15.7667 7.99836 15.6 7.76835C15.4333 7.53834 15.3667 7.29189 15.4 7.02903C15.4333 6.76616 15.5667 6.55257 15.8 6.38828L17.4 5.20537C17.6333 5.04107 17.8833 4.97536 18.15 5.00821C18.4167 5.04107 18.6333 5.17251 18.8 5.40252C18.9667 5.63253 19.0333 5.87897 19 6.14184C18.9667 6.40471 18.8333 6.61829 18.6 6.78258ZM8 15.4573H5C4.71667 15.4573 4.47917 15.3628 4.2875 15.1739C4.09583 14.9849 4 14.7508 4 14.4715V10.5285C4 10.2492 4.09583 10.0151 4.2875 9.82612C4.47917 9.63718 4.71667 9.54272 5 9.54272H8L11.3 6.2897C11.6167 5.97755 11.9792 5.90772 12.3875 6.08023C12.7958 6.25274 13 6.56079 13 7.00438V17.9956C13 18.4392 12.7958 18.7473 12.3875 18.9198C11.9792 19.0923 11.6167 19.0225 11.3 18.7103L8 15.4573Z" fill="#DADDE9"/>
+      </svg>
+      <b>안건</b>
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+        <path d="M8.12021 9.29006L12.0002 13.1701L15.8802 9.29006C16.2702 8.90006 16.9002 8.90006 17.2902 9.29006C17.6802 9.68006 17.6802 10.3101 17.2902 10.7001L12.7002 15.2901C12.3102 15.6801 11.6802 15.6801 11.2902 15.2901L6.70021 10.7001C6.31021 10.3101 6.31021 9.68006 6.70021 9.29006C7.09021 8.91006 7.73021 8.90006 8.12021 9.29006Z" fill="#DADDE9"/>
+      </svg>
+    </div>
+    <p>이번 달 전기세가 5만 원이 넘게 나왔어요. 어떻게 줄이면 좋을지 의견을 모아봐요!</p>
+  </div>
+
+  <!-- ===== 오늘의 일정 ===== -->
+  <div class="card today">
+    <div class="hd"><b>오늘의 일정</b><svg class="chev"><use href="#chev"/></svg></div>
+
+    <div class="week">
+      <div class="dot"><span class="d">일</span><span class="n">3</span><i></i></div>
+      <div class="dot on"><span class="d">월</span><span class="n">4</span><i></i></div>
+      <div><span class="d">화</span><span class="n">5</span><i></i></div>
+      <div><span class="d">수</span><span class="n">6</span><i></i></div>
+      <div><span class="d">목</span><span class="n">7</span><i></i></div>
+      <div class="dot"><span class="d">금</span><span class="n">8</span><i></i></div>
+      <div><span class="d">토</span><span class="n">9</span><i></i></div>
+    </div>
+
+    <div class="chips">
+      <span class="on" data-who="">전체</span>
+      <span data-who="나">나</span>
+      <span data-who="강은지">강은지</span>
+    </div>
+
+    <div class="sched">
+      <div data-who="강은지">
+        <div class="when">
+          <div class="bar" style="background:#71D369"></div>
+          <div class="txt"><span class="t">오전 9:00 ~ 10:00</span><span class="n">거실 대청소</span></div>
+        </div>
+        <div class="who">강은지</div>
+      </div>
+      <div data-who="나">
+        <div class="when">
+          <div class="bar" style="background:#D2E2B8"></div>
+          <div class="txt"><span class="t">오전 11:00 ~ 오후 1:00</span><span class="n">장보기</span></div>
+        </div>
+        <div class="who">나</div>
+      </div>
+      <div data-who="나">
+        <div class="when">
+          <div class="bar" style="background:#DBDBDB"></div>
+          <div class="txt"><span class="t">오후 6:00</span><span class="n">월세 입금하기</span></div>
+        </div>
+        <div class="who">나</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 우리 규칙 ===== -->
+  <div class="card rules">
+    <div class="hd"><b>우리 규칙</b><svg class="chev"><use href="#chev"/></svg></div>
+    <div class="cols">
+      <ul class="mine">
+        <li class="done"><span>쓰레기 버리기</span><svg class="chk done" viewBox="0 0 20 20"><circle cx="10" cy="10" r="9.5"/><path d="M4.77 10.08L7.89 12.89C8.29 13.25 8.9 13.23 9.28 12.84L14.54 7.38"/></svg></li>
+        <li><span>욕실 청소</span><svg class="chk" viewBox="0 0 20 20"><circle cx="10" cy="10" r="9.5"/><path d="M4.77 10.08L7.89 12.89C8.29 13.25 8.9 13.23 9.28 12.84L14.54 7.38"/></svg></li>
+        <li><span>세탁기 돌리기</span><svg class="chk" viewBox="0 0 20 20"><circle cx="10" cy="10" r="9.5"/><path d="M4.77 10.08L7.89 12.89C8.29 13.25 8.9 13.23 9.28 12.84L14.54 7.38"/></svg></li>
+      </ul>
+      <ul class="mate">
+        <li class="done"><span>설거지</span><svg class="chk done" viewBox="0 0 20 20"><circle cx="10" cy="10" r="9.5"/><path d="M4.77 10.08L7.89 12.89C8.29 13.25 8.9 13.23 9.28 12.84L14.54 7.38"/></svg></li>
+        <li class="done"><span>빨래 널기</span><svg class="chk done" viewBox="0 0 20 20"><circle cx="10" cy="10" r="9.5"/><path d="M4.77 10.08L7.89 12.89C8.29 13.25 8.9 13.23 9.28 12.84L14.54 7.38"/></svg></li>
+        <li><span>청소</span><svg class="chk" viewBox="0 0 20 20"><circle cx="10" cy="10" r="9.5"/><path d="M4.77 10.08L7.89 12.89C8.29 13.25 8.9 13.23 9.28 12.84L14.54 7.38"/></svg></li>
+      </ul>
+    </div>
+    <div class="pct"><span>완료율</span><span id="pctNum">50%</span></div>
+    <div class="gauge"><div id="gMine"></div><div id="gMate"></div></div>
+  </div>
+
+  <div class="grid">
+  <!-- ===== 메이트 관리 ===== -->
+  <div class="card mgmt">
+    <div class="hd"><b>메이트 관리</b><svg class="chev"><use href="#chev"/></svg></div>
+    <div class="box">
+      <img class="avatar" src="images/mate.png" alt="강은지">
+      <div style="text-align:center">
+        <div class="nm">강은지</div>
+        <div class="sub">함께한 지 45일째</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 스마트 제어 ===== -->
+  <div class="card smart">
+    <div class="hd"><b>스마트 제어</b><svg class="chev"><use href="#chev"/></svg></div>
+    <div class="toggle" style="top:49px" data-on="에어컨 ON" data-off="에어컨 OFF">
+      <div class="knob">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+          <path d="M8.30769 17.3077V12.8347C8.30769 12.4524 8.61765 12.1424 9 12.1424C9.38235 12.1424 9.69231 12.4524 9.69231 12.8347V17.3077C9.69229 17.69 9.38234 18 9 18C8.61766 18 8.30771 17.69 8.30769 17.3077ZM4.47386 14.2401V12.8347C4.47386 12.4524 4.78381 12.1424 5.16617 12.1424C5.54842 12.1425 5.85847 12.4525 5.85847 12.8347V14.2401C5.85847 15.6106 4.7473 16.7216 3.3768 16.7218H3.2488C2.86645 16.7218 2.55649 16.4118 2.55649 16.0294C2.55655 15.6471 2.86648 15.3371 3.2488 15.3371H3.3768C3.98259 15.337 4.47386 14.8459 4.47386 14.2401ZM12.1424 14.2401V12.8347C12.1424 12.4524 12.4524 12.1424 12.8347 12.1424C13.2171 12.1424 13.527 12.4524 13.527 12.8347V14.2401C13.527 14.846 14.0182 15.3371 14.6241 15.3371H14.7521C15.1343 15.3373 15.4444 15.6472 15.4444 16.0294C15.4444 16.4117 15.1344 16.7216 14.7521 16.7218H14.6241C13.2535 16.7218 12.1424 15.6107 12.1424 14.2401ZM13.4198 7.08263C13.4197 6.92745 13.3574 6.77873 13.2476 6.66887C13.1378 6.55915 12.9892 6.49761 12.8338 6.4976H5.16526C5.0099 6.4976 4.86047 6.559 4.7506 6.66887C4.64096 6.77865 4.57941 6.9275 4.57933 7.08263V8.94681H13.4198V7.08263ZM14.8044 8.94681H16.0294C16.353 8.94681 16.6154 8.68441 16.6154 8.36088V1.97055C16.6154 1.64702 16.353 1.38462 16.0294 1.38462H1.97055C1.64702 1.38462 1.38462 1.64702 1.38462 1.97055V8.36088C1.38462 8.6844 1.64703 8.94681 1.97055 8.94681H3.19471V7.08263C3.19479 6.56025 3.40234 6.05933 3.77163 5.6899C4.14115 5.3204 4.64267 5.11298 5.16526 5.11298H12.8338C13.3563 5.113 13.858 5.32034 14.2275 5.6899C14.5966 6.05926 14.8043 6.56022 14.8044 7.08263V8.94681ZM18 8.36088C18 9.44909 17.1177 10.3314 16.0294 10.3314H1.97055C0.88232 10.3314 0 9.4491 0 8.36088V1.97055C0 0.882323 0.882323 0 1.97055 0H16.0294C17.1177 0 18 0.88233 18 1.97055V8.36088Z" fill="#808080"/>
+        </svg>
+      </div>
+      <b>에어컨 OFF</b>
+    </div>
+    <div class="toggle on" style="top:110px" data-on="전등 ON" data-off="전등 OFF">
+      <div class="knob">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+          <!-- ponytail: Figma export에 밑동 path만 있고 유리구가 없다. 밑동은 원본 그대로 두고
+               유리구/목만 얹었다 — 제대로 된 export 나오면 이 두 줄만 지우면 된다. -->
+          <circle cx="9" cy="7" r="5.2" fill="#7F7F7F"/>
+          <rect x="6.33" y="11.6" width="5.34" height="1.5" rx="0.75" fill="#7F7F7F"/>
+          <path d="M11.667 13.333V14C11.667 15.4736 10.4736 16.667 9 16.667C7.52638 16.667 6.33301 15.4736 6.33301 14V13.333H11.667Z" fill="#7F7F7F"/>
+        </svg>
+      </div>
+      <b>전등 ON</b>
+    </div>
+  </div>
+
+  </div>
+
+  <div class="grid">
+  <!-- ===== 금액 정산 ===== -->
+  <div class="card pay">
+    <div class="hd"><b>금액 정산</b><svg class="chev"><use href="#chev"/></svg></div>
+    <div class="lbl">이번 달 정산 금액</div>
+    <div class="amt">₩392,840</div>
+    <div class="of">수도세 + 전기세 + 월세</div>
+    <button>바로 송금하기</button>
+  </div>
+
+  <!-- ===== 공용공간 예약 ===== -->
+  <div class="card room">
+    <div class="hd"><b>공용공간 예약</b><svg class="chev"><use href="#chev"/></svg></div>
+    <div class="slot"><div class="txt"><span class="k">거실</span><span class="v">13:00 ~ 14:30</span></div></div>
+    <div class="slot"><div class="txt"><span class="k">주방</span><span class="v">사용 중</span></div><i></i></div>
+  </div>
+
+  </div>
+
+  <button class="edit">+ 편집</button>
+</div>
+</div>
+
+  <!-- ===== 고정 헤더 ===== -->
+  <div style="width: 412px; height: 106px; left: 0; top: 0; position: absolute; background: rgba(247, 248, 250, 0.80); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: 1; pointer-events: none"></div>
+  <div class="nps" style="left: 16px; top: 57px; position: absolute; color: black; font-size: 24px; font-weight: 700; z-index: 2">홈</div>
+  <div style="left: 372px; top: 62px; position: absolute; z-index: 2; cursor: pointer">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+      <path d="M14.4551 21.5459C14.4551 22.9015 13.3556 24 12 24C10.6446 23.9998 9.5459 22.9014 9.5459 21.5459H14.4551ZM12 0C13.004 0.000192283 13.8174 0.814324 13.8174 1.81836V3C13.8174 3.10667 13.8067 3.21086 13.7891 3.3125C16.9402 4.10989 19.2723 6.96436 19.2725 10.3633V16.8184H18.7227C20.2811 16.8184 21.5449 18.0821 21.5449 19.6406C21.5447 20.0401 21.2208 20.3643 20.8213 20.3643H3.17773C2.77825 20.3643 2.4543 20.0401 2.4541 19.6406C2.4541 18.0821 3.71788 16.8184 5.27637 16.8184H4.72656V10.3633C4.72668 6.96421 7.05863 4.10974 10.21 3.3125C10.1923 3.21088 10.1816 3.10666 10.1816 3V1.81836C10.1816 0.814206 10.9958 0 12 0Z" fill="#BABFCF"/>
+    </svg>
+  </div>
+
+
+  <!-- ===== 하단 탭바 ===== -->
+  <div class="bottom">
+  <nav class="tabbar">
+    <a>
+      <div class="ico">
+        <svg width="56" height="32" viewBox="0 0 56 32" fill="none">
+          <path d="M21.0468 26C20.4968 26 20.0262 25.8043 19.6348 25.413C19.2428 25.021 19.0468 24.55 19.0468 24V16.05C18.6635 15.7 18.3678 15.25 18.1598 14.7C17.9512 14.15 17.9468 13.55 18.1468 12.9L19.1968 9.5C19.3302 9.06667 19.5678 8.70833 19.9098 8.425C20.2512 8.14167 20.6468 8 21.0968 8H34.9968C35.4468 8 35.8385 8.13733 36.1718 8.412C36.5052 8.68733 36.7468 9.05 36.8968 9.5L37.9468 12.9C38.1468 13.55 38.1428 14.1417 37.9348 14.675C37.7262 15.2083 37.4302 15.6667 37.0468 16.05V24C37.0468 24.55 36.8512 25.021 36.4598 25.413C36.0678 25.8043 35.5968 26 35.0468 26H21.0468ZM30.2468 15C30.6968 15 31.0385 14.8457 31.2718 14.537C31.5052 14.229 31.5968 13.8833 31.5468 13.5L30.9968 10H29.0468V13.7C29.0468 14.05 29.1635 14.3543 29.3968 14.613C29.6302 14.871 29.9135 15 30.2468 15ZM25.7468 15C26.1302 15 26.4428 14.871 26.6848 14.613C26.9262 14.3543 27.0468 14.05 27.0468 13.7V10H25.0968L24.5468 13.5C24.4802 13.9 24.5678 14.25 24.8098 14.55C25.0512 14.85 25.3635 15 25.7468 15ZM21.2968 15C21.5968 15 21.8592 14.8917 22.0838 14.675C22.3092 14.4583 22.4468 14.1833 22.4968 13.85L23.0468 10H21.0968L20.0968 13.35C19.9968 13.6833 20.0508 14.0417 20.2588 14.425C20.4675 14.8083 20.8135 15 21.2968 15ZM34.7968 15C35.2802 15 35.6302 14.8083 35.8468 14.425C36.0635 14.0417 36.1135 13.6833 35.9968 13.35L34.9468 10H33.0468L33.5968 13.85C33.6468 14.1833 33.7845 14.4583 34.0098 14.675C34.2345 14.8917 34.4968 15 34.7968 15Z" fill="#8FA18F"/>
+        </svg>
+      </div>
+      <span>골목 생활</span>
+    </a>
+
+    <a>
+      <div class="ico">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <path fill-rule="evenodd" clip-rule="evenodd" d="M5 0C5.78897 0 6.42857 0.639593 6.42857 1.42857V2.85714H13.5716V1.42857C13.5716 0.639593 14.2112 0 15.0001 0C15.7891 0 16.4287 0.639593 16.4287 1.42857V2.85714H17.8571C19.0406 2.85714 20 3.81653 20 5V17.8571C20 19.0406 19.0406 20 17.8571 20H2.14286C0.95939 20 0 19.0406 0 17.8571V5C0 3.81653 0.95939 2.85714 2.14286 2.85714H3.57143V1.42857C3.57143 0.639593 4.21103 0 5 0ZM12.2325 7.24746C12.1655 7.18044 12.0745 7.1428 11.9798 7.14286C11.885 7.14291 11.7941 7.18063 11.7271 7.24773L5.83741 13.15C5.78276 13.2048 5.74737 13.2758 5.73657 13.3524L5.36063 16.0216C5.34503 16.1324 5.38224 16.2441 5.46117 16.3234C5.54009 16.4027 5.65161 16.4404 5.76247 16.4253L8.43164 16.0619C8.509 16.0514 8.58079 16.0157 8.636 15.9606L14.5383 10.0583C14.6777 9.91883 14.6777 9.6927 14.5383 9.55323L12.2325 7.24746Z" fill="#71D369"/>
+        </svg>
+      </div>
+      <span>틈새살림</span>
+    </a>
+
+    <a class="on">
+      <div class="ico">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <path fill-rule="evenodd" clip-rule="evenodd" d="M0.454546 8.63557C0.164634 8.90579 0 9.28429 0 9.6806V17.8571C0 19.0406 0.95939 20 2.14286 20H8.57143V15.7143C8.57143 14.9253 9.21103 14.2857 10 14.2857C10.789 14.2857 11.4286 14.9253 11.4286 15.7143V20H17.8571C19.0406 20 20 19.0406 20 17.8571V9.6806C20 9.28429 19.8354 8.90579 19.5454 8.63557L10.4649 0.17196C10.1974 -0.0573198 9.80264 -0.0573201 9.53514 0.17196L0.454546 8.63557Z" fill="#8FA18F"/>
+        </svg>
+      </div>
+      <span>홈</span>
+    </a>
+
+    <a class="chat">
+      <div class="ico">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <path fill-rule="evenodd" clip-rule="evenodd" d="M7.87886 1.71768e-06C5.78927 1.71768e-06 3.78526 0.830093 2.30769 2.30766C0.830126 3.78523 3.92072e-05 5.78923 3.92072e-05 7.87883C-0.00488129 9.42969 0.453443 10.9467 1.31627 12.2354L0.263526 15.0526C0.147239 15.3637 0.413911 15.6831 0.740871 15.6244L4.43071 14.9606C4.79717 15.1391 5.17587 15.2887 5.56327 15.4081C5.4284 14.8176 5.35716 14.2028 5.35716 13.5714C5.35716 9.0348 9.03481 5.35714 13.5714 5.35714C14.2055 5.35714 14.8227 5.42897 15.4154 5.56494C15.1264 4.62397 14.663 3.74377 14.0476 2.97097C13.3091 2.04357 12.3709 1.29477 11.3028 0.78037C10.2347 0.265966 9.06436 -0.000781025 7.87886 1.71768e-06ZM18.1174 9.02575C16.9117 7.82016 15.2766 7.14286 13.5717 7.14286C12.6044 7.14222 11.6494 7.35987 10.778 7.77959C9.90649 8.1993 9.14096 8.81027 8.53843 9.56696C7.93589 10.3237 7.51187 11.2066 7.29799 12.1499C7.0841 13.0932 7.08583 14.0727 7.30309 15.0153C7.52033 15.9579 7.94747 16.8393 8.5527 17.5937C9.15793 18.3483 9.92563 18.9566 10.7986 19.3731C11.6716 19.7897 12.6273 20.004 13.5946 20C14.5619 19.9959 15.5157 19.7736 16.3851 19.3496L19.2594 19.8667C19.5864 19.9256 19.853 19.6061 19.7367 19.2949L18.9263 17.126C19.6303 16.0746 20.0043 14.8369 20.0003 13.5714C20.0003 11.8665 19.323 10.2313 18.1174 9.02575Z" fill="#8FA18F"/>
+        </svg>
+      </div>
+      <span>채팅</span>
+    </a>
+
+    <a>
+      <div class="ico">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <path d="M10 10C8.625 10 7.44792 9.51042 6.46875 8.53125C5.48958 7.55208 5 6.375 5 5C5 3.625 5.48958 2.44792 6.46875 1.46875C7.44792 0.489584 8.625 0 10 0C11.375 0 12.5521 0.489584 13.5312 1.46875C14.5104 2.44792 15 3.625 15 5C15 6.375 14.5104 7.55208 13.5312 8.53125C12.5521 9.51042 11.375 10 10 10ZM2.5 20C1.8125 20 1.22417 19.7554 0.735 19.2663C0.245 18.7763 0 18.1875 0 17.5V16.5C0 15.7917 0.1825 15.1404 0.5475 14.5463C0.911667 13.9529 1.39583 13.5 2 13.1875C3.29167 12.5417 4.60417 12.0571 5.9375 11.7338C7.27083 11.4113 8.625 11.25 10 11.25C11.375 11.25 12.7292 11.4113 14.0625 11.7338C15.3958 12.0571 16.7083 12.5417 18 13.1875C18.6042 13.5 19.0883 13.9529 19.4525 14.5463C19.8175 15.1404 20 15.7917 20 16.5V17.5C20 18.1875 19.7554 18.7763 19.2663 19.2663C18.7763 19.7554 18.1875 20 17.5 20H2.5Z" fill="#8FA18F"/>
+        </svg>
+      </div>
+      <span>마이</span>
+    </a>
+  </nav>
+  <div class="home-ind"><div></div></div>
+  </div>
+
+  <!-- ===== 의견 나눔 ===== -->
+  <div class="feed" id="feed" hidden>
+
+    <div class="list">
+      <div class="chips" id="feedChips">
+        <span class="on">전체</span><span>공지</span><span>안건</span><span>투표</span><span>구독권</span>
+      </div>
+
+      <article class="post">
+      <div class="by">
+        <img class="face" src="images/mate.png" alt="강은지">
+        <div class="meta"><b>강은지</b><span>2026년 4월 3일 오후 11:14 · 안건 · 2명 읽음</span></div>
+        <button class="kebab" aria-label="더보기"><svg width="30" height="30"><use href="#kebab"/></svg></button>
+      </div>
+        <div class="body">
+          <div class="kind"><svg><use href="#kind"/></svg>안건</div>
+          <p>이번 달 전기세가 5만 원이 넘게 나왔어요. 어떻게 줄이면 좋을지 의견을 모아봐요!</p>
+        </div>
+      <button class="cmt"><svg><use href="#cmt"/></svg>댓글쓰기</button>
+      </article>
+
+      <article class="post line">
+      <div class="by">
+        <img class="face" src="images/yu-yehyeon.png" alt="유예현">
+        <div class="meta"><b>유예현</b><span>2026년 3월 29일 오전 9:04 · 투표 · 2명 읽음</span></div>
+        <button class="kebab" aria-label="더보기"><svg width="30" height="30"><use href="#kebab"/></svg></button>
+      </div>
+        <div class="body">
+          <div class="kind"><svg><use href="#kind"/></svg>투표</div>
+          <div class="vote">
+            <div class="end">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <path fill-rule="evenodd" clip-rule="evenodd" d="M7 14C10.866 14 14 10.866 14 7C14 3.13401 10.866 0 7 0C3.13401 0 0 3.13401 0 7C0 10.866 3.13401 14 7 14ZM7.625 4.5C7.625 4.15482 7.34518 3.875 7 3.875C6.65482 3.875 6.375 4.15482 6.375 4.5V7C6.375 7.14621 6.42626 7.28779 6.51986 7.40012L9.01986 10.4001C9.24084 10.6653 9.63494 10.7011 9.90012 10.4801C10.1653 10.2592 10.2011 9.86506 9.98014 9.59988L7.625 6.77372V4.5Z" fill="#F8F8F8"/>
+              </svg>
+              투표가 3월 30일 오전 9:00에 종료되었습니다.
+            </div>
+            <div class="in">
+              <div><h4>외부인 초대 규칙</h4><span class="anon">익명 투표・2명 참여</span></div>
+              <ul>
+                <li>
+                  <div class="opt">
+                    <b>
+                      <svg width="16" height="12" viewBox="0 0 16 12" fill="none">
+                        <path d="M5.2635 11.175C5.13017 11.175 5.00517 11.154 4.8885 11.112C4.77183 11.0707 4.6635 11 4.5635 10.9L0.263502 6.6C0.0801684 6.41667 -0.00749826 6.179 0.000501742 5.887C0.00916841 5.59567 0.105168 5.35833 0.288501 5.175C0.471835 4.99167 0.705168 4.9 0.988502 4.9C1.27183 4.9 1.50517 4.99167 1.6885 5.175L5.2635 8.75L13.7385 0.275C13.9218 0.0916668 14.1595 0 14.4515 0C14.7428 0 14.9802 0.0916668 15.1635 0.275C15.3468 0.458333 15.4385 0.695667 15.4385 0.987C15.4385 1.279 15.3468 1.51667 15.1635 1.7L5.9635 10.9C5.8635 11 5.75517 11.0707 5.6385 11.112C5.52183 11.154 5.39683 11.175 5.2635 11.175Z" fill="#FF9696"/>
+                      </svg>
+                      최소 1일 전 메이트에게 미리 알리기
+                    </b>
+                    <span>1표</span>
+                  </div>
+                  <div class="bar"><i style="width: 50%"></i></div>
+                </li>
+                <li>
+                  <div class="opt"><b>외부인 초대 금지</b><span>0표</span></div>
+                  <div class="bar"></div>
+                </li>
+                <li>
+                  <div class="opt"><b>외부인 초대 아무때나 상관없음</b><span>1표</span></div>
+                  <div class="bar"><i style="width: 50%; background: #FFD3D7"></i></div>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      <button class="cmt"><svg><use href="#cmt"/></svg>댓글쓰기</button>
+      </article>
+
+      <article class="post line">
+      <div class="by">
+        <img class="face" src="images/mate.png" alt="강은지">
+        <div class="meta"><b>강은지</b><span>2026년 3월 18일 오전 10:13 · 공지 · 2명 읽음</span></div>
+        <button class="kebab" aria-label="더보기"><svg width="30" height="30"><use href="#kebab"/></svg></button>
+      </div>
+        <div class="body">
+          <div class="kind"><svg><use href="#kind"/></svg>공지</div>
+          <p>지금 화장실 청소하려고 세정제 뿌리고 기다리는 중이라서 바닥이 미끄럽습니다!! 화장실 30분 뒤에 닦기 전까진 사용하지 말아 주세요!!</p>
+        </div>
+      <button class="cmt"><svg><use href="#cmt"/></svg>댓글쓰기</button>
+      </article>
+
+      <article class="post line">
+      <div class="by">
+        <img class="face" src="images/yu-yehyeon.png" alt="유예현">
+        <div class="meta"><b>유예현</b><span>2026년 3월 10일 오후 2:29 · 구독권 · 2명 읽음</span></div>
+        <button class="kebab" aria-label="더보기"><svg width="30" height="30"><use href="#kebab"/></svg></button>
+      </div>
+        <div class="body">
+          <div class="kind"><svg><use href="#kind"/></svg>구독권</div>
+          <p>여기 전에 한 번 사 먹었는데 맛있더라고요 같이 드실래요?</p>
+          <div class="plan">
+            <div class="row">
+              <div>
+                <img class="thumb" src="images/thumb-sukja-banchan.png" alt="숙자네 반찬가게">
+                <div>
+                  <div class="shop">숙자네 반찬가게</div>
+                  <div class="nm">정기 반찬 구독권</div>
+                  <div class="price">월 35,000원</div>
+                </div>
+              </div>
+              <svg width="9" height="16" viewBox="0 0 9 16" fill="none">
+                <path d="M1 1L7.27983 6.49485C8.19048 7.29167 8.19048 8.70833 7.27982 9.50515L1 15" stroke="#71D369" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <hr>
+            <p class="desc">매 2주마다 원하는 반찬 2가지 택하여 가져갈 수 있습니다^^<br>첫 달 구독자에게 반찬 1가지를 써비스로 드립니다~</p>
+            <button class="join">구독 참여하기</button>
+          </div>
+        </div>
+      <button class="cmt"><svg><use href="#cmt"/></svg>댓글쓰기</button>
+      </article>
+    </div>
+
+    <div class="topbar"></div>
+    <div class="head">
+      <span class="nps">의견 나눔</span>
+    </div>
+    <button class="close" id="feedClose" aria-label="닫기">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+        <path d="M2 20.5616L10.5737 11.9879L2 3.41421L3.41421 2L11.9879 10.5737L20.5174 2.04419L21.9316 3.45841L13.4021 11.9879L21.9316 20.5174L20.5174 21.9316L11.9879 13.4021L3.41421 21.9758L2 20.5616Z" fill="#BABFCF"/>
+      </svg>
+    </button>
+  </div>
+
+  <!-- ===== 안건 상세 ===== -->
+  <div class="agenda" id="agenda" hidden>
+
+    <div class="thread">
+      <article class="post">
+        <div class="by">
+          <img class="face" src="images/mate.png" alt="강은지">
+          <div class="meta">
+            <b>강은지</b>
+            <span>2026년 4월 3일 오후 11:14 · 안건 · 2명 읽음</span>
+          </div>
+          <button class="kebab" aria-label="더보기">
+            <svg width="30" height="30"><use href="#kebab"/></svg>
+          </button>
+        </div>
+        <p>이번 달 전기세가 5만 원이 넘게 나왔어요. 어떻게 줄이면 좋을지 의견을 모아봐요!</p>
+        <hr>
+      </article>
+
+      <div class="comment">
+        <div class="who">
+          <img class="face" src="images/mate.png" alt="강은지">
+          <span>강은지</span>
+        </div>
+        <div class="row">
+          <div class="bubble">TV를 안 볼 때는 꼭 꺼 두는 게 좋을 것 같아요</div>
+          <time>오후 2:05</time>
+        </div>
+      </div>
+    </div>
+
+    <!-- 첨부 트레이 (+ 버튼) -->
+    <div class="tray">
+      <button>
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <path d="M12 0H2V20H18V6L12 0ZM11 13V17H9V13H6L10.01 9L14 13H11ZM11 7V1.5L16.5 7H11Z" fill="#BABFCF"/>
+        </svg>
+        파일 업로드
+      </button>
+      <button>
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <path d="M18 2.8H12.5067C12.1333 1.756 11.1556 1 10 1C8.84444 1 7.86667 1.756 7.49333 2.8H2V19H18V2.8ZM10 2.8C10.4889 2.8 10.8889 3.205 10.8889 3.7C10.8889 4.195 10.4889 4.6 10 4.6C9.51111 4.6 9.11111 4.195 9.11111 3.7C9.11111 3.205 9.51111 2.8 10 2.8ZM8.22222 15.4L4.66667 11.8L5.92 10.531L8.22222 12.853L14.08 6.922L15.3333 8.2L8.22222 15.4Z" fill="#BABFCF"/>
+        </svg>
+        투표
+      </button>
+      <button>
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <path d="M12.5235 10.3086C13.6939 10.6909 14.7951 11.3458 15.7256 12.2763C17.3315 13.8822 18.1197 15.9918 18.0957 18.0957C15.9919 18.1196 13.8803 17.3295 12.2764 15.7255C11.3489 14.7966 10.6946 13.6995 10.3116 12.5322C11.4712 12.3904 12.3884 11.4703 12.5235 10.3086ZM7.4766 10.3095C7.61167 11.4675 8.52409 12.3854 9.67875 12.5312C9.29546 13.6967 8.64315 14.7924 7.71586 15.7197C6.11392 17.3236 4.00626 18.1117 1.90434 18.0898C1.88238 15.9899 2.6705 13.8822 4.27445 12.2783C5.20545 11.3488 6.30605 10.6923 7.4766 10.3095ZM1.90238 1.89839C4.00413 1.87647 6.11393 2.66385 7.71781 4.26754C8.65284 5.20403 9.30974 6.31229 9.69145 7.49019C8.53879 7.62981 7.62593 8.53953 7.48051 9.69039C6.30799 9.30828 5.20448 8.65361 4.2725 7.72164C2.66659 6.11573 1.87848 4.00423 1.90238 1.90035V1.89839ZM18.0938 1.90425C18.1157 4.00616 17.3276 6.11575 15.7237 7.71968C14.792 8.64982 13.69 9.30483 12.5186 9.68746C12.3718 8.5367 11.4583 7.62806 10.3047 7.49019C10.6867 6.31423 11.3437 5.20907 12.2784 4.27437C13.8823 2.67045 15.9919 1.88034 18.0938 1.90425Z" fill="#BABFCF"/>
+        </svg>
+        AI 물어보기
+      </button>
+    </div>
+
+    <!-- 입력바 -->
+    <div class="composer">
+      <button class="plus" id="agendaPlus" aria-label="첨부">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <path d="M7.20946 15.5709V8.36149H0V7.1723H7.20946V0H8.39865V7.1723H15.5709V8.36149H8.39865V15.5709H7.20946Z" fill="white"/>
+        </svg>
+      </button>
+      <div class="field">
+        <input type="text" placeholder="메시지를 입력해주세요." aria-label="메시지">
+        <button class="send" aria-label="보내기">
+          <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+            <path d="M14.0176 21.2936L21.9172 1.54067C22.2817 0.621562 21.3784 -0.281703 20.4593 0.0827722L0.706351 7.98238C-0.0463692 8.27554 -0.23653 9.2422 0.32603 9.80476L3.97078 13.4654C4.36695 13.8615 5.00082 13.9091 5.44453 13.5604L13.6996 8.30042L8.43164 16.5475C8.09094 16.9992 8.13848 17.633 8.53465 18.0292L12.1952 21.674C12.7578 22.2365 13.7245 22.0464 14.0176 21.2936Z" fill="white"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- 헤더 -->
+    <div class="topbar"></div>
+    <div class="head">
+      <button id="agendaBack" aria-label="뒤로">
+        <svg width="29" height="29" viewBox="0 0 29 29" fill="none">
+          <path d="M20 5L10.7526 12.9864C9.82896 13.7841 9.82896 15.2159 10.7526 16.0136L20 24" stroke="#BABFCF" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </button>
+      <span class="nps">안건</span>
+    </div>
+    <button class="close" id="agendaClose" aria-label="닫기">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+        <path d="M2 20.5616L10.5737 11.9879L2 3.41421L3.41421 2L11.9879 10.5737L20.5174 2.04419L21.9316 3.45841L13.4021 11.9879L21.9316 20.5174L20.5174 21.9316L11.9879 13.4021L3.41421 21.9758L2 20.5616Z" fill="#BABFCF"/>
+      </svg>
+    </button>
+  </div>
+
+  <!-- ===== 채팅 목록 (하단 탭 '채팅') ===== -->
+  <div class="chats" id="chats" hidden>
+    <div class="list">
+      <h3>개인 (1)</h3>
+      <div class="crow" id="chatMate">
+        <img class="face" src="images/mate.png" alt="강은지">
+        <div class="txt">
+          <div class="nm"><span>강은지</span>
+            <svg width="10" height="17" viewBox="148 165 10 17" fill="none"><path d="M156.333 172.65L158 174.35V176.05H153.833V181.15L153 182L152.167 181.15V176.05H148V174.35L149.667 172.65V166.7H148.833V165H157.167V166.7H156.333V172.65Z" fill="#499963"/></svg>
+          </div>
+          <div class="pv">어떻게 줄이면 좋을지 같이 정해 보면 좋겠어요!</div>
+        </div>
+        <div class="side"><time></time><span class="badge">3</span></div>
+      </div>
+      <h3>그룹 (2)</h3>
+      <div class="crow">
+        <img class="face" src="images/yu-yehyeon.png" alt="">
+        <div class="txt"><div class="nm"><span>골목 이웃방</span></div><div class="pv">숙자네 반찬가게 오늘 할인한대요!</div></div>
+        <div class="side"><time>오후 1:20</time></div>
+      </div>
+      <div class="crow">
+        <div class="duo"><img class="face" src="images/mate.png" alt="강은지"><img class="face" src="images/yu-yehyeon.png" alt=""></div>
+        <div class="txt"><div class="nm"><span>동네 산책 모임</span></div><div class="pv">이번 주 토요일 아침에 같이 걸어요</div></div>
+        <div class="side"><time>오전 11:05</time></div>
+      </div>
+    </div>
+    <div class="topbar"></div>
+    <div class="head"><span>채팅</span></div>
+    <svg class="bell" width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M14.4551 21.5459C14.4551 22.9015 13.3556 24 12 24C10.6446 23.9998 9.5459 22.9014 9.5459 21.5459H14.4551ZM12 0C13.004 0.000192283 13.8174 0.814324 13.8174 1.81836V3C13.8174 3.10667 13.8067 3.21086 13.7891 3.3125C16.9402 4.10989 19.2723 6.96436 19.2725 10.3633V16.8184H18.7227C20.2811 16.8184 21.5449 18.0821 21.5449 19.6406C21.5447 20.0401 21.2208 20.3643 20.8213 20.3643H3.17773C2.77825 20.3643 2.4543 20.0401 2.4541 19.6406C2.4541 18.0821 3.71788 16.8184 5.27637 16.8184H4.72656V10.3633C4.72668 6.96421 7.05863 4.10974 10.21 3.3125C10.1923 3.21088 10.1816 3.10666 10.1816 3V1.81836C10.1816 0.814206 10.9958 0 12 0Z" fill="#BABFCF"/></svg>
+  </div>
+
+  <!-- ===== 채팅방 (메이트 1:1) - 트레이·입력바는 안건 화면 것을 복제해 쓴다 (스크립트) ===== -->
+  <div class="chatroom" id="chatroom" hidden>
+    <div class="msgs"></div>
+    <div class="topbar"></div>
+    <div class="head">
+      <button id="chatBack" aria-label="뒤로">
+        <svg width="29" height="29" viewBox="0 0 29 29" fill="none"><path d="M20 5L10.7526 12.9864C9.82896 13.7841 9.82896 15.2159 10.7526 16.0136L20 24" stroke="#BABFCF" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+      <img class="face" src="images/mate.png" alt="강은지">
+      <span>강은지</span>
+    </div>
+    <svg class="search" width="20" height="20" viewBox="376 64 20 20" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" d="M384.381 64C389.009 64 392.761 67.7379 392.761 72.3489C392.761 74.4169 392.006 76.3092 390.756 77.7675L395.8 82.7925C396.067 83.0581 396.067 83.4886 395.8 83.7541L395.753 83.8008C395.487 84.0664 395.054 84.0664 394.788 83.8008L389.737 78.7695C388.285 79.9735 386.418 80.6978 384.381 80.6978C379.752 80.6978 376 76.9598 376 72.3489C376 67.7379 379.752 64 384.381 64ZM384.381 65.6622C380.674 65.6622 377.669 68.6559 377.669 72.3489C377.669 76.0418 380.674 79.0355 384.381 79.0355C388.087 79.0355 391.093 76.0418 391.093 72.3489C391.093 68.6559 388.087 65.6622 384.381 65.6622Z" fill="#BABFCF"/></svg>
+  </div>
+
+</div>
+
+<script src="../app-guide-bridge.js"></script>
+<script>
+  // 상태는 마크업이 유일한 출처 — 선택/체크만 옮기고 숫자는 거기서 다시 센다
+  const pick = (box, el) => {
+    box.querySelectorAll('.on').forEach(x => x.classList.remove('on'));
+    el.classList.add('on');
+  };
+
+  const week = document.querySelector('.week');
+  week.onclick = e => { const d = e.target.closest('.week > div'); if (d) pick(week, d); };
+
+  // ===== 날짜·시간 =====
+  // ponytail: 화면을 열 때 실제 시각에서 계산한다 — 마크업의 값은 자리만 잡아두는 것.
+  const now = new Date();
+  const MOVED_IN = new Date(2026, 8 - 1, 12);   // 입주일 2026-08-12. JS 월은 0부터라 -1을 남겨 둔다.
+  const hhmm = d => d.toLocaleTimeString('ko-KR', { hour: 'numeric', minute: '2-digit' });
+  const ymd  = d => d.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' });
+  const sameDay = (a, b) => a.toDateString() === b.toDateString();
+
+  // 이번 주 일~토. 요일 라벨은 순서가 곧 요일이라 날짜만 채우면 된다.
+  const sun = new Date(now); sun.setDate(now.getDate() - now.getDay());
+  [...week.children].forEach((pill, i) => {
+    const d = new Date(sun); d.setDate(sun.getDate() + i);
+    pill.querySelector('.n').textContent = d.getDate();
+    pill.classList.toggle('on', sameDay(d, now));
+  });
+
+  document.querySelector('.mgmt .sub').textContent =
+    '함께한 지 ' + (Math.floor((now - MOVED_IN) / 86400000) + 1) + '일째';
+
+  // 스레드는 앞뒤가 맞아야 하니 지금을 기준으로 거슬러 잡는다: 안건 3시간 전 → 댓글 25분 전 → 내 메시지 지금
+  const posted = new Date(now - 3 * 3600e3);
+  // ponytail: .post / .comment 가 의견 나눔 목록에도 있다 — document 전체가 아니라 화면 안에서 찾는다
+  const postedMeta = ymd(posted) + ' ' + hhmm(posted) + ' · 안건 · 2명 읽음';
+  agenda.querySelector('.post .meta span').textContent = postedMeta;
+  feed.querySelector('.post .meta span').textContent = postedMeta;   // 목록 첫 글 = 같은 안건
+  agenda.querySelector('.comment time').textContent = hhmm(new Date(now - 25 * 60e3));
+
+  const chips = document.querySelector('.today .chips'), sched = document.querySelector('.sched');
+  chips.onclick = e => {
+    const c = e.target.closest('span'); if (!c) return;
+    pick(chips, c);
+    [...sched.children].forEach(r =>
+      r.classList.toggle('out', !!c.dataset.who && r.dataset.who !== c.dataset.who));
+  };
+
+  const rules = document.querySelector('.rules'), lis = [...rules.querySelectorAll('li')];
+  const draw = () => {
+    const seg = c => rules.querySelectorAll('.' + c + ' li.done').length / lis.length * 338 + 'px';
+    gMine.style.width = seg('mine');
+    gMate.style.width = seg('mate');
+    pctNum.textContent = Math.round(rules.querySelectorAll('li.done').length / lis.length * 100) + '%';
+  };
+  rules.querySelector('.cols').onclick = e => {
+    const li = e.target.closest('li'); if (!li) return;
+    li.classList.toggle('done');
+    li.querySelector('.chk').classList.toggle('done');
+    draw();
+  };
+  draw();
+
+  // 안건 카드 → 상세. 뒤로(‹)는 의견 나눔 목록으로, 닫기(✕)는 홈으로.
+  const shutAgenda = () => {
+    agenda.hidden = true;
+    agenda.classList.remove('tray-on');   // 다음에 열 때 트레이는 닫힌 채로
+  };
+  document.querySelector('.notice').onclick = () => agenda.hidden = false;
+  agendaBack.onclick = () => { shutAgenda(); feed.hidden = false; };
+  agendaClose.onclick = () => { shutAgenda(); feed.hidden = true; };
+  feedClose.onclick = () => feed.hidden = true;   // 의견 나눔은 ✕ 하나 — 뒤로가기 없음
+  // 칩 = 글머리의 분류 이름 그대로라 텍스트로 맞춰 본다 ('전체'만 예외)
+  const feedPosts = [...feed.querySelectorAll('.post')];
+  const kindOf = post => post.querySelector('.kind').textContent.trim();
+
+  // 목록의 안건 글 → 안건 상세. 케밥·댓글쓰기는 제 일을 해야 하니 버튼 위는 빼고.
+  const agendaPost = feedPosts.find(post => kindOf(post) === '안건');
+  agendaPost.style.cursor = 'pointer';
+  agendaPost.onclick = e => { if (!e.target.closest('button')) agenda.hidden = false; };
+  feedChips.onclick = e => {
+    const c = e.target.closest('span'); if (!c) return;
+    pick(feedChips, c);
+    const kind = c.textContent === '전체' ? '' : c.textContent;
+    let first = true;
+    feedPosts.forEach(post => {
+      const show = !kind || kindOf(post) === kind;
+      post.hidden = !show;
+      post.classList.toggle('line', show && !first);
+      if (show) first = false;
+    });
+  };
+  agendaPlus.onclick = () => agenda.classList.toggle('tray-on');
+
+  const thread = agenda.querySelector('.thread');
+  const msg = agenda.querySelector('.field input');
+  // AI 물어보기: 누르면 바로 트레이가 내려가고 '생각 중' 말풍선이 붙는다. 연타는 이미 붙은 걸로 막는다.
+  const AI_ROW = `<div class="comment ai">
+      <div class="who">
+        <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+          <path d="M3.80429 3.79982C3.75629 8.00782 5.33229 12.2318 8.54429 15.4438C11.0843 17.9838 14.2603 19.4998 17.5563 19.9998C14.2603 20.4998 11.0883 22.0198 8.54829 24.5558C5.34029 27.7638 3.76429 31.9798 3.80829 36.1798C8.01229 36.2238 12.2283 34.6478 15.4323 31.4398C17.9763 28.8958 19.4923 25.7198 19.9923 22.4158C20.4883 25.7238 22.0083 28.9038 24.5523 31.4518C27.7603 34.6598 31.9843 36.2398 36.1923 36.1918C36.2403 31.9838 34.6643 27.7638 31.4523 24.5518C28.9123 22.0118 25.7363 20.4958 22.4403 19.9958C25.7363 19.4958 28.9083 17.9758 31.4483 15.4398C34.6563 12.2318 36.2323 8.01182 36.1883 3.80782C31.9843 3.75982 27.7643 5.33982 24.5563 8.54782C22.0123 11.0918 20.4963 14.2678 19.9963 17.5718C19.5003 14.2638 17.9803 11.0838 15.4363 8.53582C12.2283 5.32782 8.00829 3.75182 3.80429 3.79582V3.79982Z" fill="#FF9696"/>
+          <path d="M20 25.1084C22.8078 25.1084 25.084 22.8322 25.084 20.0244C25.084 17.2166 22.8078 14.9404 20 14.9404C17.1922 14.9404 14.916 17.2166 14.916 20.0244C14.916 22.8322 17.1922 25.1084 20 25.1084Z" fill="white"/>
+        </svg>
+        <span>AI 도우미</span>
+      </div>
+      <div class="row">
+        <div class="bubble">
+          <svg width="19" height="19" viewBox="0 0 19 19" fill="none">
+            <path d="M1.80715 1.80506C1.78435 3.80386 2.53295 5.81026 4.05865 7.33596C5.26515 8.54246 6.77375 9.26256 8.33935 9.50006C6.77375 9.73756 5.26705 10.4596 4.06055 11.6642C2.53675 13.188 1.78815 15.1906 1.80905 17.1856C3.80595 17.2065 5.80855 16.4579 7.33045 14.9341C8.53885 13.7257 9.25895 12.2171 9.49645 10.6477C9.73205 12.219 10.454 13.7295 11.6624 14.9398C13.1862 16.4636 15.1926 17.2141 17.1914 17.1913C17.2142 15.1925 16.4656 13.188 14.9399 11.6623C13.7334 10.4558 12.2248 9.73566 10.6592 9.49816C12.2248 9.26066 13.7315 8.53866 14.938 7.33406C16.4618 5.81026 17.2104 3.80576 17.1895 1.80886C15.1926 1.78606 13.1881 2.53656 11.6643 4.06036C10.4559 5.26876 9.73585 6.77736 9.49835 8.34676C9.26275 6.77546 8.54075 5.26496 7.33235 4.05466C5.80855 2.53086 3.80405 1.78226 1.80715 1.80316V1.80506Z" stroke="#B2B2B2"/>
+            <path d="M9.49986 11.9265C10.8336 11.9265 11.9148 10.8453 11.9148 9.51158C11.9148 8.17787 10.8336 7.09668 9.49986 7.09668C8.16615 7.09668 7.08496 8.17787 7.08496 9.51158C7.08496 10.8453 8.16615 11.9265 9.49986 11.9265Z" fill="#B2B2B2"/>
+          </svg>
+          <span>틈이 이 안건에 대해 생각 중이에요<span class="dots"><i>.</i><i>.</i><i>.</i></span></span>
+        </div>
+      </div>
+    </div>`;
+  // 줄바꿈은 \n 하나로 — 한 글자씩 textContent에 넣으려면 태그가 없는 편이 낫다 (.answer가 pre-wrap)
+  let AI_ANSWER = '두 분의 대화 내용을 분석해 보니, 한 달 전에도 전기세 얘기를 나누셨어요!\n'
+                  + '그때 자리를 비우거나 쓰지 않는 가전은 전원을 끄고 콘센트를 뽑아 두자고 약속하셨어요.';
+  agenda.querySelectorAll('.tray button')[2].onclick = () => {
+    agenda.classList.remove('tray-on');
+    if (!thread.querySelector('.ai')) {
+      thread.insertAdjacentHTML('beforeend', AI_ROW);
+      // '생각 중'을 1.5초 보여준 뒤 같은 말풍선에 답변을 적어 나간다 — 행을 새로 만들면 아바타가 한 번 튄다
+      const bubble = thread.querySelector('.ai .bubble');
+      setTimeout(() => {
+        bubble.className = 'bubble answer';
+        bubble.textContent = '';
+        bubble.insertAdjacentHTML('afterend', '<time>' + hhmm(new Date()) + '</time>');
+        if (matchMedia('(prefers-reduced-motion: reduce)').matches) { bubble.textContent = AI_ANSWER; return; }
+        // 또각또각 박히는 느낌은 글자가 갑자기 불투명해져서 생긴다 — 머리 4글자를 옅게 깔아 스며들게 한다.
+        // ponytail: 몇 글자째인지는 매번 시계에서 다시 구한다. 틱을 세면 렌더가 밀릴 때 같이 느려진다.
+        // (rAF는 안 쓴다 — 배경 탭에서 멈춰 답변이 영영 안 나온다)
+        const CPS = 42, W = 4;   // 초당 글자 / 옅게 들어오는 머리 길이
+        const t0 = performance.now();
+        let shown = -1;
+        const typing = setInterval(() => {
+          const n = Math.min(AI_ANSWER.length, Math.floor((performance.now() - t0) / 1000 * CPS));
+          if (n === shown) return;
+          shown = n;
+          const solid = n === AI_ANSWER.length ? n : Math.max(0, n - W);   // 다 적으면 머리도 진하게
+          bubble.textContent = AI_ANSWER.slice(0, solid);
+          for (let k = solid; k < n; k++) {
+            const c = bubble.appendChild(document.createElement('i'));
+            c.textContent = AI_ANSWER[k];
+            c.style.opacity = (n - k) / (n - solid);   // 머리로 갈수록 옅게
+          }
+          thread.scrollTop = thread.scrollHeight;
+          if (n === AI_ANSWER.length) clearInterval(typing);
+        }, 16);
+      }, 1500);
+    }
+    thread.scrollTop = thread.scrollHeight;
+  };
+
+  // 전송: 입력값이 있으면 그걸, 비어 있으면 아래 기본 메시지를 붙인다.
+  const SENT = '저번에 이거 관련해서 얘기 했던 게 있던 것 같은데 기억이 안 나네요...';
+  const send = agenda.querySelector('.send');
+  // 한글 조합 중의 Enter는 글자를 확정하는 키라 전송으로 새면 안 된다
+  msg.onkeydown = e => { if (e.key === 'Enter' && !e.isComposing) send.click(); };
+  send.onclick = () => {
+    const row = document.createRange().createContextualFragment(
+      '<div class="sent"><time></time><div class="bubble"></div></div>').firstElementChild;
+    row.querySelector('time').textContent = hhmm(new Date());
+    wrapSeg(row.querySelector('.bubble'), msg.value.trim() || SENT);   // textContent로 넣는다 — 입력값을 HTML로 안 읽는다
+    thread.append(row);
+    msg.value = '';
+    // 보내고 나면 다시 비활성. 전송 버튼이 .field 안이라 클릭하면 버튼이 포커스를 쥔다 —
+    // 입력칸만 blur하면 :focus-within이 살아남아 초록이 안 풀린다.
+    document.activeElement.blur();   // 클릭이면 전송 버튼, 엔터면 입력칸
+    thread.scrollTop = thread.scrollHeight;
+  };
+
+  document.querySelectorAll('.toggle').forEach(t => t.onclick = () => {
+    t.classList.toggle('on');
+    t.querySelector('b').textContent = t.dataset[t.classList.contains('on') ? 'on' : 'off'];
+  });
+
+  // ===== 게임 미션 가이드 (감정형 TV 미션: 안건 → 메시지 → AI 물어보기) =====
+
+  // ===== 채팅 (감정형 미션1): 하단 탭 '채팅' → 메이트 채팅방 → [+] → [안건 등록] =====
+  const chats = document.getElementById('chats'), chatroom = document.getElementById('chatroom');
+  const chatMsgs = chatroom.querySelector('.msgs');
+  // 목록 아래 탭바 = 홈 탭바 복제 ('채팅'에 불). 홈을 누르면 목록을 닫는다
+  const chatNav = document.querySelector('.bottom').cloneNode(true);
+  chatNav.querySelectorAll('.on').forEach(a => a.classList.remove('on'));
+  chatNav.querySelector('.chat').classList.add('on');
+  [...chatNav.querySelectorAll('.tabbar > a')][2].onclick = () => chats.hidden = true;
+  chats.appendChild(chatNav);
+  document.querySelector('.bottom .chat').onclick = () => chats.hidden = false;
+  // 트레이·입력바는 안건 화면 것과 같은 모양 - 세 번째 카드만 [안건 등록]
+  const chatTray = agenda.querySelector('.tray').cloneNode(true), chatComposer = agenda.querySelector('.composer').cloneNode(true);
+  const chatAgendaBtn = chatTray.querySelectorAll('button')[2];
+  chatAgendaBtn.innerHTML = '<svg width="20" height="20" viewBox="289 736 20 15" fill="none"><path d="M296.272 744.182C298.7 744.182 303.545 745.4 303.545 747.818V750.046C303.545 750.322 303.321 750.546 303.045 750.546H289.5C289.224 750.546 289 750.322 289 750.046V747.818C289 745.4 293.845 744.182 296.272 744.182ZM305.364 744.772C307.273 745.357 309 746.372 309 747.818V750.046C309 750.322 308.776 750.546 308.5 750.546H305.864C305.588 750.546 305.364 750.322 305.364 750.046V747.818C305.364 747.06 305.149 746.396 304.78 745.816C304.496 745.369 304.857 744.617 305.364 744.772ZM296.271 736C298.28 736 299.908 737.628 299.908 739.637C299.908 741.645 298.28 743.272 296.271 743.272C294.264 743.272 292.636 741.645 292.636 739.637C292.636 737.628 294.263 736 296.271 736ZM301.726 736C303.735 736 305.361 737.628 305.361 739.637C305.361 741.646 303.734 743.272 301.726 743.272C301.551 743.272 301.38 743.257 301.214 743.23C300.87 743.175 300.749 742.764 300.931 742.467C301.434 741.641 301.726 740.671 301.726 739.637C301.726 738.603 301.434 737.633 300.931 736.807C300.749 736.509 300.87 736.097 301.214 736.042C301.38 736.015 301.551 736 301.726 736Z" fill="#BABFCF"/></svg>안건 등록';
+  chatroom.append(chatTray, chatComposer);
+  const chatPlus = chatComposer.querySelector('.plus');
+  chatPlus.removeAttribute('id');
+  chatPlus.onclick = () => chatroom.classList.toggle('tray-on');
+  const chatInput = chatComposer.querySelector('input'), chatSend = chatComposer.querySelector('.send');
+  // 메이트가 먼저 전기값 이야기를 꺼낸 대화 - 방에 들어가면 메이트 말이 하나씩 오고(chat-in), 내 차례('me')는 내가 [보내기]로 보낸다
+  const CHAT = [
+    ['in', '있잖아요…'],
+    ['in', '혹시 지금 바빠요?'],
+    ['in', '이번 달 전기 고지서가 왔는데요.'],
+    ['me', '아니요! 무슨 일 있어요?'],
+    ['in', '전기값이 생각보다 많이 나왔어요.'],
+    ['me', '헉, 얼마나 나왔어요?'],
+    ['in', '5만 원이 넘게 나왔더라고요.'],
+    ['in', 'TV나 전등이 켜진 채로 있을 때가 많았나 봐요.'],
+    ['in', '어떻게 줄이면 좋을지 같이 정해 보면 좋겠어요!']
+  ];
+  let chatShown = 0;   // CHAT 중 채팅방에 올라온 줄 수
+  chats.querySelector('#chatMate time').textContent = hhmm(new Date());
+  const chatRow = (who, t) => {
+    const row = chatMsgs.appendChild(document.createElement('div'));
+    row.className = 'cm' + (who === 'me' ? ' me' : '');
+    const b = row.appendChild(document.createElement('div')); b.className = 'b';
+    wrapSeg(b, t);
+    row.appendChild(document.createElement('time')).textContent = hhmm(new Date());
+    chatMsgs.scrollTop = chatMsgs.scrollHeight;
+  };
+  const openChatRoom = () => {
+    chatMsgs.textContent = '';
+    CHAT.slice(0, chatShown).forEach(([who, t]) => chatRow(who, t));
+    chatroom.classList.remove('tray-on');
+    chatroom.hidden = false;
+  };
+  // 내 차례 줄을 보낸다 - 입력칸에 고쳐 쓴 글이 있으면 그 글로 (textContent로 넣는다)
+  chatSend.onclick = () => {
+    if (!CHAT[chatShown] || CHAT[chatShown][0] !== 'me') return;
+    chatRow('me', chatInput.value.trim() || CHAT[chatShown][1]);
+    chatShown++;
+    chatInput.value = '';
+    document.activeElement.blur();
+  };
+  chatInput.onkeydown = e => { if (e.key === 'Enter' && !e.isComposing) chatSend.click(); };
+  document.getElementById('chatMate').onclick = openChatRoom;
+  document.getElementById('chatBack').onclick = () => { chatroom.hidden = true; chatroom.classList.remove('tray-on'); };
+  // [안건 등록] → 대화가 안건으로 올라가고 채팅방에 알림 줄이 붙는다
+  chatAgendaBtn.onclick = () => {
+    chatroom.classList.remove('tray-on');
+    if (chatMsgs.querySelector('.cm-sys')) return;
+    const sys = chatMsgs.appendChild(document.createElement('div'));
+    sys.className = 'cm-sys';
+    sys.innerHTML = '<b>안건</b>이 등록됐어요 · 이번 달 전기세 절약';
+    chatMsgs.scrollTop = chatMsgs.scrollHeight;
+  };
+
+  // 세 번째 미션(메이트가 올린 새 안건)은 같은 화면에 유형별 글·댓글·AI 답변·구독권 첨부를 채운다 - 처음 마크업 글은 reset-view가 되돌린다
+  const postBy = agenda.querySelector('.post .by'), postMeta = postBy.querySelector('.meta span').textContent;
+  const ORIG = { ai: AI_ANSWER, texts: [document.querySelector('.notice p'), agenda.querySelector('.post p'), agendaPost.querySelector('.body p'),
+                 agenda.querySelector('.comment:not(.ai) .bubble')].map(el => [el, el.textContent]) };
+  let shownName = '강은지';
+  // 문장마다 한 덩어리(.ws)로 넣어 줄이 문장 끝에서 먼저 바뀌게 한다 (덩어리가 한 줄보다 길 때만 그 안에서 단어 단위로)
+  const wrapSeg = (el, text) => {
+    el.textContent = '';
+    String(text).split(/(?<=[.!?…~])\s+/).forEach((t, i) => {
+      if (i) el.append(' ');
+      const sp = el.appendChild(document.createElement('span'));
+      sp.className = 'ws'; sp.textContent = t;
+    });
+  };
+  // 새 규칙 투표 카드 - value = { title, options:[{ label, votes }] }. 고르고 [투표하기] → 결과, [다시 투표하기] → 다시 고르기
+  const makePoll = v => {
+    const box = document.createElement('div'); box.className = 'attach';
+    const end = new Date(now.getTime() + 86400e3);
+    box.innerHTML = '<div class="poll"><div class="end"><svg viewBox="16 12 14 14"><path fill-rule="evenodd" clip-rule="evenodd" d="M23 26C26.866 26 30 22.866 30 19C30 15.134 26.866 12 23 12C19.134 12 16 15.134 16 19C16 22.866 19.134 26 23 26ZM23.625 16.5C23.625 16.1548 23.3452 15.875 23 15.875C22.6548 15.875 22.375 16.1548 22.375 16.5V19C22.375 19.1462 22.4263 19.2878 22.5199 19.4001L25.0199 22.4001C25.2408 22.6653 25.6349 22.7011 25.9001 22.4801C26.1653 22.2592 26.2011 21.8651 25.9801 21.5999L23.625 18.7737V16.5Z" fill="#F8F8F8"/></svg><span></span></div>'
+      + '<div class="in"><h4></h4><span class="anon"></span><ul></ul><button class="go">투표하기</button></div></div>';
+    const poll = box.firstChild, ul = poll.querySelector('ul'), anon = poll.querySelector('.anon');
+    poll.querySelector('.end span').textContent = '투표가 ' + (end.getMonth() + 1) + '월 ' + end.getDate() + '일 오전 9:00에 종료됩니다.';
+    poll.querySelector('h4').textContent = v.title;
+    anon.textContent = '복수 선택 가능・2명 참여';
+    v.options.forEach(o => {
+      const li = ul.appendChild(document.createElement('li'));
+      li.innerHTML = '<div class="opt"><i class="radio"></i><svg class="pchk" viewBox="10 105.4 15.5 11.2"><path d="M15.2635 116.588C15.1302 116.588 15.0052 116.567 14.8885 116.525C14.7718 116.483 14.6635 116.413 14.5635 116.313L10.2635 112.013C10.0802 111.829 9.9925 111.592 10.0005 111.3C10.0092 111.008 10.1052 110.771 10.2885 110.588C10.4718 110.404 10.7052 110.313 10.9885 110.313C11.2718 110.313 11.5052 110.404 11.6885 110.588L15.2635 114.163L23.7385 105.688C23.9218 105.504 24.1595 105.413 24.4515 105.413C24.7428 105.413 24.9802 105.504 25.1635 105.688C25.3468 105.871 25.4385 106.108 25.4385 106.4C25.4385 106.692 25.3468 106.929 25.1635 107.113L15.9635 116.313C15.8635 116.413 15.7552 116.483 15.6385 116.525C15.5218 116.567 15.3968 116.588 15.2635 116.588Z" fill="#FF9696"/></svg><b></b><span class="cnt"></span></div><div class="bar"><i></i></div>';
+      li.querySelector('b').textContent = o.label;
+      li.onclick = () => { if (!poll.classList.contains('done')) li.classList.toggle('on'); };
+    });
+    poll.querySelector('.go').onclick = () => {
+      const lis = [...ul.children];
+      if (poll.classList.toggle('done', !poll.classList.contains('done') && lis.some(li => li.classList.contains('on')))) {
+        const votes = v.options.map((o, i) => o.votes + (lis[i].classList.contains('on') ? 1 : 0));
+        const total = votes.reduce((a, b) => a + b, 0), max = Math.max(...votes);
+        lis.forEach((li, i) => {
+          li.querySelector('.cnt').textContent = votes[i] + '표';
+          li.classList.toggle('top', votes[i] === max && max > 0);
+          li.querySelector('.bar i').style.width = (votes[i] / total * 100) + '%';
+        });
+      }
+      const done = poll.classList.contains('done');
+      poll.querySelector('.go').textContent = done ? '다시 투표하기' : '투표하기';
+    };
+    return box;
+  };   // 지금 화면에 쓰인 메이트 이름 - 유형을 바꿔도 이 이름을 새 이름으로 바꾼다
+  TeumGuide.register({
+    aiAnswer:  () => { const b = agenda.querySelector('.ai .bubble.answer'); return b && b.textContent === AI_ANSWER ? agenda.querySelector('.comment.ai') : null; },
+    mateReply: () => agenda.querySelector('.comment.mate-reply'),
+    attach:    () => agenda.querySelector('.post .attach'),
+    chatMate:  () => !chats.hidden && chatroom.hidden ? document.getElementById('chatMate') : null,
+    chatMsgs:  () => chatroom.hidden ? null : chatMsgs,
+    chatPlus:  () => chatroom.hidden ? null : chatPlus,
+    chatAgenda: () => chatroom.classList.contains('tray-on') ? chatAgendaBtn : null,
+    chatSys:   () => chatMsgs.querySelector('.cm-sys'),
+    chatField: () => chatroom.hidden ? null : chatComposer.querySelector('.field'),
+    chatSend:  () => chatroom.hidden ? null : chatSend,
+    pollOpt:   () => agenda.querySelector('.poll li'),
+    pollGo:    () => agenda.querySelector('.poll .go'),
+    poll:      () => agenda.querySelector('.poll.done'),
+    notice:  () => document.querySelector('.notice'),
+    post:    () => agenda.querySelector('.post'),
+    comment: () => agenda.querySelector('.comment:not(.ai)'),
+    field:   () => agenda.querySelector('.field'),
+    send:    () => agenda.querySelector('.send'),
+    plus:    () => agendaPlus,
+    ai:      () => agenda.querySelectorAll('.tray button')[2],
+    aiRow:   () => agenda.querySelector('.comment.ai')
+  }, {
+    // 미션 시작 전: 홈 화면으로, 지난번에 붙인 메시지·AI 답변은 지운다
+    'reset-view': () => {
+      shutAgenda(); feed.hidden = true;
+      chats.hidden = chatroom.hidden = true; chatroom.classList.remove('tray-on'); chatShown = 0; chatInput.value = '';
+      thread.querySelectorAll('.ai, .sent, .mate-reply, .attach, .post .kind').forEach(el => el.remove());
+      ORIG.texts.forEach(([el, t]) => el.textContent = t);
+      // 글쓴이를 '나'로 바꿨으면 메이트로 되돌린다 (이름·얼굴은 바로 뒤 set-mate가 맞춘다)
+      const face = postBy.querySelector('img'), mateFace = agenda.querySelector('.comment:not(.ai) img');
+      postBy.querySelector('b').textContent = shownName; face.alt = shownName; face.src = mateFace.src; face.style.cssText = mateFace.style.cssText;
+      postBy.querySelector('.meta span').textContent = postMeta;
+      AI_ANSWER = ORIG.ai;
+      msg.value = '';
+      document.querySelector('.scroll').scrollTop = 0;
+    },
+    // 게임 메이트로 이름·얼굴 바꾸기 (마크업의 강은지 자리) - value = { name, face }
+    'set-mate': v => {
+      if (!v || !v.name) return;
+      const walk = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+      for (let n; (n = walk.nextNode());) if (n.nodeValue.includes(shownName)) n.nodeValue = n.nodeValue.replaceAll(shownName, v.name);
+      document.querySelectorAll('img[alt="' + shownName + '"]').forEach(img => {
+        img.alt = v.name;
+        if (v.face) { img.src = v.face; img.style.objectFit = 'cover'; img.style.objectPosition = '50% 12%'; }
+      });
+      document.querySelectorAll('[data-who="' + shownName + '"]').forEach(el => el.dataset.who = v.name);
+      shownName = v.name;
+    },
+    // 채팅 목록부터 (감정형 미션1)
+    'open-chats': () => { chats.hidden = false; chats.querySelector('.list').scrollTop = 0; },
+    // 새 안건 - value = { agenda, comment, answer, kind?, author?:{ name, face }, plan?:{ thumb, shop, nm, price, desc:[], join }, poll?:{ title, voters, options } }
+    'set-agenda': v => {
+      ORIG.texts.slice(0, 3).forEach(([el]) => el.textContent = v.agenda);
+      wrapSeg(agenda.querySelector('.post p'), v.agenda);
+      wrapSeg(ORIG.texts[3][0], v.comment);
+      AI_ANSWER = v.answer;
+      const body = agenda.querySelector('.post p');
+      if (v.kind) {
+        body.insertAdjacentHTML('beforebegin', '<div class="kind"><svg><use href="#kind"/></svg></div>');
+        body.previousElementSibling.append(v.kind);
+        postBy.querySelector('.meta span').textContent = postMeta.replace('안건', v.kind);
+      }
+      if (v.author) {
+        const face = postBy.querySelector('img');
+        postBy.querySelector('b').textContent = v.author.name;
+        face.alt = v.author.name; face.src = v.author.face; face.style.objectPosition = '50% 15%';
+      }
+      if (v.poll) body.after(makePoll(v.poll));
+      if (v.plan) {   // 의견 나눔 목록의 구독권 카드와 같은 모양
+        const box = document.createElement('div'); box.className = 'attach';
+        box.innerHTML = '<div class="plan"><div class="row"><div><img class="thumb" alt=""><div><div class="shop"></div><div class="nm"></div><div class="price"></div></div></div>'
+          + '<svg width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 1L7.27983 6.49485C8.19048 7.29167 8.19048 8.70833 7.27982 9.50515L1 15" stroke="#71D369" stroke-width="2" stroke-linecap="round"/></svg></div>'
+          + '<hr><p class="desc"></p><button class="join"></button></div>';
+        box.querySelector('img').src = v.plan.thumb; box.querySelector('img').alt = v.plan.shop;
+        ['shop', 'nm', 'price', 'join'].forEach(k => box.querySelector('.' + k).textContent = v.plan[k]);
+        box.querySelector('.desc').textContent = v.plan.desc.map(t => '• ' + t).join('\n');
+        box.querySelector('.desc').style.whiteSpace = 'pre-line';
+        body.after(box);
+      }
+    },
+    // 내 답장에 메이트가 댓글로 답한다 (안건 아래 첫 댓글과 같은 모양)
+    'mate-reply': v => TeumGuide.wait(900).then(() => {
+      const row = agenda.querySelector('.comment:not(.ai)').cloneNode(true);
+      row.classList.add('mate-reply');
+      wrapSeg(row.querySelector('.bubble'), v);
+      row.querySelector('time').textContent = hhmm(new Date());
+      thread.append(row);
+      thread.scrollTop = thread.scrollHeight;
+    }),
+    'type-msg': v => TeumGuide.type(msg, v || SENT, 40),
+    // 채팅: 메이트 말이 내 차례 전까지 하나씩 온다 / 내 차례 줄을 입력칸에 적는다
+    'chat-in': () => (function next() {
+      if (!CHAT[chatShown] || CHAT[chatShown][0] === 'me') return Promise.resolve();
+      return TeumGuide.wait(chatShown ? 900 : 500).then(() => { chatRow('in', CHAT[chatShown][1]); chatShown++; return next(); });
+    })(),
+    'chat-type': () => CHAT[chatShown] && CHAT[chatShown][0] === 'me' ? TeumGuide.type(chatInput, CHAT[chatShown][1], 40) : null,
+    // AI 답변을 끝까지 적을 때까지 기다린다
+    'wait-ai': () => new Promise(resolve => {
+      const t = setInterval(() => {
+        const b = agenda.querySelector('.ai .bubble.answer');
+        if (b && b.textContent === AI_ANSWER) { clearInterval(t); resolve(); }
+      }, 150);
+    })
+  });
+</script>
+</body>
+</html>

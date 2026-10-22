@@ -1,0 +1,17 @@
+/* 틈새살이 마우스 커서 - 메인 화면·합의서·앱 화면(iframe) 모두 같은 초록(#499963) 커서.
+   보통은 화살표(--cur-arrow), 눌러야 하는 곳만 손가락(--cur-hand). 각 파일의 cursor:pointer 자리는 var(--cur-hand)로 쓴다 */
+:root{
+  --cur-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M4 2.5v17.2l4.6-4.4 3 6.6 2.9-1.3-3-6.5h6.4z' fill='%23499963' stroke='white' stroke-width='1.6' stroke-linejoin='round'/%3E%3C/svg%3E") 4 3, default;
+  --cur-hand: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M8 3a1.5 1.5 0 0 1 3 0v6.3a1.4 1.4 0 0 1 2.8.2 1.4 1.4 0 0 1 2.8.5 1.4 1.4 0 0 1 2.8.7V16c0 3.1-2.1 5.5-5 5.5h-2.3c-1.6 0-2.9-.7-3.8-2L4.6 14.6c-.6-.9-.3-2 .7-2.3.7-.2 1.3.1 1.7.6L8 14.2z' fill='%23499963' stroke='white' stroke-width='1.4' stroke-linejoin='round'/%3E%3C/svg%3E") 9 2, pointer;
+}
+html{ cursor: var(--cur-arrow); }
+/* 글자 입력 칸도 눌러서 쓰는 곳이라 손가락 (브라우저 기본 I자 커서 대신 - 구역마다 커서 모양이 바뀌지 않게) */
+input, textarea, select, [contenteditable]{ cursor: var(--cur-hand); }
+/* 버튼·라벨·링크는 따로 커서를 안 정해도 손가락 (브라우저 기본은 버튼에 검은 기본 화살표). 눌리지 않는 버튼은 화살표 */
+button, [role=button], label, a[href], summary{ cursor: var(--cur-hand); }
+button:disabled{ cursor: var(--cur-arrow); }
+
+/* 앱 화면(미션 중 폰 안): 앱 자체 커서(글자 입력·끌기 등)는 모두 무시하고 화살표, 지금 눌러야 하는 가이드 테두리 안만 손가락.
+   html.teum-app은 앱이 게임 폰 안에서 열렸을 때, html.teum-hand는 마우스가 가이드 테두리 안일 때 (app-guide-bridge.js / app_1) */
+html.teum-app, html.teum-app *{ cursor: var(--cur-arrow) !important; }
+html.teum-app.teum-hand, html.teum-app.teum-hand *{ cursor: var(--cur-hand) !important; }

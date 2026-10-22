@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>틈 | 메이트 유형 테스트</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
+<script>
+  /* 게임 위치 — 한방판 게임 폴더를 복사하지 않고 그 자리 그대로 연다.
+     게임을 고치면(teum_game_1018 안의 파일) 여기엔 아무것도 안 바꿔도 바로 반영된다.
+     게임 폴더를 옮기거나 웹에 올리면 이 주소만 바꾸면 된다. 뒤에 ?code=유형코드가 붙는다. */
+  var GAME_URL = 'teum_game/index.html';
+</script>
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:#eef0f2;font-family:Pretendard,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;color:#1A1A1A;word-break:keep-all}
+  .wrap{height:100%;display:flex;align-items:center;justify-content:center;gap:24px;padding:0 4vw}
+  /* 테스트 페이지는 폭 600px 이하에서 폰 테두리 없는 모바일 화면으로 바뀌므로 그보다 넓게 둔다 */
+  .phone{flex:none;width:620px;height:100%;border:0;display:block;order:2} /* 안내는 왼쪽, 테스트 앱은 오른쪽 */
+  .guide{flex:0 1 520px;min-width:300px}
+  .label{margin:0 0 18px;color:#71D369;font-size:26px;font-weight:700}
+  h1{margin:0 0 26px;font-size:42px;line-height:1.35;font-weight:700}
+  .desc{margin:0 0 14px;font-size:19px;line-height:1.65;color:#474747}
+  .steps{margin:30px 0 36px;padding:0;list-style:none;display:flex;flex-direction:column;gap:12px}
+  .steps li{display:flex;align-items:center;gap:12px;font-size:17px;color:#474747}
+  .steps b{flex:none;width:28px;height:28px;border-radius:50%;background:#fff;color:#FF9696;font-size:14px;display:grid;place-items:center}
+  .start{width:100%;max-width:420px;min-height:64px;border:0;border-radius:40px;padding:0 28px;font:inherit;font-size:19px;font-weight:700;
+         background:#D9DEDA;color:#8A948C;cursor:not-allowed;transition:background .3s,color .3s,transform .15s}
+  .start.on{background:#71D369;color:#fff;cursor:pointer}
+  .start.on:hover{background:#64c85d}
+  .start.on:active{transform:translateY(1px)}
+  .hint{margin:14px 0 0 6px;font-size:14px;color:#8A948C}
+  @media (max-width:1100px){.wrap{flex-direction:column;justify-content:flex-start;padding:24px 16px;overflow:auto;height:auto;min-height:100%}
+    .phone{width:min(620px,100%);height:900px}.guide{flex:none;width:min(520px,100%);padding-bottom:32px}}
+
+  /* ---- 게임 보기: 테두리 없이 그림자만 있는 16:9 칸 안에 게임. 전체 화면 버튼으로 칸째 화면을 꽉 채운다 ---- */
+  .play{display:none;height:100%;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:24px 4vw 32px}
+  body.playing .wrap{display:none}
+  body.playing .play{display:flex}
+  .bar{display:flex;align-items:center;justify-content:space-between;gap:16px}
+  .bar h2{margin:0;font-size:22px;font-weight:700}
+  .bar h2 span{color:#499963}
+  .fs{flex:none;display:flex;align-items:center;gap:8px;min-height:46px;padding:0 22px;border:0;border-radius:30px;background:#71D369;color:#fff;
+      font:inherit;font-size:16px;font-weight:700;cursor:pointer}
+  .fs:hover{background:#64c85d}
+  .btns{display:flex;gap:10px}
+  .fs.ghost{background:#fff;color:#499963;box-shadow:inset 0 0 0 1.5px #71D369}
+  .fs.ghost:hover{background:#F3F7E9}
+  .fs svg{width:18px;height:18px}
+  .screen{position:relative;flex:none;border-radius:22px;box-shadow:0 40px 90px -30px rgba(20,30,24,.45)}
+  .screen iframe{display:block;width:100%;height:100%;border:0;border-radius:22px;background:#fff}
+  /* 사이트 안 전체 화면: 사이트가 헤더를 내리고 이 페이지가 창 전체가 되면, 칸을 창 크기로 펼친다 (브라우저 F11식 전체 화면 아님) */
+  body.full .play{padding:0;gap:0}
+  body.full .bar{display:none}
+  body.full .screen{position:fixed;inset:0;width:auto!important;height:auto!important;padding:0;border-radius:0;box-shadow:none;z-index:5}
+  body.full .screen iframe{border-radius:0}
+  .toast{position:absolute;left:50%;top:28px;transform:translate(-50%,-8px);padding:12px 22px;border-radius:30px;background:rgba(27,30,28,.82);color:#fff;
+         font-size:16px;font-weight:600;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .35s,transform .35s;z-index:2}
+  .toast.show{opacity:1;transform:translate(-50%,0)}
+  .toast b{color:#71D369}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <iframe class="phone" src="mate_type_test.html" title="주거 메이트 매칭 테스트"></iframe>
+  <section class="guide">
+    <p class="label">Mate Matching Test</p>
+    <h1>나의 주거 성향을 알아보고<br>잘 맞는 메이트를 만나보세요</h1>
+    <p class="desc">함께 살 때 중요한 6가지 질문에 답하면 나의 메이트 유형과 잘 맞는 메이트를 알려줘요.</p>
+    <p class="desc">테스트를 마치면 그 메이트와 함께 사는 하루를 '틈새살이' 게임으로 바로 체험할 수 있어요.</p>
+    <ul class="steps">
+      <li><b>1</b>오른쪽 화면에서 '메이트 매칭 시작하기'를 눌러요</li>
+      <li><b>2</b>질문 6개에 답하고 나의 유형을 확인해요</li>
+      <li><b>3</b>아래 버튼으로 내 유형의 게임을 시작해요</li>
+    </ul>
+    <button class="start" id="start" disabled>테스트를 마치면 게임을 시작할 수 있어요</button>
+    <p class="hint" id="hint">게임은 PC 화면(1280×720 이상)에 맞춰져 있어요.</p>
+  </section>
+</div>
+<div class="play" id="play">
+  <div class="bar" id="bar">
+    <h2>틈새살이 · <span id="playType"></span></h2>
+    <div class="btns">
+    <button class="fs ghost" id="retryBtn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>유형 테스트 다시하기</button>
+    <button class="fs" id="fsBtn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>전체 화면</button>
+    </div>
+  </div>
+  <div class="screen" id="screen">
+    <iframe id="gameFrame" title="틈새살이 게임"></iframe>
+    <div class="toast" id="toast"><b>ESC</b> 키를 누르면 다시 작게 볼 수 있어요</div>
+  </div>
+</div>
+<script>
+(function(){
+  var btn = document.getElementById('start'), code = '';
+  // 테스트(mate_type_test.html)가 결과를 보여 주면 유형을 보내 온다 → 버튼 켜기. 다시하기 → 끄기.
+  addEventListener('message', function(e){
+    var d = e.data || {};
+    if (d.teum === 'typeResult') {
+      code = String(d.code || '');
+      btn.disabled = false; btn.classList.add('on');
+      typeName = d.name; btn.textContent = d.name + ' 메이트 유형으로 틈새살이 시작하기 →';
+    } else if (d.teum === 'typeReset') {
+      code = ''; btn.disabled = true; btn.classList.remove('on');
+      btn.textContent = '테스트를 마치면 게임을 시작할 수 있어요';
+    }
+  });
+  var play = document.getElementById('play'), screen = document.getElementById('screen'), frame = document.getElementById('gameFrame'),
+      bar = document.getElementById('bar'), toast = document.getElementById('toast'), typeName = '';
+  // 칸 크기: 남은 공간 안에서 16:9로 최대한 크게
+  function fit(){
+    var w = play.clientWidth * 0.92, h = play.clientHeight - bar.offsetHeight - 18 - 56;
+    var W = Math.max(320, Math.min(w, h * 16 / 9)), H = W * 9 / 16;
+    screen.style.width = W + 'px'; screen.style.height = H + 'px'; bar.style.width = W + 'px';
+  }
+  addEventListener('resize', function(){ if (document.body.classList.contains('playing')) fit(); });
+  btn.addEventListener('click', function(){
+    if (!code) return;
+    document.getElementById('playType').textContent = typeName + ' 메이트 유형';
+    document.body.classList.add('playing'); fit();
+    frame.src = GAME_URL + '?code=' + encodeURIComponent(code);
+  });
+  // 전체 화면 = 사이트 안에서 헤더까지 덮게 펼치기. 사이트(부모)에 알려 헤더를 내리고 위쪽 여백을 없애게 한다.
+  function setFull(on){
+    document.body.classList.toggle('full', on);
+    try { parent.postMessage({teum: 'gameFull', on: on}, '*'); } catch (e) {}
+    onFs(on);
+  }
+  document.getElementById('fsBtn').addEventListener('click', function(){ setFull(true); });
+  // 유형 테스트 다시하기: 게임을 멈추고(빈 페이지) 테스트를 처음부터 다시 연다. 시작 버튼도 다시 꺼 둔다.
+  document.getElementById('retryBtn').addEventListener('click', function(){
+    frame.src = 'about:blank';
+    document.body.classList.remove('playing');
+    var t = document.querySelector('iframe.phone'); t.src = 'mate_type_test.html?r=' + Date.now();
+    code = ''; btn.disabled = true; btn.classList.remove('on'); btn.textContent = '테스트를 마치면 게임을 시작할 수 있어요';
+  });
+  // ESC: 이 페이지에 포커스가 있을 때는 직접, 게임 안을 누른 뒤에는 게임(url-code.js)이 사이트를 거쳐 보내 준다
+  addEventListener('keydown', function(e){ if (e.key === 'Escape' && document.body.classList.contains('full')) setFull(false); });
+  addEventListener('message', function(e){ if ((e.data || {}).teum === 'gameEsc' && document.body.classList.contains('full')) setFull(false); });
+  var tt;
+  // 전체 화면이 되면 처음에 ESC 안내를 잠깐 보여 준다
+  function onFs(on){
+    clearTimeout(tt);
+    if (on) { toast.classList.add('show'); tt = setTimeout(function(){ toast.classList.remove('show'); }, 3500); }
+    else { toast.classList.remove('show'); fit(); }
+  }
+})();
+</script>
+</body>
+</html>

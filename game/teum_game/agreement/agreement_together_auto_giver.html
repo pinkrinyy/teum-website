@@ -1,0 +1,1372 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<!-- 폰 프레임(412) + 여백(20×2) = 452. 폰에서는 이 폭 전체가 화면에 맞게 축소된다 -->
+<meta name="viewport" content="width=452">
+<title>틈새살이 합의서 · 동거 임대인 (자동 시연)</title>
+<link rel="stylesheet" href="../teum-cursor.css">
+<style>
+  @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+  @font-face {
+    font-family: 'NationalPension';
+    src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2310@1.0/NPSfontBold.woff2') format('woff2');
+    font-weight: 700;
+    font-display: swap;
+  }
+  /* 게임 화면 폰 안(iframe)은 해상도에 따라 축소 반올림으로 412x892보다 1px 작아질 때가 있다 → 페이지가 넘쳐 가로·세로 스크롤바가 생기며
+     화면이 작아 보였다. 페이지 자체는 스크롤하지 않는다 (합의서 내용 스크롤은 안쪽 영역에서 따로 된다) */
+  html, body { overflow: hidden; }
+  body {
+    margin: 0; padding: 0;
+    display: flex; justify-content: center; align-items: center;
+    background: #e2e8f0;
+    font-family: 'Pretendard', sans-serif;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+  .app-wrapper {
+    position: relative;
+    width: 412px; height: 892px; flex-shrink: 0;   /* 창이 좁아도 폰 프레임이 찌그러지지 않게 */
+    border-radius: 30px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.15);
+    background: #F7F8FA;
+    overflow: hidden;
+    user-select: none; -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    /* 한글은 어절 단위로만 줄바꿈, 띄어쓰기 없는 긴 문자열(URL 등)만 칸 끝에서 끊는다 */
+    word-break: keep-all; overflow-wrap: break-word;
+  }
+  .app-wrapper, .app-wrapper * { box-sizing: border-box; }
+  .nps { font-family: 'NationalPension', 'Pretendard', sans-serif; }
+
+  /* ===== 헤더 + 진행 막대 (1/3) ===== */
+  .topbar { position: absolute; left: 0; top: 0; width: 412px; height: 106px; z-index: 1;
+            background: rgba(247, 248, 250, 0.80); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+  /* 상단 바 좌표는 Figma 헤더 SVG 기준: ‹ 화살표 (25, 64), 제목 글자 시작 (61.7, 63.4) */
+  .head { position: absolute; left: 25px; top: 63px; z-index: 2; display: flex; align-items: flex-start; }
+  .head a { display: flex; margin-top: 1px; }
+  .head h1 { margin: 0 0 0 23.5px; color: black; font-size: 24px; font-weight: 700; }
+  .progress { position: absolute; left: 16px; top: 96px; z-index: 2; width: 380px; height: 6px;
+              background: #DBDBDB; border-radius: 100px; overflow: hidden; }
+  .progress i { display: block; width: 126.6px; height: 100%; border-radius: 100px;
+                transition: width .45s cubic-bezier(.4, 0, .2, 1);
+                background: linear-gradient(90deg, #A6C673 0%, #FF9696 100%); }   /* 동거 버전 색 (Figma) */
+
+  /* ===== 본문: 헤더(106)·하단 버튼(88) 뒤로 지나가며 스크롤 ===== */
+  /* ponytail: Figma 본문이 144~약 806px라 하단 버튼 바(804~)와 겹친다 — 스크롤 영역으로 둔다 */
+  .body { position: absolute; inset: 0; overflow-y: auto; scrollbar-width: none;
+          padding: 144px 16px 112px; }                 /* 112 = 버튼 바 88 + 여유 24 */
+  .body::-webkit-scrollbar { display: none; }
+  .content { width: 380px; display: flex; flex-direction: column; gap: 24px; }
+  h2 { margin: 0; color: black; font-size: 20px; font-weight: 700; }
+
+  .sect { display: flex; flex-direction: column; gap: 14px; }
+  .lead { width: 286px; display: flex; flex-direction: column; gap: 5px; }
+  .lead p { margin: 0; color: #B1B1B1; font-size: 15px; }
+
+  .form { display: flex; flex-direction: column; gap: 16px; }
+  .fields { display: flex; flex-direction: column; gap: 8px; }
+  .field { display: flex; flex-direction: column; gap: 10px; }
+  .row { display: flex; justify-content: space-between; align-items: center; }
+  label.k { color: #7F7F7F; font-size: 14px; font-weight: 700; }
+  .inp { padding: 16px 20px; background: white; border-radius: 50px;
+         outline: 1px #BABFCF solid; outline-offset: -1px; border: 0;
+         color: black; font: 400 15px 'Pretendard', sans-serif; transition: outline-color .2s ease; }
+  .inp::placeholder { color: #BABFCF; }
+  .inp:focus, .inp.typing, .inp:not(:placeholder-shown) { outline-color: #71D369; }
+  .row .inp { width: 265px; }
+
+  .notice-box { min-height: 85px; padding: 16px 20px 13px; border-radius: 12px;
+                background: rgba(219, 219, 219, 0.15); outline: 1px #DBDBDB solid; outline-offset: -1px;
+                display: flex; flex-direction: column; gap: 5px; }
+  .notice-box .ttl { display: flex; align-items: center; gap: 9px; color: #7F7F7F; font-size: 14px; font-weight: 700; }
+  .notice-box p { margin: 0; max-width: 341px; color: #7F7F7F; font-size: 12px; line-height: 16px; }
+
+  hr { width: 100%; margin: 0; border: 0; border-top: 1px solid #DBDBDB; }
+
+  /* ===== 이체 내역 업로드 ===== */
+  .uploads { width: 358px; display: flex; justify-content: space-between; align-items: center; }
+  .up { width: 160px; display: flex; flex-direction: column; gap: 8px; }
+  .up > span { color: #474747; font-size: 15px; font-weight: 500; }
+  .proof { position: relative; height: 160px; background: white; border-radius: 12px;
+         outline: 1px #BABFCF solid; outline-offset: -1px;
+         display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 16.08px;
+         color: #BABFCF; font-size: 15px; font-weight: 500; }
+  .proof .idle { display: contents; text-transform: uppercase; }
+  .proof .loading, .proof .receipt, .proof .del { display: none; }
+  /* 업로드 중: 로딩 원 + '업로드 중' (본인 초록 / 메이트 분홍) */
+  .proof.busy .idle { display: none; }
+  .proof.busy .loading { display: contents; }
+  .proof.busy { outline-color: #71D369; color: #71D369; }
+  .proof.off.busy { outline-color: #FF9696; color: #FF9696; }
+  /* 업로드 끝: 이체확인증 + 지우기 ✕ */
+  .proof.has .idle { display: none; }
+  .proof.has { outline-color: #71D369; }
+  .proof.off.has { outline-color: #FF9696; }
+  .proof.has .receipt { display: block; }
+  .proof.has .del { display: flex; }
+  #myProof:not(.busy, .has) { cursor:var(--cur-hand); }
+  /* 동거 1/3: 빌려주는 쪽(임대인·전대인)이 올리는 서류 2장 — 누르면 업로드 중 → 업로드 완료 */
+  .docs .uploads { margin-left: 11px; }
+  /* 서류 칸: 빌려주는 쪽을 고르면 펼쳐진다. 높이는 grid 0fr → 1fr로 내용 높이만큼 부드럽게.
+     접혀 있을 땐 부모 gap(12)만큼 margin을 빼서 빈틈도 안 남긴다 */
+  .docs { display: grid; grid-template-rows: 0fr; margin-top: -12px; opacity: 0; visibility: hidden;
+          transition: grid-template-rows .4s cubic-bezier(.4, 0, .2, 1), margin-top .4s cubic-bezier(.4, 0, .2, 1), opacity .3s ease, visibility 0s .4s; }
+  .docs > .uploads { min-height: 0; overflow: hidden; }
+  .docs.open { grid-template-rows: 1fr; margin-top: 0; opacity: 1; visibility: visible;
+               transition: grid-template-rows .4s cubic-bezier(.4, 0, .2, 1), margin-top .4s cubic-bezier(.4, 0, .2, 1), opacity .3s ease .1s; }
+  .doc:not(.busy, .has) { cursor:var(--cur-hand); }
+  /* 올라간 서류 = 그 칸의 이미지 (1번 칸 a.png, 2번 칸 b.png). 빌려주는 쪽은 누르면, 빌린 쪽(조회)은 처음부터 보인다 */
+  .doc.has, .viewer .docs .doc { background: white var(--img) center / cover no-repeat; }
+  .proof .del { position: absolute; left: 130px; top: 7.4px; padding: 0; border: 0; background: none; cursor:var(--cur-hand); }
+  /* 메이트 칸은 메이트가 직접 올리는 자리 — 누를 수 없다 */
+  .proof.off { color: #DBDBDB; }
+
+  /* 이체확인증 (Figma 좌표 그대로, 값은 오른쪽 끝 8px에 맞춤) */
+  .receipt { position: absolute; inset: 0; color: black; font-size: 6.7px; line-height: 1.2; text-transform: none; }
+  .receipt > * { position: absolute; margin: 0; }
+  .receipt h4 { left: 8px; top: 8px; font-size: 8px; font-weight: 500; }
+  .receipt hr { left: 9px; top: 25px; width: 143px; border: 0; border-top: 1px solid #DBDBDB; }
+  .receipt dt { left: 9px; color: rgba(0, 0, 0, 0.50); font-weight: 400; }
+  .receipt dd { right: 8px; text-align: right; font-weight: 400; }
+
+  .spin { animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .spin { animation-duration: 3s; } }
+
+  /* ===== 하단 버튼 ===== */
+  /* ===== 동거 1/3: 계약 형태·지위 + 보증금 반환 확인 ===== */
+  .ctype { width: 380px; background: white; border-radius: 12px; overflow: hidden;
+           outline: 1px #BABFCF solid; outline-offset: -1px; }
+  .ctype .r { display: flex; height: 52px; }
+  .ctype .r + .r { border-top: 1px solid #BABFCF; }
+  .ctype .lbl { width: 252px; flex: 0 0 auto; padding: 0 20px; display: flex; align-items: center; color: black; font-size: 15px; }
+  .ctype label { flex: 1; border-left: 1px solid #BABFCF; cursor:var(--cur-hand);
+                 display: flex; justify-content: center; align-items: center; color: #BABFCF; font-size: 15px;
+                 }   /* 전환 없이 바로 바꾼다 - 회색 글자(#BABFCF)·흰 글자 둘 다 초록/분홍 바탕과 밝기가 거의 같아서, 바탕을 서서히 바꾸면 중간에 글자가 사라져 깜빡인다 */
+  .ctype label:has(:checked) { background: #71D369; color: white; }
+  /* 지위 줄: 계약 형태를 고르면 0 → 52px로 펼쳐지며 나타난다 */
+  .ctype .r.party { height: 0; opacity: 0; overflow: hidden; visibility: hidden; border-top: 0 solid transparent;
+                  transition: height .35s cubic-bezier(.4, 0, .2, 1), opacity .3s ease, border-width .35s ease, border-color .35s ease, visibility 0s .35s; }
+  /* 동거 2/3: 책임 주체 표 — 빌려주는 쪽은 초록, 빌린 쪽(메이트)은 분홍 (Figma 활성) */
+  .resp-head { width: 304px; display: flex; justify-content: space-between; color: #474747; font-size: 14px; }
+  .ctype.resp label:has(input[value=taker]:checked) { background: #FF9696; color: white; }
+  .resp-wrap { display: flex; flex-direction: column; gap: 6px; }
+  .sect-resp { display: flex; flex-direction: column; gap: 9px; }
+  /* 입주 시점 방 사진: Upload 칸 오른쪽으로 사진이 붙고, 넘치면 화면 끝까지 가로 스크롤 */
+  .room-rec { display: flex; flex-direction: column; gap: 5px; }   /* .room은 시작 화면 공용공간 카드가 쓰는 이름 */
+  .room-pics { display: flex; gap: 5px; overflow-x: auto; margin-right: -16px; padding-right: 16px; scrollbar-width: none; }
+  .room-pics::-webkit-scrollbar { display: none; }
+  .room-pics .proof { flex: 0 0 auto; width: 160px; }
+  #roomAdd:not(.busy) { cursor:var(--cur-hand); }
+  .pic { flex: 0 0 auto; position: relative; width: 160px; height: 160px; border-radius: 12px;
+         background: white center / cover no-repeat; outline: 1px #71D369 solid; outline-offset: -1px; }
+  /* 새로 붙는 사진: 폭이 0에서 펼쳐지며(뒤 사진이 부드럽게 밀림) 살짝 커지면서 나타난다 */
+  .pic.enter { animation: picIn .45s cubic-bezier(.2, .8, .2, 1) both; }
+  @keyframes picIn {
+    from { width: 0; margin-left: -5px; opacity: 0; transform: scale(.85); }
+    60%  { opacity: 1; }
+    to   { width: 160px; margin-left: 0; opacity: 1; transform: none; }
+  }
+  @media (prefers-reduced-motion: reduce) { .pic.enter { animation-duration: .01ms; } }
+  .pic button { position: absolute; left: 130px; top: 7.4px; padding: 0; border: 0; background: none; cursor:var(--cur-hand); display: flex; }
+  /* ===== 빌린 쪽(임차인·전차인) 조회 모드: 임대인이 작성한 내용을 읽기만 한다 (Figma) ===== */
+  .inp[readonly], .free textarea[readonly] { background: rgba(219, 219, 219, 0.15); outline-color: #DBDBDB !important; color: #7F7F7F; }
+  label:has(input:disabled) { cursor:var(--cur-arrow); }
+  .viewer .docs .doc { outline-color: #DBDBDB; pointer-events: none; }
+  .viewer .docs .doc > * { display: none !important; }
+  .viewer #roomAdd, .viewer .pic:not(.view) { display: none; }
+  .pic.view { outline-color: #DBDBDB; }
+  /* 조회 모드의 보증금 반환 확약 = 임대인이 체크해 둔 것 → 회색 체크 (Figma) */
+  .viewer #depositOk:checked + i { background-color: #DBDBDB; border-color: #DBDBDB; }
+  .ctype:has([name=ctype]:checked) .party { height: 52px; opacity: 1; visibility: visible; border-top: 1px solid #BABFCF;
+                  transition: height .35s cubic-bezier(.4, 0, .2, 1), opacity .3s ease .05s, border-width .35s ease, border-color .35s ease; }
+  .dep { display: flex; flex-direction: column; gap: 20px; }
+  .dep-top { display: flex; flex-direction: column; gap: 15px; }
+
+  .cta { position: absolute; left: 0; top: 804px; width: 412px; height: 88px; z-index: 1;
+         background: rgba(247, 248, 250, 0.80); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+  /* 비활성 모양 (Figma 그대로) */
+  .cta button { position: absolute; left: 16px; top: 12px; width: 380px; height: 52px; border-radius: 26px;
+                background: #F2F7EA; border: 1px solid rgba(113, 211, 105, 0.15);
+                color: #499963; font: 500 18px 'Pretendard', sans-serif;
+                transition: background-color .2s ease, border-color .2s ease; }   /* 꺼질 땐 초록 글자로 바로 */
+  /* 금액 3칸 + 본인 이체 내역까지 채우면 활성 */
+  .cta button.on { background: #71D369; border-color: #71D369; color: white; cursor:var(--cur-hand);
+                  transition: background-color .2s ease, border-color .2s ease, color 0s .2s; }   /* 켜질 땐 배경이 다 찬 뒤 흰 글자로 - 글자색까지 페이드하면 중간에 글자가 사라진다 */
+  /* 2/3부터 '이전' 버튼이 생긴다 — 380 = 98 + 14 + 268 */
+  .cta .prev { display: none; width: 98px; background: white; border: 0; cursor:var(--cur-hand); }
+  .s2 .cta .prev { display: block; }
+  .s2 .cta #next { left: 128px; width: 268px; }
+  /* 3/3 서명까지 마쳐 '합의 완료' 버튼이 켜지면 숨쉬듯 빛나며 눌러야 할 곳을 알려준다 */
+  .s3 .cta #next.on { animation: ctaPulse 1.4s ease-in-out infinite; }
+  @keyframes ctaPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(113, 211, 105, 0.55); transform: scale(1); }
+    50% { box-shadow: 0 0 0 10px rgba(113, 211, 105, 0); transform: scale(1.03); }
+  }
+
+  /* ===== 단계 전환 (1/3 ↔ 2/3) — 같은 화면의 모드만 바꾼다 ===== */
+  .step2 { display: none; }
+  .s2 .step1 { display: none; }
+  .s2 .step2 { display: block; }
+  .s2 .progress i { width: 253.3px; }
+  /* 3/3은 s2 위에 s3을 얹는다 — 이전/다음 버튼 배치는 2/3 것을 그대로 쓴다 */
+  .step3 { display: none; }
+  .s3 .step2 { display: none; }
+  .s3 .step3 { display: block; }
+  .s3 .progress i { width: 380px; }
+
+  /* ===== 2/3: 중도 퇴거 · 공석 · 자유 합의 ===== */
+  .lead2 { display: flex; flex-direction: column; gap: 5px; }
+  .lead2 p { margin: 0; color: #7F7F7F; font-size: 14px; line-height: 20px; }
+  .sect2 { display: flex; flex-direction: column; gap: 12px; }
+  .sect3 { display: flex; flex-direction: column; gap: 16px; }
+  /* 라디오는 네이티브를 쓰고 화면 밖으로만 민다 — 선택 상태 관리 JS가 없다 */
+  .step1 input[type=radio], .step1 input[type=checkbox], .step2 input[type=radio], .step3 input[type=checkbox] { position: absolute; width: 0; height: 0; opacity: 0; }
+  .choice { display: flex; gap: 14px; }
+  .choice label { width: 183px; height: 88px; padding: 16px; background: white; border-radius: 12px;
+                  outline: 1px #BABFCF solid; outline-offset: -1px; cursor:var(--cur-hand);
+                  display: flex; justify-content: center; align-items: center;
+                  color: black; font-size: 20px; font-weight: 700;
+                  transition: outline-color .2s ease, background-color .2s ease; }   /* 해제될 땐 검은 글자로 바로 */
+  .choice label:has(:checked) { outline-color: #71D369; background: #71D369; color: white;   /* Figma 활성 */
+                              transition: outline-color .2s ease, background-color .2s ease, color 0s .2s; }   /* 배경이 다 찬 뒤 흰 글자로 */
+  .ttl2 { display: flex; align-items: flex-end; gap: 6px; }
+  .ttl2 em { color: #7F7F7F; font-size: 12px; font-style: normal; }
+  .opts { display: flex; flex-direction: column; gap: 12px; }
+  /* '기타 (직접 작성)'를 고르면 목록 바로 아래(4px)에 입력칸이 열린다 */
+  .opts-wrap { display: flex; flex-direction: column; gap: 4px; }
+  .etc-inp { display: none; }
+  .opts-wrap:has(#vacEtc:checked) .etc-inp { display: block; }
+  .opt { width: 340px; display: flex; align-items: center; gap: 14px; cursor:var(--cur-hand); color: black; font-size: 15px; }
+  .opt i, .chk-row i { width: 20px; height: 20px; flex: 0 0 auto; border-radius: 50%; border: 1px solid #71D369;
+           background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M5.05831 10.2918L8.18137 13.1038C8.58198 13.4646 9.19643 13.4428 9.57052 13.0546L14.8307 7.59681' fill='none' stroke='white' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") center / 0 no-repeat;
+           transition: background-color .2s ease; }
+  .opt :checked + i, .chk-row :checked + i { background-color: #71D369; background-size: 20px; }
+  .free h2 { line-height: 20px; letter-spacing: 0.10px; }
+  .free textarea { width: 380px; height: 172px; padding: 16px 20px; background: white; border: 0; border-radius: 12px;
+                   outline: 1px #BABFCF solid; outline-offset: -1px; resize: none;
+                   color: black; font: 400 15px/22px 'Pretendard', sans-serif; transition: outline-color .2s ease; }
+  .free textarea::placeholder { color: #BABFCF; }
+  /* Figma 활성: 내용이 차면 회색 테두리. 쓰는 동안(포커스)만 초록 */
+  .free textarea:not(:placeholder-shown) { outline-color: #BABFCF; }   /* 동거 Figma 활성: 내용이 있어도 회색 테두리 그대로 */
+  .free textarea:focus, .free textarea.typing { outline-color: #71D369; }
+
+  /* ===== 3/3: 합의서 최종 확인 ===== */
+  .step3 .content { gap: 53px; }
+  .final { display: flex; flex-direction: column; gap: 24px; }
+  .final-top { display: flex; flex-direction: column; gap: 14px; }
+  .lead3 h2 { color: #383838; }
+  .lead3 p { margin: 0; color: #7F7F7F; font-size: 14px; line-height: 20px; }
+  .agrees { display: flex; flex-direction: column; gap: 18px; }
+  .agree-list { display: flex; flex-direction: column; gap: 12px; }
+  .chk-row { display: flex; align-items: flex-start; gap: 14px; cursor:var(--cur-hand); color: black; font-size: 15px; }
+  .chk-row.center { align-items: center; }
+  .chk-all b { display: block; height: 20px; font-size: 18px; font-weight: 500; }
+  .chk-all small { display: block; margin-top: 6px; color: #7F7F7F; font-size: 12px; font-weight: 500; }
+
+  .status { display: flex; flex-direction: column; gap: 24px; }
+  .signers { display: flex; flex-direction: column; gap: 10px; }
+  .signer-list { display: flex; flex-direction: column; gap: 20px; }
+  .signer { display: flex; flex-direction: column; gap: 6px; }
+  .who-line { display: flex; align-items: center; gap: 35px; color: #7F7F7F; font-size: 14px; line-height: 20px; }
+  .who-line::before, .who-line::after { content: ""; flex: 1; border-top: 1px solid #DBDBDB; }
+  .sign-card { height: 74px; padding: 11px 23px 11px 25px; border-radius: 12px;
+               background: rgba(219, 219, 219, 0.15); outline: 1px #DBDBDB solid; outline-offset: -1px;
+               display: flex; justify-content: space-between; align-items: center; }
+  .sign-card .nm { display: flex; flex-direction: column; gap: 8px; }
+  .sign-card .nm b { color: black; font-size: 14px; font-weight: 400; }
+  .sign-card .nm span { font-size: 12px; font-weight: 500; }
+  .st-wait { color: #E84646; }
+  .st-me-done { color: #71D369; }
+  .st-mate-done { color: #FF9696; }
+  .sign-box { position: relative; width: 143px; height: 51px; background: white; border-radius: 12px; border: 1px solid #DBDBDB;
+              display: flex; justify-content: center; align-items: center; color: #DBDBDB; font-size: 14px; }
+  /* 본인 서명칸: 누르면 서명 팝업. 완료하면 그린 서명을 줄여서 보여준다 */
+  #mySign { cursor:var(--cur-hand); }
+  .sign-box canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+  .sign-box.signed span { display: none; }
+  /* 자동 시연이 끝나면 서명칸이 숨쉬듯 깜빡여 '여기만 하면 된다'를 알려준다 */
+  #mySign.nudge:not(.signed) { animation: nudge 1.4s ease-in-out infinite; }
+  @keyframes nudge { 50% { border-color: #71D369; box-shadow: 0 0 0 4px rgba(113, 211, 105, 0.25); } }
+
+  /* ===== 서명 팝업 ===== */
+  .sign-modal { position: absolute; inset: 0; z-index: 40; background: rgba(0, 0, 0, 0.60);
+                backdrop-filter: blur(0.5px); -webkit-backdrop-filter: blur(0.5px); }
+  .sign-modal[hidden] { display: none; }
+  .sign-pad { position: absolute; left: 16px; top: 255px; width: 380px; height: 380px; padding: 19px;
+              background: white; border-radius: 12px; border: 3px solid #DBDBDB;
+              display: flex; flex-direction: column; justify-content: flex-end; align-items: center; }
+  .sign-pad canvas { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 9px;
+                     touch-action: none; cursor:var(--cur-hand); }
+  .sign-pad .ph { position: absolute; left: 0; right: 0; top: 164px; text-align: center; pointer-events: none;
+                  color: #DBDBDB; font-size: 32px; }
+  .sign-pad.inked .ph { display: none; }
+  /* 서명을 그리면 '서명 완료' 버튼이 숨쉬듯 빛나며 누를 곳을 알려준다 (다시하기로 지우면 멈춤) */
+  .sign-pad.inked .sign-done { animation: signDonePulse 1.4s ease-in-out infinite; }
+  @keyframes signDonePulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(113, 211, 105, 0.6); transform: scale(1); }
+    50% { box-shadow: 0 0 0 10px rgba(113, 211, 105, 0); transform: scale(1.04); }
+  }
+  .sign-btns { position: relative; display: flex; align-items: center; gap: 16px; }   /* 캔버스 위에 뜬다 */
+  .sign-btns button { padding: 10px 8px; border: 0; border-radius: 23px; cursor:var(--cur-hand);
+                      display: flex; align-items: center; gap: 5px; color: white; font: 400 16px 'Pretendard', sans-serif; }
+  .sign-redo { width: 101px; background: #BABFCF; justify-content: flex-start; }
+  .sign-done { width: 224px; background: #71D369; outline: 1px rgba(113, 211, 105, 0.50) solid; outline-offset: -1px; justify-content: center; }
+  .sign-date { text-align: right; color: #7F7F7F; font-size: 14px; }
+
+  /* ================= 시작 화면 (홈 + 합의서 작성 안내) =================
+     '지금 작성하기'를 누르면 이 층만 숨기고 아래의 합의서 폼이 드러난다 */
+  .start { position: absolute; inset: 0; z-index: 50; background: #F7F8FA; }
+  .start[hidden] { display: none; }
+
+  .card { background: white; border-radius: 12px; outline: 1px #F0F0F0 solid; outline-offset: -1px;
+          position: relative; }
+
+  /* ponytail: Figma 프레임이 1344px — 892 화면에 안 들어가니 본문만 스크롤시킨다.
+     .page 안은 Figma 좌표 그대로 쓰고, 헤더/탭바만 wrapper에 고정. */
+  .scroll { position: absolute; inset: 0; overflow-y: auto; overflow-x: hidden; }
+  .scroll::-webkit-scrollbar { width: 0; }
+  /* ponytail: 카드를 Figma 좌표로 박아두면 일정이 접혀도 아래가 안 따라 올라온다.
+     세로 흐름으로 바꾸고, 원래 좌표 차이를 그대로 margin으로 옮겼다 (108/24/9/15/15/20/114). */
+  .page { width: 412px; padding: 108px 16px 114px; position: relative;
+          display: flex; flex-direction: column; }
+  .page > * + * { margin-top: 15px; }
+  .today { margin-top: 24px; }
+  .rules { margin-top: 7px; }   /* today의 그라데이션 테두리 1px×2 만큼 뺀다 */
+  .edit  { margin-top: 20px; }
+  .grid  { display: flex; gap: 14px; }   /* 183 + 14 + 183 = 380 */
+
+  /* 카드 제목 + 오른쪽 화살표 — 6장이 같은 머리를 쓴다 */
+  .hd { display: flex; justify-content: space-between; align-items: center; }
+  .hd b { color: black; font-size: 18px; font-weight: 700; }
+  .chev { width: 6px; height: 10px; flex: 0 0 auto; }
+
+  /* ===== 안건 ===== */
+  .notice { width: 380px; height: 78px; background: white; border-radius: 10px; padding: 15px 17px;
+            display: flex; flex-direction: column; gap: 8px; }
+  .notice .top { display: flex; align-items: center; gap: 9px; }
+  .notice .top b { color: black; font-size: 20px; font-weight: 700; }
+  .notice .top svg:last-child { margin-left: auto; }
+  .notice p { margin: 0; color: black; font-size: 14px;
+              white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* ===== 오늘의 일정 ===== */
+  /* 유일하게 높이가 내용 따라 늘어나는 카드 — 나머지는 Figma 고정 크기라 절대배치 */
+  /* 테두리가 위→아래 초록→분홍 그라데이션. outline은 그라데이션을 못 받으므로
+     app_3의 .pay와 같은 2겹 배경 기법을 쓴다 (padding-box 흰 면 + border-box 그라데이션). */
+  .today { width: 380px; padding: 20px;
+           outline: 0; border: 1px solid transparent;
+           background: linear-gradient(white, white) padding-box,
+                       linear-gradient(180deg, #71D369 0%, #FF9696 100%) border-box;
+           display: flex; flex-direction: column; gap: 12px; }
+  .today .hd { margin-bottom: 6px; }   /* 제목 아래만 18 */
+
+  /* 7칸 × 41px + 간격 = 338.9 ≒ 안쪽 340. gap 8.65 대신 space-between으로 맡긴다 */
+  .week { display: flex; justify-content: space-between; }
+  .week > div { width: 41px; height: 54px; border-radius: 12px;
+                display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; }
+  .week .d { color: #7F7F7F; font-size: 12px; line-height: 1; }
+  .week .n { color: black; font-size: 15px; font-weight: 600; line-height: 1; letter-spacing: 0.5px; }
+  /* 일정 없는 날도 4px 점자리를 비워 둔다 — 안 그러면 날짜가 위아래로 튄다 */
+  .week i { width: 4px; height: 4px; border-radius: 50%; }
+  .week .dot i { background: #71D369; }
+  .week .on { background: #71D369; }
+  .week .on .d, .week .on .n { color: white; }
+  .week .on.dot i { background: white; }   /* 점이 있는 날만 흰 점 */
+
+  .chips { display: flex; gap: 8px; }
+  .chips span { padding: 6px 12px; border-radius: 20px;
+                outline: 1px #BABFCF solid; outline-offset: -1px;
+                color: #7F7F7F; font-size: 12px; line-height: 16.8px; }
+  .chips .on { background: #499963; outline-color: #499963; color: white; }
+
+  /* ponytail: gap 대신 margin-bottom — 접힌 행이 gap까지 같이 0으로 만들 수 있다 */
+  .sched { display: flex; flex-direction: column; }
+  .sched > div { height: 60px; margin-bottom: 6px; overflow: hidden;
+                 padding: 12px 20px 12px 12px; background: #F7F8FA; border-radius: 12px;
+                 display: flex; justify-content: space-between; align-items: center;
+                 transition: height .28s cubic-bezier(.4, 0, .2, 1), margin-bottom .28s cubic-bezier(.4, 0, .2, 1),
+                             padding .28s cubic-bezier(.4, 0, .2, 1), opacity .18s ease; }
+  .sched > div:last-child { margin-bottom: 0; }
+  .sched > div.out { height: 0; margin-bottom: 0; padding-top: 0; padding-bottom: 0; opacity: 0; }
+  .sched .when { display: flex; align-items: center; gap: 12px; }
+  /* 3×36 세로선은 SVG 대신 div — stroke-linecap round = border-radius 1.5 */
+  .sched .bar { width: 3px; height: 36px; border-radius: 1.5px; flex: 0 0 auto; }
+  .sched .txt { display: flex; flex-direction: column; gap: 6px; line-height: 1.2; }
+  .sched .t { color: #474747; font-size: 10px; }
+  .sched .n { color: black; font-size: 15px; font-weight: 600; }
+  /* ponytail: padding-top 1px = 글자만 0.5px 아래로 (border-box라 알약 높이는 24 그대로).
+     Pretendard 세로 메트릭이 0.41px 위로 치우친 데다 한글은 디센더가 없어 더 떠 보인다. */
+  .sched .who { height: 24px; padding: 1px 8px 0; background: #DBDBDB; border-radius: 59px; flex: 0 0 auto;
+                display: flex; align-items: center; justify-content: center;
+                color: white; font-size: 12px; line-height: 16.8px; }
+
+  /* ===== 우리 규칙 ===== */
+  .rules { width: 380px; height: 183px; overflow: hidden; }
+  .rules .hd { position: absolute; left: 21px; top: 21px; width: 338px; }
+  .rules .cols { position: absolute; left: 21px; top: 52px; width: 338px;
+                 display: flex; justify-content: space-between; }
+  .rules ul { margin: 0; padding: 0; list-style: none; width: 141px;
+              display: flex; flex-direction: column; gap: 6px; }
+  .rules .mine { color: #71D369; }   /* chk 테두리/채움이 currentColor를 따라간다 */
+  .rules .mate { color: #FF9696; }
+  .rules li { height: 20px; display: flex; justify-content: space-between; align-items: center; }
+  .rules li span { color: black; font-size: 15px; font-weight: 500; }
+  .rules li.done span { color: #B3B3B3; text-decoration: line-through; }
+  .chk { width: 20px; height: 20px; flex: 0 0 auto; }
+  .chk circle { fill: none; stroke: currentColor; }
+  .chk path { display: none; }
+  .chk.done circle { fill: currentColor; }
+  .chk.done path { display: inline; fill: none; stroke: white; stroke-width: 2; stroke-linecap: round; }
+  .rules .pct { position: absolute; left: 21px; top: 148px; width: 338px;
+                display: flex; justify-content: space-between;
+                color: #999999; font-size: 10px; font-weight: 500; }
+  .rules .gauge { position: absolute; left: 21px; top: 164px; width: 338px; height: 6px;
+                  background: #EEEEEE; border-radius: 100px; overflow: hidden; display: flex; }
+  /* 두 칸이 같은 flex 줄에 있어서 앞칸 width만 바뀌어도 뒷칸이 따라 민다 — width 하나만 애니메이션 걸면 끝 */
+  .rules .gauge div { transition: width .45s cubic-bezier(.4, 0, .2, 1); }
+  .rules .gauge div:first-child { background: #71D369; }
+  .rules .gauge div:last-child  { background: #FF9696; }
+
+  /* ===== 메이트 관리 / 스마트 제어 / 금액 정산 =====
+     183×183 고정 카드 3장은 Figma 좌표 그대로 절대배치 — flex로 재현하면 여백 산수만 늘어난다. */
+  .mgmt { width: 183px; height: 183px; }
+  .mgmt .hd { position: absolute; left: 21px; top: 21px; width: 141px; }
+  .mgmt .box { position: absolute; left: 21px; top: 46px; width: 141px; height: 114px;
+               padding: 12px 16px; border-radius: 12px;
+               background: rgba(238,238,238,0.15); outline: 1px #EEEEEE solid; outline-offset: -1px;
+               display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; }
+  /* ponytail: Figma는 회색 원 placeholder. 사진 넣으려면 img.avatar로 갈아끼우면 된다. */
+  /* 흰 테두리는 55px 안쪽 2px(border-box), 그림자는 Figma의 dy1/stdDeviation1 = blur 2px */
+  .mgmt .avatar { width: 55px; height: 55px; border-radius: 50%; background: #C4C4C4;
+                  border: 2px solid white; box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+                  object-fit: cover; flex: 0 0 auto; }   /* 배경색은 이미지 로딩 전 자리잡이 */
+  .mgmt .nm { color: black; font-size: 12px; font-weight: 700; }
+  .mgmt .sub { margin-top: 2px; color: #7F7F7F; font-size: 10px; font-weight: 500; }
+
+  .smart { width: 183px; height: 183px; }
+  .smart .hd { position: absolute; left: 21px; top: 20px; width: 141px; }
+  /* 손잡이(42) 안에 아이콘이 들어가는 진짜 토글.
+     ponytail: flex-direction은 애니메이션이 안 먹는다. 손잡이를 absolute로 띄워 transform으로 밀고,
+     라벨은 padding만 바뀌게 뒀다 — 좌우 여백 두 값이 곧 Figma의 OFF/ON 라벨 위치다. */
+  .toggle { position: absolute; left: 21px; width: 141px; height: 56px;
+            border-radius: 28px;
+            background: rgba(199,199,199,0.15);
+            padding: 7px 18px 7px 61px;
+            display: flex; align-items: center; justify-content: flex-end;
+            transition: background-color .32s ease, padding .32s cubic-bezier(.4, 0, .2, 1); }
+  .toggle .knob { position: absolute; left: 9px; top: 7px;
+                  width: 42px; height: 42px; border-radius: 50%; background: white;
+                  display: flex; align-items: center; justify-content: center;
+                  transition: transform .32s cubic-bezier(.4, 0, .2, 1); }
+  .toggle b { color: black; font-size: 12px; font-weight: 600; white-space: nowrap;
+              transition: color .2s ease; }
+  .toggle.on { background: #71D369; padding: 7px 72px 7px 9px; }
+  .toggle.on .knob { transform: translateX(80px); }   /* 9 → 89, Figma ON 손잡이 위치 */
+  .toggle.on b { color: white; }
+
+  .pay { width: 183px; height: 183px; }
+  .pay .hd  { position: absolute; left: 21px; top: 20px; width: 141px; }
+  .pay .lbl { position: absolute; left: 21px; top: 53px; color: #999999; font-size: 14px; font-weight: 600; }
+  .pay .amt { position: absolute; left: 21px; top: 72px; color: black; font-size: 20px; font-weight: 700; }
+  .pay .of  { position: absolute; left: 21px; top: 106px; color: #999999; font-size: 10px; }
+  .pay button { position: absolute; left: 21px; top: 137px; width: 141px; height: 32px;
+                border: 0; background: #71D369; border-radius: 30px;
+                color: white; font-size: 12px; font-weight: 600; font-family: inherit; }
+
+  /* ===== 공용공간 예약 ===== */
+  .room { width: 183px; height: 183px; padding: 18px 21px;
+          display: flex; flex-direction: column; justify-content: space-between; }
+  /* 두 칸이 같은 규칙 하나를 쓴다 — 상태 점 있는 칸만 <i>가 하나 더 붙을 뿐 */
+  .room .slot { height: 54px; padding: 9px 12px; background: #F7F8FA; border-radius: 12px;
+                display: flex; align-items: center; justify-content: space-between; }
+  .room .slot .txt { display: flex; flex-direction: column; gap: 4px; }
+  .room .slot .k { color: #999999; font-size: 12px; }
+  .room .slot .v { color: black; font-size: 15px; font-weight: 700; }
+  .room .slot i { width: 8px; height: 8px; border-radius: 50%; background: #FF9696; flex: 0 0 auto; }
+
+  /* ===== + 편집 ===== */
+  .edit { width: 380px; padding: 6px 16px; background: #B3B3B3; border-radius: 50px; border: 0;
+          color: white; font-size: 12px; font-weight: 600; line-height: 22px; font-family: inherit; }
+
+  /* ===== 하단 탭바 ===== */
+  /* ponytail: 탭바(64px) + 홈 인디케이터를 세로 flex로 쌓는다.
+     각각 절대좌표로 두면 탭바 실제 높이와 어긋나 겹친다. */
+  .bottom { width: 412px; left: 0; top: 798px; position: absolute;
+            display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  /* ponytail: 본문이 탭바 밑으로 흘러가는 화면이라 헤더와 같은 blur를 걸어야 글씨가 안 겹쳐 보인다. */
+  .tabbar { width: 386px;
+            background: rgba(247, 248, 250, 0.75); border-radius: 60px;
+            backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+            display: flex; justify-content: center; align-items: center; gap: 20px; }
+  .tabbar > a { width: 56px; padding: 6px 0; text-decoration: none;
+                display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .tabbar .ico { align-self: stretch; height: 32px; position: relative;
+                 display: flex; justify-content: center; align-items: center; }
+  .tabbar span { color: #8FA18F; font-size: 12px; font-weight: 500; line-height: 16px;
+                 letter-spacing: 0.5px; text-align: center; }
+  /* ponytail: 채팅 아이콘만 중앙에서 1px 왼쪽 — Figma 배치 오차지만
+     app_1 하단 네비(left:17px)가 그대로 쓰고 있어서 두 화면을 맞춘다. */
+  .tabbar .chat svg { transform: translateX(-1px); }
+  .tabbar .on .ico { background: rgba(113, 211, 105, 0.25); border-radius: 39px; }
+  .tabbar .on span { color: #71D369; }
+  .home-ind { align-self: stretch; height: 24px; position: relative; }
+  .home-ind > div { width: 108px; height: 4px; left: 152px; top: 10px; position: absolute;
+                    background: #1D1B20; border-radius: 12px; }
+  /* ponytail: 아이콘 색을 CSS가 쥔다 — 활성 탭을 옮길 때 svg의 fill을 손댈 필요가 없다.
+     presentation attribute(fill="...")는 CSS보다 우선순위가 낮아 그대로 덮인다. */
+  .tabbar .ico path { fill: #8FA18F; }
+  .tabbar .on .ico path { fill: #71D369; }
+
+  /* ===== 모션 줄이기 =====
+     ponytail: 선택자마다 해제 규칙을 두면 특이도 싸움에서 진다 (.comment.ai .bubble svg 가
+     .ai .bubble svg 를 이겨서 별이 계속 돌던 버그). 여기 한 곳에서 전부 끈다. */
+  @media (prefers-reduced-motion: reduce) {
+    .app-wrapper *, .app-wrapper *::before, .app-wrapper *::after {
+      animation-duration: .01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: .01ms !important;
+    }
+  }
+  /* ===== 틈새살이 합의서 작성 안내 (바텀시트) ===== */
+  /* 시트를 아래에 붙이고 높이는 내용에 맡긴다 — 폰트가 바뀌어 줄이 늘어도 버튼이 화면 밖으로 안 밀린다 */
+  .dim { position: absolute; inset: 0; z-index: 20; background: rgba(0, 0, 0, 0.60); }
+  .dim[hidden] { display: none; }
+  .sheet { position: absolute; left: 0; bottom: 0; width: 412px; min-height: 439px;
+           padding: 32px 16px 2px; background: white; border-radius: 20px 20px 0 0; }
+  .sheet h1 { margin: 0 0 20px; color: black; font-size: 24px; font-weight: 700; line-height: 30px; }
+  .sheet .x { position: absolute; left: 382px; top: 42.1px; padding: 0; border: 0; background: none; display: flex; pointer-events: none; }
+  .sheet .content { display: flex; flex-direction: column; gap: 30px; }
+  .sheet .btns { display: flex; flex-direction: column; gap: 8px; }
+  .sheet .intro { display: flex; flex-direction: column; gap: 18px; }
+  .sheet .lead { width: 345px; display: flex; flex-direction: column; gap: 12px; }
+  .sheet .lead h2 { margin: 0; color: black; font-size: 24px; font-weight: 700; }
+  .sheet .lead p { margin: 0; color: #7F7F7F; font-size: 15px; }
+  .sheet .notice-box { width: 380px; min-height: 85px; padding: 16px 20px 13px; border-radius: 12px;
+                       background: rgba(219, 219, 219, 0.15); outline: 1px #DBDBDB solid; outline-offset: -1px;
+                       display: flex; flex-direction: column; gap: 5px; }
+  .sheet .notice-box .ttl { display: flex; align-items: center; gap: 9px; color: #7F7F7F; font-size: 14px; font-weight: 700; }
+  .sheet .notice-box p { margin: 0; max-width: 341px; color: #7F7F7F; font-size: 12px; line-height: 16px; }
+  .sheet .btn { width: 380px; height: 52px; border-radius: 26px; font: 500 18px 'Pretendard', sans-serif; }
+  .sheet .btn-go { cursor:var(--cur-hand); background: #71D369; border: 1px solid #71D369; color: white; }
+  .sheet .btn-later { background: #F2F7EA; border: 1px solid rgba(113, 211, 105, 0.15); color: #499963; pointer-events: none; }
+</style>
+</head>
+<body>
+<div class="app-wrapper">
+
+<!-- ===== 시작 화면 ===== -->
+<div class="start" id="start">
+
+<!-- 6번 반복되는 6×10 화살표는 symbol 하나로 -->
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="kind" viewBox="0 0 24 24"><path d="M20 13.4858H18C17.7167 13.4858 17.4792 13.3913 17.2875 13.2024C17.0958 13.0134 17 12.7793 17 12.5C17 12.2207 17.0958 11.9866 17.2875 11.7976C17.4792 11.6087 17.7167 11.5142 18 11.5142H20C20.2833 11.5142 20.5208 11.6087 20.7125 11.7976C20.9042 11.9866 21 12.2207 21 12.5C21 12.7793 20.9042 13.0134 20.7125 13.2024C20.5208 13.3913 20.2833 13.4858 20 13.4858ZM15.6 17.2317C15.7667 17.0016 15.9833 16.8702 16.25 16.8373C16.5167 16.8045 16.7667 16.8702 17 17.0345L18.6 18.2174C18.8333 18.3817 18.9667 18.5953 19 18.8582C19.0333 19.121 18.9667 19.3675 18.8 19.5975C18.6333 19.8275 18.4167 19.9589 18.15 19.9918C17.8833 20.0246 17.6333 19.9589 17.4 19.7946L15.8 18.6117C15.5667 18.4474 15.4333 18.2338 15.4 17.971C15.3667 17.7081 15.4333 17.4617 15.6 17.2317ZM18.6 6.78258L17 7.9655C16.7667 8.12979 16.5167 8.19551 16.25 8.16265C15.9833 8.12979 15.7667 7.99836 15.6 7.76835C15.4333 7.53834 15.3667 7.29189 15.4 7.02903C15.4333 6.76616 15.5667 6.55257 15.8 6.38828L17.4 5.20537C17.6333 5.04107 17.8833 4.97536 18.15 5.00821C18.4167 5.04107 18.6333 5.17251 18.8 5.40252C18.9667 5.63253 19.0333 5.87897 19 6.14184C18.9667 6.40471 18.8333 6.61829 18.6 6.78258ZM8 15.4573H5C4.71667 15.4573 4.47917 15.3628 4.2875 15.1739C4.09583 14.9849 4 14.7508 4 14.4715V10.5285C4 10.2492 4.09583 10.0151 4.2875 9.82612C4.47917 9.63718 4.71667 9.54272 5 9.54272H8L11.3 6.2897C11.6167 5.97755 11.9792 5.90772 12.3875 6.08023C12.7958 6.25274 13 6.56079 13 7.00438V17.9956C13 18.4392 12.7958 18.7473 12.3875 18.9198C11.9792 19.0923 11.6167 19.0225 11.3 18.7103L8 15.4573Z" fill="#DBDBDB"/></symbol>
+  <symbol id="cmt" viewBox="0 0 14 14"><path fill-rule="evenodd" clip-rule="evenodd" d="M6.99794 1.12951e-06C8.05109 -0.000597177 9.09079 0.236507 10.0395 0.693642C10.9884 1.15079 11.8218 1.81622 12.4776 2.64029C13.1334 3.46436 13.5948 4.42584 13.8273 5.45305C14.0598 6.48026 14.0575 7.54671 13.8205 8.57289C13.5835 9.59907 13.1179 10.5585 12.4585 11.3798C11.7991 12.201 10.9628 12.8627 10.012 13.3158C9.06123 13.7688 8.02045 14.0013 6.96727 13.9961C5.97002 13.9912 4.986 13.7732 4.08092 13.3574L0.592746 13.9881C0.414527 14.0204 0.232739 13.9543 0.116749 13.8152C0.000757664 13.6762 -0.0315398 13.4855 0.0321799 13.316L1.03278 10.6538C0.41852 9.65113 0.0660561 8.50849 0.00995911 7.33116C-0.0502871 6.06673 0.233558 4.80964 0.831261 3.69378C1.42897 2.57792 2.31814 1.64508 3.40409 0.994611C4.48999 0.34416 5.73213 0.000422913 6.99794 1.12951e-06ZM4.9872 6.99808C4.9872 7.55389 4.53662 8.00448 3.9808 8.00448C3.42499 8.00448 2.9744 7.55389 2.9744 6.99808C2.9744 6.44226 3.42499 5.99167 3.9808 5.99167C4.53662 5.99167 4.9872 6.44226 4.9872 6.99808ZM7.00001 8.00448C7.55583 8.00448 8.00641 7.55389 8.00641 6.99808C8.00641 6.44226 7.55583 5.99167 7.00001 5.99167C6.44419 5.99167 5.99361 6.44226 5.99361 6.99808C5.99361 7.55389 6.44419 8.00448 7.00001 8.00448ZM10.0192 8.00448C10.5751 8.00448 11.0256 7.55389 11.0256 6.99808C11.0256 6.44226 10.5751 5.99167 10.0192 5.99167C9.4634 5.99167 9.01282 6.44226 9.01282 6.99808C9.01282 7.55389 9.4634 8.00448 10.0192 8.00448Z" fill="#BABFCF"/></symbol>
+  <symbol id="kebab" viewBox="0 0 30 30">
+    <circle cx="15" cy="8" r="2" fill="#7F7F7F"/><circle cx="15" cy="15" r="2" fill="#7F7F7F"/><circle cx="15" cy="22" r="2" fill="#7F7F7F"/>
+  </symbol>
+  <symbol id="chev" viewBox="0 0 6 10">
+    <path d="M3.49154 4.6582L0.241536 1.4082C-0.08063 1.08604 -0.08063 0.563703 0.241536 0.241536C0.563703 -0.08063 1.08604 -0.08063 1.4082 0.241537L5.11776 3.9511C5.50829 4.34162 5.50829 4.97479 5.11776 5.36531L1.4082 9.07487C1.08604 9.39704 0.563703 9.39704 0.241536 9.07487C-0.08063 8.7527 -0.08063 8.23037 0.241537 7.9082L3.49154 4.6582Z" fill="#DBDBDB"/>
+  </symbol>
+</svg>
+
+<div class="scroll">
+<div class="page">
+
+  <!-- ===== 안건 ===== -->
+  <div class="notice">
+    <div class="top">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+        <path d="M20 13.4858H18C17.7167 13.4858 17.4792 13.3913 17.2875 13.2024C17.0958 13.0134 17 12.7793 17 12.5C17 12.2207 17.0958 11.9866 17.2875 11.7976C17.4792 11.6087 17.7167 11.5142 18 11.5142H20C20.2833 11.5142 20.5208 11.6087 20.7125 11.7976C20.9042 11.9866 21 12.2207 21 12.5C21 12.7793 20.9042 13.0134 20.7125 13.2024C20.5208 13.3913 20.2833 13.4858 20 13.4858ZM15.6 17.2317C15.7667 17.0016 15.9833 16.8702 16.25 16.8373C16.5167 16.8045 16.7667 16.8702 17 17.0345L18.6 18.2174C18.8333 18.3817 18.9667 18.5953 19 18.8582C19.0333 19.121 18.9667 19.3675 18.8 19.5975C18.6333 19.8275 18.4167 19.9589 18.15 19.9918C17.8833 20.0246 17.6333 19.9589 17.4 19.7946L15.8 18.6117C15.5667 18.4474 15.4333 18.2338 15.4 17.971C15.3667 17.7081 15.4333 17.4617 15.6 17.2317ZM18.6 6.78258L17 7.9655C16.7667 8.12979 16.5167 8.19551 16.25 8.16265C15.9833 8.12979 15.7667 7.99836 15.6 7.76835C15.4333 7.53834 15.3667 7.29189 15.4 7.02903C15.4333 6.76616 15.5667 6.55257 15.8 6.38828L17.4 5.20537C17.6333 5.04107 17.8833 4.97536 18.15 5.00821C18.4167 5.04107 18.6333 5.17251 18.8 5.40252C18.9667 5.63253 19.0333 5.87897 19 6.14184C18.9667 6.40471 18.8333 6.61829 18.6 6.78258ZM8 15.4573H5C4.71667 15.4573 4.47917 15.3628 4.2875 15.1739C4.09583 14.9849 4 14.7508 4 14.4715V10.5285C4 10.2492 4.09583 10.0151 4.2875 9.82612C4.47917 9.63718 4.71667 9.54272 5 9.54272H8L11.3 6.2897C11.6167 5.97755 11.9792 5.90772 12.3875 6.08023C12.7958 6.25274 13 6.56079 13 7.00438V17.9956C13 18.4392 12.7958 18.7473 12.3875 18.9198C11.9792 19.0923 11.6167 19.0225 11.3 18.7103L8 15.4573Z" fill="#DADDE9"/>
+      </svg>
+      <b>안건</b>
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+        <path d="M8.12021 9.29006L12.0002 13.1701L15.8802 9.29006C16.2702 8.90006 16.9002 8.90006 17.2902 9.29006C17.6802 9.68006 17.6802 10.3101 17.2902 10.7001L12.7002 15.2901C12.3102 15.6801 11.6802 15.6801 11.2902 15.2901L6.70021 10.7001C6.31021 10.3101 6.31021 9.68006 6.70021 9.29006C7.09021 8.91006 7.73021 8.90006 8.12021 9.29006Z" fill="#DADDE9"/>
+      </svg>
+    </div>
+    <p>이번 달 전기세가 5만 원이 넘게 나왔어요. 어떻게 줄이면 좋을지 의견을 모아봐요!</p>
+  </div>
+
+  <!-- ===== 오늘의 일정 ===== -->
+  <div class="card today">
+    <div class="hd"><b>오늘의 일정</b><svg class="chev"><use href="#chev"/></svg></div>
+
+    <div class="week">
+      <div class="dot"><span class="d">일</span><span class="n">3</span><i></i></div>
+      <div class="dot on"><span class="d">월</span><span class="n">4</span><i></i></div>
+      <div><span class="d">화</span><span class="n">5</span><i></i></div>
+      <div><span class="d">수</span><span class="n">6</span><i></i></div>
+      <div><span class="d">목</span><span class="n">7</span><i></i></div>
+      <div class="dot"><span class="d">금</span><span class="n">8</span><i></i></div>
+      <div><span class="d">토</span><span class="n">9</span><i></i></div>
+    </div>
+
+    <div class="chips">
+      <span class="on" data-who="">전체</span>
+      <span data-who="나">나</span>
+      <span data-who="강은지">강은지</span>
+    </div>
+
+    <div class="sched">
+      <div data-who="강은지">
+        <div class="when">
+          <div class="bar" style="background:#71D369"></div>
+          <div class="txt"><span class="t">오전 9:00 ~ 10:00</span><span class="n">거실 대청소</span></div>
+        </div>
+        <div class="who">강은지</div>
+      </div>
+      <div data-who="나">
+        <div class="when">
+          <div class="bar" style="background:#D2E2B8"></div>
+          <div class="txt"><span class="t">오전 11:00 ~ 오후 1:00</span><span class="n">장보기</span></div>
+        </div>
+        <div class="who">나</div>
+      </div>
+      <div data-who="나">
+        <div class="when">
+          <div class="bar" style="background:#DBDBDB"></div>
+          <div class="txt"><span class="t">오후 6:00</span><span class="n">월세 입금하기</span></div>
+        </div>
+        <div class="who">나</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 우리 규칙 ===== -->
+  <div class="card rules">
+    <div class="hd"><b>우리 규칙</b><svg class="chev"><use href="#chev"/></svg></div>
+    <div class="cols">
+      <ul class="mine">
+        <li class="done"><span>쓰레기 버리기</span><svg class="chk done" viewBox="0 0 20 20"><circle cx="10" cy="10" r="9.5"/><path d="M4.77 10.08L7.89 12.89C8.29 13.25 8.9 13.23 9.28 12.84L14.54 7.38"/></svg></li>
+        <li><span>욕실 청소</span><svg class="chk" viewBox="0 0 20 20"><circle cx="10" cy="10" r="9.5"/><path d="M4.77 10.08L7.89 12.89C8.29 13.25 8.9 13.23 9.28 12.84L14.54 7.38"/></svg></li>
+        <li><span>세탁기 돌리기</span><svg class="chk" viewBox="0 0 20 20"><circle cx="10" cy="10" r="9.5"/><path d="M4.77 10.08L7.89 12.89C8.29 13.25 8.9 13.23 9.28 12.84L14.54 7.38"/></svg></li>
+      </ul>
+      <ul class="mate">
+        <li class="done"><span>설거지</span><svg class="chk done" viewBox="0 0 20 20"><circle cx="10" cy="10" r="9.5"/><path d="M4.77 10.08L7.89 12.89C8.29 13.25 8.9 13.23 9.28 12.84L14.54 7.38"/></svg></li>
+        <li class="done"><span>빨래 널기</span><svg class="chk done" viewBox="0 0 20 20"><circle cx="10" cy="10" r="9.5"/><path d="M4.77 10.08L7.89 12.89C8.29 13.25 8.9 13.23 9.28 12.84L14.54 7.38"/></svg></li>
+        <li><span>청소</span><svg class="chk" viewBox="0 0 20 20"><circle cx="10" cy="10" r="9.5"/><path d="M4.77 10.08L7.89 12.89C8.29 13.25 8.9 13.23 9.28 12.84L14.54 7.38"/></svg></li>
+      </ul>
+    </div>
+    <div class="pct"><span>완료율</span><span id="pctNum">50%</span></div>
+    <div class="gauge"><div style="width: 56.33px"></div><div style="width: 112.67px"></div></div>
+  </div>
+
+  <div class="grid">
+  <!-- ===== 메이트 관리 ===== -->
+  <div class="card mgmt">
+    <div class="hd"><b>메이트 관리</b><svg class="chev"><use href="#chev"/></svg></div>
+    <div class="box">
+      <img class="avatar" src="images/mate.png" alt="강은지">
+      <div style="text-align:center">
+        <div class="nm">강은지</div>
+        <div class="sub">함께한 지 45일째</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 스마트 제어 ===== -->
+  <div class="card smart">
+    <div class="hd"><b>스마트 제어</b><svg class="chev"><use href="#chev"/></svg></div>
+    <div class="toggle" style="top:49px" data-on="에어컨 ON" data-off="에어컨 OFF">
+      <div class="knob">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+          <path d="M8.30769 17.3077V12.8347C8.30769 12.4524 8.61765 12.1424 9 12.1424C9.38235 12.1424 9.69231 12.4524 9.69231 12.8347V17.3077C9.69229 17.69 9.38234 18 9 18C8.61766 18 8.30771 17.69 8.30769 17.3077ZM4.47386 14.2401V12.8347C4.47386 12.4524 4.78381 12.1424 5.16617 12.1424C5.54842 12.1425 5.85847 12.4525 5.85847 12.8347V14.2401C5.85847 15.6106 4.7473 16.7216 3.3768 16.7218H3.2488C2.86645 16.7218 2.55649 16.4118 2.55649 16.0294C2.55655 15.6471 2.86648 15.3371 3.2488 15.3371H3.3768C3.98259 15.337 4.47386 14.8459 4.47386 14.2401ZM12.1424 14.2401V12.8347C12.1424 12.4524 12.4524 12.1424 12.8347 12.1424C13.2171 12.1424 13.527 12.4524 13.527 12.8347V14.2401C13.527 14.846 14.0182 15.3371 14.6241 15.3371H14.7521C15.1343 15.3373 15.4444 15.6472 15.4444 16.0294C15.4444 16.4117 15.1344 16.7216 14.7521 16.7218H14.6241C13.2535 16.7218 12.1424 15.6107 12.1424 14.2401ZM13.4198 7.08263C13.4197 6.92745 13.3574 6.77873 13.2476 6.66887C13.1378 6.55915 12.9892 6.49761 12.8338 6.4976H5.16526C5.0099 6.4976 4.86047 6.559 4.7506 6.66887C4.64096 6.77865 4.57941 6.9275 4.57933 7.08263V8.94681H13.4198V7.08263ZM14.8044 8.94681H16.0294C16.353 8.94681 16.6154 8.68441 16.6154 8.36088V1.97055C16.6154 1.64702 16.353 1.38462 16.0294 1.38462H1.97055C1.64702 1.38462 1.38462 1.64702 1.38462 1.97055V8.36088C1.38462 8.6844 1.64703 8.94681 1.97055 8.94681H3.19471V7.08263C3.19479 6.56025 3.40234 6.05933 3.77163 5.6899C4.14115 5.3204 4.64267 5.11298 5.16526 5.11298H12.8338C13.3563 5.113 13.858 5.32034 14.2275 5.6899C14.5966 6.05926 14.8043 6.56022 14.8044 7.08263V8.94681ZM18 8.36088C18 9.44909 17.1177 10.3314 16.0294 10.3314H1.97055C0.88232 10.3314 0 9.4491 0 8.36088V1.97055C0 0.882323 0.882323 0 1.97055 0H16.0294C17.1177 0 18 0.88233 18 1.97055V8.36088Z" fill="#808080"/>
+        </svg>
+      </div>
+      <b>에어컨 OFF</b>
+    </div>
+    <div class="toggle on" style="top:110px" data-on="전등 ON" data-off="전등 OFF">
+      <div class="knob">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+          <!-- ponytail: Figma export에 밑동 path만 있고 유리구가 없다. 밑동은 원본 그대로 두고
+               유리구/목만 얹었다 — 제대로 된 export 나오면 이 두 줄만 지우면 된다. -->
+          <circle cx="9" cy="7" r="5.2" fill="#7F7F7F"/>
+          <rect x="6.33" y="11.6" width="5.34" height="1.5" rx="0.75" fill="#7F7F7F"/>
+          <path d="M11.667 13.333V14C11.667 15.4736 10.4736 16.667 9 16.667C7.52638 16.667 6.33301 15.4736 6.33301 14V13.333H11.667Z" fill="#7F7F7F"/>
+        </svg>
+      </div>
+      <b>전등 ON</b>
+    </div>
+  </div>
+
+  </div>
+
+  <div class="grid">
+  <!-- ===== 금액 정산 ===== -->
+  <div class="card pay">
+    <div class="hd"><b>금액 정산</b><svg class="chev"><use href="#chev"/></svg></div>
+    <div class="lbl">이번 달 정산 금액</div>
+    <div class="amt">₩392,840</div>
+    <div class="of">수도세 + 전기세 + 월세</div>
+    <button>바로 송금하기</button>
+  </div>
+
+  <!-- ===== 공용공간 예약 ===== -->
+  <div class="card room">
+    <div class="hd"><b>공용공간 예약</b><svg class="chev"><use href="#chev"/></svg></div>
+    <div class="slot"><div class="txt"><span class="k">거실</span><span class="v">13:00 ~ 14:30</span></div></div>
+    <div class="slot"><div class="txt"><span class="k">주방</span><span class="v">사용 중</span></div><i></i></div>
+  </div>
+
+  </div>
+
+  <button class="edit">+ 편집</button>
+</div>
+</div>
+
+  <!-- ===== 고정 헤더 ===== -->
+  <div style="width: 412px; height: 106px; left: 0; top: 0; position: absolute; background: rgba(247, 248, 250, 0.80); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: 1; pointer-events: none"></div>
+  <div class="nps" style="left: 16px; top: 57px; position: absolute; color: black; font-size: 24px; font-weight: 700; z-index: 2">홈</div>
+  <div style="left: 372px; top: 62px; position: absolute; z-index: 2">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+      <path d="M14.4551 21.5459C14.4551 22.9015 13.3556 24 12 24C10.6446 23.9998 9.5459 22.9014 9.5459 21.5459H14.4551ZM12 0C13.004 0.000192283 13.8174 0.814324 13.8174 1.81836V3C13.8174 3.10667 13.8067 3.21086 13.7891 3.3125C16.9402 4.10989 19.2723 6.96436 19.2725 10.3633V16.8184H18.7227C20.2811 16.8184 21.5449 18.0821 21.5449 19.6406C21.5447 20.0401 21.2208 20.3643 20.8213 20.3643H3.17773C2.77825 20.3643 2.4543 20.0401 2.4541 19.6406C2.4541 18.0821 3.71788 16.8184 5.27637 16.8184H4.72656V10.3633C4.72668 6.96421 7.05863 4.10974 10.21 3.3125C10.1923 3.21088 10.1816 3.10666 10.1816 3V1.81836C10.1816 0.814206 10.9958 0 12 0Z" fill="#BABFCF"/>
+    </svg>
+  </div>
+
+
+  <!-- ===== 하단 탭바 ===== -->
+  <div class="bottom">
+  <nav class="tabbar">
+    <a>
+      <div class="ico">
+        <svg width="56" height="32" viewBox="0 0 56 32" fill="none">
+          <path d="M21.0468 26C20.4968 26 20.0262 25.8043 19.6348 25.413C19.2428 25.021 19.0468 24.55 19.0468 24V16.05C18.6635 15.7 18.3678 15.25 18.1598 14.7C17.9512 14.15 17.9468 13.55 18.1468 12.9L19.1968 9.5C19.3302 9.06667 19.5678 8.70833 19.9098 8.425C20.2512 8.14167 20.6468 8 21.0968 8H34.9968C35.4468 8 35.8385 8.13733 36.1718 8.412C36.5052 8.68733 36.7468 9.05 36.8968 9.5L37.9468 12.9C38.1468 13.55 38.1428 14.1417 37.9348 14.675C37.7262 15.2083 37.4302 15.6667 37.0468 16.05V24C37.0468 24.55 36.8512 25.021 36.4598 25.413C36.0678 25.8043 35.5968 26 35.0468 26H21.0468ZM30.2468 15C30.6968 15 31.0385 14.8457 31.2718 14.537C31.5052 14.229 31.5968 13.8833 31.5468 13.5L30.9968 10H29.0468V13.7C29.0468 14.05 29.1635 14.3543 29.3968 14.613C29.6302 14.871 29.9135 15 30.2468 15ZM25.7468 15C26.1302 15 26.4428 14.871 26.6848 14.613C26.9262 14.3543 27.0468 14.05 27.0468 13.7V10H25.0968L24.5468 13.5C24.4802 13.9 24.5678 14.25 24.8098 14.55C25.0512 14.85 25.3635 15 25.7468 15ZM21.2968 15C21.5968 15 21.8592 14.8917 22.0838 14.675C22.3092 14.4583 22.4468 14.1833 22.4968 13.85L23.0468 10H21.0968L20.0968 13.35C19.9968 13.6833 20.0508 14.0417 20.2588 14.425C20.4675 14.8083 20.8135 15 21.2968 15ZM34.7968 15C35.2802 15 35.6302 14.8083 35.8468 14.425C36.0635 14.0417 36.1135 13.6833 35.9968 13.35L34.9468 10H33.0468L33.5968 13.85C33.6468 14.1833 33.7845 14.4583 34.0098 14.675C34.2345 14.8917 34.4968 15 34.7968 15Z" fill="#8FA18F"/>
+        </svg>
+      </div>
+      <span>골목 생활</span>
+    </a>
+
+    <a>
+      <div class="ico">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <path fill-rule="evenodd" clip-rule="evenodd" d="M5 0C5.78897 0 6.42857 0.639593 6.42857 1.42857V2.85714H13.5716V1.42857C13.5716 0.639593 14.2112 0 15.0001 0C15.7891 0 16.4287 0.639593 16.4287 1.42857V2.85714H17.8571C19.0406 2.85714 20 3.81653 20 5V17.8571C20 19.0406 19.0406 20 17.8571 20H2.14286C0.95939 20 0 19.0406 0 17.8571V5C0 3.81653 0.95939 2.85714 2.14286 2.85714H3.57143V1.42857C3.57143 0.639593 4.21103 0 5 0ZM12.2325 7.24746C12.1655 7.18044 12.0745 7.1428 11.9798 7.14286C11.885 7.14291 11.7941 7.18063 11.7271 7.24773L5.83741 13.15C5.78276 13.2048 5.74737 13.2758 5.73657 13.3524L5.36063 16.0216C5.34503 16.1324 5.38224 16.2441 5.46117 16.3234C5.54009 16.4027 5.65161 16.4404 5.76247 16.4253L8.43164 16.0619C8.509 16.0514 8.58079 16.0157 8.636 15.9606L14.5383 10.0583C14.6777 9.91883 14.6777 9.6927 14.5383 9.55323L12.2325 7.24746Z" fill="#71D369"/>
+        </svg>
+      </div>
+      <span>틈새살림</span>
+    </a>
+
+    <a class="on">
+      <div class="ico">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <path fill-rule="evenodd" clip-rule="evenodd" d="M0.454546 8.63557C0.164634 8.90579 0 9.28429 0 9.6806V17.8571C0 19.0406 0.95939 20 2.14286 20H8.57143V15.7143C8.57143 14.9253 9.21103 14.2857 10 14.2857C10.789 14.2857 11.4286 14.9253 11.4286 15.7143V20H17.8571C19.0406 20 20 19.0406 20 17.8571V9.6806C20 9.28429 19.8354 8.90579 19.5454 8.63557L10.4649 0.17196C10.1974 -0.0573198 9.80264 -0.0573201 9.53514 0.17196L0.454546 8.63557Z" fill="#8FA18F"/>
+        </svg>
+      </div>
+      <span>홈</span>
+    </a>
+
+    <a class="chat">
+      <div class="ico">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <path fill-rule="evenodd" clip-rule="evenodd" d="M7.87886 1.71768e-06C5.78927 1.71768e-06 3.78526 0.830093 2.30769 2.30766C0.830126 3.78523 3.92072e-05 5.78923 3.92072e-05 7.87883C-0.00488129 9.42969 0.453443 10.9467 1.31627 12.2354L0.263526 15.0526C0.147239 15.3637 0.413911 15.6831 0.740871 15.6244L4.43071 14.9606C4.79717 15.1391 5.17587 15.2887 5.56327 15.4081C5.4284 14.8176 5.35716 14.2028 5.35716 13.5714C5.35716 9.0348 9.03481 5.35714 13.5714 5.35714C14.2055 5.35714 14.8227 5.42897 15.4154 5.56494C15.1264 4.62397 14.663 3.74377 14.0476 2.97097C13.3091 2.04357 12.3709 1.29477 11.3028 0.78037C10.2347 0.265966 9.06436 -0.000781025 7.87886 1.71768e-06ZM18.1174 9.02575C16.9117 7.82016 15.2766 7.14286 13.5717 7.14286C12.6044 7.14222 11.6494 7.35987 10.778 7.77959C9.90649 8.1993 9.14096 8.81027 8.53843 9.56696C7.93589 10.3237 7.51187 11.2066 7.29799 12.1499C7.0841 13.0932 7.08583 14.0727 7.30309 15.0153C7.52033 15.9579 7.94747 16.8393 8.5527 17.5937C9.15793 18.3483 9.92563 18.9566 10.7986 19.3731C11.6716 19.7897 12.6273 20.004 13.5946 20C14.5619 19.9959 15.5157 19.7736 16.3851 19.3496L19.2594 19.8667C19.5864 19.9256 19.853 19.6061 19.7367 19.2949L18.9263 17.126C19.6303 16.0746 20.0043 14.8369 20.0003 13.5714C20.0003 11.8665 19.323 10.2313 18.1174 9.02575Z" fill="#8FA18F"/>
+        </svg>
+      </div>
+      <span>채팅</span>
+    </a>
+
+    <a>
+      <div class="ico">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <path d="M10 10C8.625 10 7.44792 9.51042 6.46875 8.53125C5.48958 7.55208 5 6.375 5 5C5 3.625 5.48958 2.44792 6.46875 1.46875C7.44792 0.489584 8.625 0 10 0C11.375 0 12.5521 0.489584 13.5312 1.46875C14.5104 2.44792 15 3.625 15 5C15 6.375 14.5104 7.55208 13.5312 8.53125C12.5521 9.51042 11.375 10 10 10ZM2.5 20C1.8125 20 1.22417 19.7554 0.735 19.2663C0.245 18.7763 0 18.1875 0 17.5V16.5C0 15.7917 0.1825 15.1404 0.5475 14.5463C0.911667 13.9529 1.39583 13.5 2 13.1875C3.29167 12.5417 4.60417 12.0571 5.9375 11.7338C7.27083 11.4113 8.625 11.25 10 11.25C11.375 11.25 12.7292 11.4113 14.0625 11.7338C15.3958 12.0571 16.7083 12.5417 18 13.1875C18.6042 13.5 19.0883 13.9529 19.4525 14.5463C19.8175 15.1404 20 15.7917 20 16.5V17.5C20 18.1875 19.7554 18.7763 19.2663 19.2663C18.7763 19.7554 18.1875 20 17.5 20H2.5Z" fill="#8FA18F"/>
+        </svg>
+      </div>
+      <span>마이</span>
+    </a>
+  </nav>
+  <div class="home-ind"><div></div></div>
+  </div>
+
+  <!-- ===== 틈새살이 합의서 작성 안내 ===== -->
+  <div class="dim" id="agreeGuide">
+    <div class="sheet" role="dialog" aria-labelledby="agreeTitle">
+      <h1 class="nps" id="agreeTitle">틈새살이 합의서 작성 안내</h1>
+      <button class="x" aria-label="닫기" tabindex="-1">
+        <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M12.4842 0.292804C12.8747 -0.0976606 13.5078 -0.0975415 13.8983 0.292804C14.2887 0.683341 14.2888 1.31639 13.8983 1.70687L8.50962 7.09554L13.8983 12.4852C14.2885 12.8757 14.2887 13.5088 13.8983 13.8992C13.5078 14.2892 12.8746 14.2893 12.4842 13.8992L7.09556 8.51058L1.70688 13.8992C1.31649 14.2893 0.683285 14.2892 0.292822 13.8992C-0.0976035 13.5088 -0.0974066 12.8757 0.292822 12.4852L5.68149 7.09554L0.292822 1.70687C-0.0976549 1.31639 -0.0975597 0.68334 0.292822 0.292804C0.683361 -0.0975422 1.31642 -0.0976606 1.70688 0.292804L7.09556 5.68148L12.4842 0.292804Z" fill="black"/></svg>
+      </button>
+      <div class="content">
+        <div class="intro">
+          <div class="lead">
+            <h2>원활한 틈새생활 관리를 위해<br>틈새살이 합의서를 작성해주세요!</h2>
+            <p>메이트와 함께 정한 내용을 공증하는 단계에요.</p>
+          </div>
+          <div class="notice-box">
+            <div class="ttl">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 0C12.4183 0 16 3.58172 16 8C16 12.4183 12.4183 16 8 16C3.58172 16 0 12.4183 0 8C0 3.58172 3.58172 0 8 0ZM8.12793 10.2715C7.61388 10.2715 7.19805 10.6766 7.20898 11.1797C7.19805 11.6828 7.61388 12.0986 8.12793 12.0986C8.60918 12.0986 9.03613 11.6828 9.03613 11.1797C9.03613 10.6766 8.60918 10.2715 8.12793 10.2715ZM7.27441 4.08105L7.41699 9.62695H8.81738L8.95898 4.08105H7.27441Z" fill="#7F7F7F"/></svg>
+              안내사항
+            </div>
+            <p>틈새살이 합의서 작성을 7일 이상 미루면 서비스 이용이 어려워요.<br>7일 이내에 작성해봐요!</p>
+          </div>
+        </div>
+        <div class="btns">
+          <button class="btn btn-go" onclick="document.getElementById('start').hidden = true">지금 작성하기</button>
+          <button class="btn btn-later" tabindex="-1">건너뛰고 나중에 하기</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ===== 합의서 작성 1/3 · 2/3 ===== -->
+
+  <div class="body step1">
+    <div class="content">
+
+      <div class="sect2">
+        <h2>법적 증빙 서류 업로드</h2>
+        <div class="ctype">
+          <div class="r">
+            <div class="lbl">계약 형태를 선택해 주세요</div>
+            <label><input type="radio" name="ctype" value="임대차">임대차</label>
+            <label><input type="radio" name="ctype" value="전대차">전대차</label>
+          </div>
+          <div class="r party">
+            <div class="lbl">계약 당사자 지위 확인</div>
+            <label><input type="radio" name="party" value="giver"><span data-role="giver">임대인</span></label>
+            <label><input type="radio" name="party" value="taker"><span data-role="taker">임차인</span></label>
+          </div>
+        </div>
+        <!-- 지위에서 빌려주는 쪽(임대인·전대인)을 고르면 나타난다. 제목은 계약 형태를 따른다 -->
+        <div class="docs">
+          <div class="uploads">
+          <div class="up">
+            <span data-doc="0">전입신고 확인증</span>
+            <div class="proof doc" role="button" tabindex="0" style="--img: url(images/a.png)">
+              <span class="idle"><svg width="48" height="48" viewBox="0 0 48 48" fill="none"><rect width="48" height="48" rx="24" fill="#71D369"/><path d="M23.9999 15.5L24 24M24 32.5L24 24M15.5 24L24 24M24 24L32.5 24" stroke="white" stroke-width="2" stroke-linecap="round"/></svg><span>Upload</span></span>
+              <span class="loading"><svg class="spin" width="48" height="48" viewBox="0 0 48 48" fill="none"><path d="M48 24C48 37.2548 37.2548 48 24 48C10.7452 48 0 37.2548 0 24C0 10.7452 10.7452 0 24 0C37.2548 0 48 10.7452 48 24ZM1.512 24C1.512 36.4198 11.5802 46.488 24 46.488C36.4198 46.488 46.488 36.4198 46.488 24C46.488 11.5802 36.4198 1.512 24 1.512C11.5802 1.512 1.512 11.5802 1.512 24Z" fill="#DBDBDB"/><path d="M24 0C19.9578 -4.82025e-08 15.9811 1.02095 12.4388 2.96812C8.89657 4.9153 5.90349 7.72562 3.73728 11.1384C1.57106 14.5511 0.30191 18.4557 0.0475602 22.4898C-0.20679 26.524 0.561906 30.5571 2.28233 34.2148C4.00275 37.8726 6.61917 41.0366 9.88883 43.4133C13.1585 45.7899 16.9755 47.3023 20.9856 47.8099C24.9958 48.3176 29.0692 47.8042 32.828 46.3174C36.5868 44.8305 39.9092 42.4184 42.4869 39.3048L41.3222 38.3406C38.9069 41.258 35.7938 43.5182 32.2719 44.9114C28.7499 46.3046 24.9331 46.7856 21.1755 46.3099C17.418 45.8342 13.8415 44.4172 10.7778 42.1902C7.71416 39.9633 5.26258 36.9986 3.65054 33.5713C2.03851 30.144 1.31824 26.365 1.55656 22.585C1.79489 18.805 2.98409 15.1464 5.01383 11.9486C7.04357 8.75091 9.84809 6.11764 13.1672 4.29313C16.4863 2.46863 20.2125 1.512 24 1.512L24 0Z" fill="#71D369"/></svg><span>업로드 중</span></span>
+              <button type="button" class="del" aria-label="업로드 삭제"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect width="23.4479" height="23.4479" rx="11.7239" fill="#474747"/><path d="M8.54212 8.54186L11.7241 11.7238M14.9061 14.9058L11.7241 11.7238M8.54214 14.9058L11.7241 11.7238M11.7241 11.7238L14.9061 8.54184" stroke="#F9F9F9" stroke-linecap="round"/></svg></button>
+            </div>
+          </div>
+          <div class="up">
+            <span data-doc="1">등기부등본 확인</span>
+            <div class="proof doc" role="button" tabindex="0" style="--img: url(images/b.png)">
+              <span class="idle"><svg width="48" height="48" viewBox="0 0 48 48" fill="none"><rect width="48" height="48" rx="24" fill="#71D369"/><path d="M23.9999 15.5L24 24M24 32.5L24 24M15.5 24L24 24M24 24L32.5 24" stroke="white" stroke-width="2" stroke-linecap="round"/></svg><span>Upload</span></span>
+              <span class="loading"><svg class="spin" width="48" height="48" viewBox="0 0 48 48" fill="none"><path d="M48 24C48 37.2548 37.2548 48 24 48C10.7452 48 0 37.2548 0 24C0 10.7452 10.7452 0 24 0C37.2548 0 48 10.7452 48 24ZM1.512 24C1.512 36.4198 11.5802 46.488 24 46.488C36.4198 46.488 46.488 36.4198 46.488 24C46.488 11.5802 36.4198 1.512 24 1.512C11.5802 1.512 1.512 11.5802 1.512 24Z" fill="#DBDBDB"/><path d="M24 0C19.9578 -4.82025e-08 15.9811 1.02095 12.4388 2.96812C8.89657 4.9153 5.90349 7.72562 3.73728 11.1384C1.57106 14.5511 0.30191 18.4557 0.0475602 22.4898C-0.20679 26.524 0.561906 30.5571 2.28233 34.2148C4.00275 37.8726 6.61917 41.0366 9.88883 43.4133C13.1585 45.7899 16.9755 47.3023 20.9856 47.8099C24.9958 48.3176 29.0692 47.8042 32.828 46.3174C36.5868 44.8305 39.9092 42.4184 42.4869 39.3048L41.3222 38.3406C38.9069 41.258 35.7938 43.5182 32.2719 44.9114C28.7499 46.3046 24.9331 46.7856 21.1755 46.3099C17.418 45.8342 13.8415 44.4172 10.7778 42.1902C7.71416 39.9633 5.26258 36.9986 3.65054 33.5713C2.03851 30.144 1.31824 26.365 1.55656 22.585C1.79489 18.805 2.98409 15.1464 5.01383 11.9486C7.04357 8.75091 9.84809 6.11764 13.1672 4.29313C16.4863 2.46863 20.2125 1.512 24 1.512L24 0Z" fill="#71D369"/></svg><span>업로드 중</span></span>
+              <button type="button" class="del" aria-label="업로드 삭제"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect width="23.4479" height="23.4479" rx="11.7239" fill="#474747"/><path d="M8.54212 8.54186L11.7241 11.7238M14.9061 14.9058L11.7241 11.7238M8.54214 14.9058L11.7241 11.7238M11.7241 11.7238L14.9061 8.54184" stroke="#F9F9F9" stroke-linecap="round"/></svg></button>
+            </div>
+          </div>
+          </div>
+        </div>
+        <div class="notice-box">
+          <div class="ttl"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 0C12.4183 0 16 3.58172 16 8C16 12.4183 12.4183 16 8 16C3.58172 16 0 12.4183 0 8C0 3.58172 3.58172 0 8 0ZM8.12793 10.2715C7.61388 10.2715 7.19805 10.6766 7.20898 11.1797C7.19805 11.6828 7.61388 12.0986 8.12793 12.0986C8.60918 12.0986 9.03613 11.6828 9.03613 11.1797C9.03613 10.6766 8.60918 10.2715 8.12793 10.2715ZM7.27441 4.08105L7.41699 9.62695H8.81738L8.95898 4.08105H7.27441Z" fill="#7F7F7F"/></svg>안내사항</div>
+          <p>임대인(전대인)은 집을 제공하는 ‘빌려주는 메이트’, 임차인(전차인)은 집에 들어오는 ‘빌린 메이트’이에요.<br>임대인(전대인)에게는 작성/편집 권한이 부여되고, 임차인(전차인)에게는 조회/수정요청/서명 권한만 부여될 거예요.</p>
+        </div>
+      </div>
+
+      <hr>
+
+      <div class="dep">
+        <div class="dep-top">
+          <div class="lead2">
+            <h2>보증금 반환 확인서</h2>
+            <p><span data-role="giver">임/전대인</span>은 <span data-role="taker">임/전차인</span> 퇴거 시 보증금 반환 의무를 가집니다.</p>
+          </div>
+          <div class="field">
+            <label class="k" for="deposit">총 보증금</label>
+            <input class="inp" id="deposit" placeholder="총 보증금을 작성해 주세요." autocomplete="off">
+          </div>
+          <label class="chk-row"><input type="checkbox" id="depositOk"><i></i><span>본인(<span data-role="giver">임/전대인</span>)은 <span data-role="taker">임/전차인</span>으로부터 수령한 보증금을<br>계약 종료 및 퇴거 시 지체없이 반환할 것을 확약합니다.</span></label>
+        </div>
+        <div class="notice-box">
+          <div class="ttl"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 0C12.4183 0 16 3.58172 16 8C16 12.4183 12.4183 16 8 16C3.58172 16 0 12.4183 0 8C0 3.58172 3.58172 0 8 0ZM8.12793 10.2715C7.61388 10.2715 7.19805 10.6766 7.20898 11.1797C7.19805 11.6828 7.61388 12.0986 8.12793 12.0986C8.60918 12.0986 9.03613 11.6828 9.03613 11.1797C9.03613 10.6766 8.60918 10.2715 8.12793 10.2715ZM7.27441 4.08105L7.41699 9.62695H8.81738L8.95898 4.08105H7.27441Z" fill="#7F7F7F"/></svg>안내사항</div>
+          <p>보증금 계약을 진행하지 않았다면 금액에 ‘0’ 작성 후 체크하고<br>다음으로 이동해주세요.</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ===== 2/3 ===== -->
+  <div class="body step2">
+    <div class="content" style="gap: 25px">
+
+      <div class="sect-resp">
+        <h2>원상복구 및 수선의무 분담</h2>
+        <div class="resp-wrap">
+          <div class="resp-head"><span>항목</span><span>책임 주체</span></div>
+          <div class="ctype resp">
+            <div class="r">
+              <div class="lbl">전등/소모품 교체</div>
+              <label><input type="radio" name="resp0" value="giver"><span data-role="giver">임대인</span></label>
+              <label><input type="radio" name="resp0" value="taker"><span data-role="taker">임차인</span></label>
+            </div>
+            <div class="r">
+              <div class="lbl">보일러/배관 고장</div>
+              <label><input type="radio" name="resp1" value="giver"><span data-role="giver">임대인</span></label>
+              <label><input type="radio" name="resp1" value="taker"><span data-role="taker">임차인</span></label>
+            </div>
+            <div class="r">
+              <div class="lbl">수도꼭지/누수</div>
+              <label><input type="radio" name="resp2" value="giver"><span data-role="giver">임대인</span></label>
+              <label><input type="radio" name="resp2" value="taker"><span data-role="taker">임차인</span></label>
+            </div>
+            <div class="r">
+              <div class="lbl">벽지/장판 오염</div>
+              <label><input type="radio" name="resp3" value="giver"><span data-role="giver">임대인</span></label>
+              <label><input type="radio" name="resp3" value="taker"><span data-role="taker">임차인</span></label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <hr>
+
+      <div class="room-rec">
+        <div class="lead2">
+          <h2>입주 시점 방 상태 기록</h2>
+          <p>퇴거 시 원상복구 분쟁 방지를 위해 상세히 촬영해주세요.</p>
+        </div>
+        <div class="room-pics" id="roomPics">
+          <div class="proof" id="roomAdd" role="button" tabindex="0" aria-label="방 사진 올리기">
+            <span class="idle"><svg width="48" height="48" viewBox="0 0 48 48" fill="none"><rect width="48" height="48" rx="24" fill="#71D369"/><path d="M23.9999 15.5L24 24M24 32.5L24 24M15.5 24L24 24M24 24L32.5 24" stroke="white" stroke-width="2" stroke-linecap="round"/></svg><span>Upload</span></span>
+            <span class="loading"><svg class="spin" width="48" height="48" viewBox="0 0 48 48" fill="none"><path d="M48 24C48 37.2548 37.2548 48 24 48C10.7452 48 0 37.2548 0 24C0 10.7452 10.7452 0 24 0C37.2548 0 48 10.7452 48 24ZM1.512 24C1.512 36.4198 11.5802 46.488 24 46.488C36.4198 46.488 46.488 36.4198 46.488 24C46.488 11.5802 36.4198 1.512 24 1.512C11.5802 1.512 1.512 11.5802 1.512 24Z" fill="#DBDBDB"/><path d="M24 0C19.9578 -4.82025e-08 15.9811 1.02095 12.4388 2.96812C8.89657 4.9153 5.90349 7.72562 3.73728 11.1384C1.57106 14.5511 0.30191 18.4557 0.0475602 22.4898C-0.20679 26.524 0.561906 30.5571 2.28233 34.2148C4.00275 37.8726 6.61917 41.0366 9.88883 43.4133C13.1585 45.7899 16.9755 47.3023 20.9856 47.8099C24.9958 48.3176 29.0692 47.8042 32.828 46.3174C36.5868 44.8305 39.9092 42.4184 42.4869 39.3048L41.3222 38.3406C38.9069 41.258 35.7938 43.5182 32.2719 44.9114C28.7499 46.3046 24.9331 46.7856 21.1755 46.3099C17.418 45.8342 13.8415 44.4172 10.7778 42.1902C7.71416 39.9633 5.26258 36.9986 3.65054 33.5713C2.03851 30.144 1.31824 26.365 1.55656 22.585C1.79489 18.805 2.98409 15.1464 5.01383 11.9486C7.04357 8.75091 9.84809 6.11764 13.1672 4.29313C16.4863 2.46863 20.2125 1.512 24 1.512L24 0Z" fill="#71D369"/></svg><span>업로드 중</span></span>
+          </div>
+        </div>
+      </div>
+
+      <hr>
+
+      <!-- ponytail: Figma는 입력칸이 제목보다 위 — 레이어 순서 실수로 보고 제목 → 입력칸 -->
+      <div class="sect3 free">
+        <h2>기타 자유 합의 사항</h2>
+        <textarea id="freeNote" placeholder="추가적으로 합의가 필요한 사항을 작성해주세요.&#10;없을 시 ‘추가 합의사항은 없습니다.’라고 작성해주세요."></textarea>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ===== 3/3 ===== -->
+  <div class="body step3">
+    <div class="content">
+
+      <div class="final">
+        <div class="final-top">
+          <div class="lead3">
+            <h2>합의서 최종 확인</h2>
+            <p>안전한 틈새살이를 위해 합의를 마칩니다.</p>
+          </div>
+          <div class="notice-box">
+            <div class="ttl">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 0C12.4183 0 16 3.58172 16 8C16 12.4183 12.4183 16 8 16C3.58172 16 0 12.4183 0 8C0 3.58172 3.58172 0 8 0ZM8.12793 10.2715C7.61388 10.2715 7.19805 10.6766 7.20898 11.1797C7.19805 11.6828 7.61388 12.0986 8.12793 12.0986C8.60918 12.0986 9.03613 11.6828 9.03613 11.1797C9.03613 10.6766 8.60918 10.2715 8.12793 10.2715ZM7.27441 4.08105L7.41699 9.62695H8.81738L8.95898 4.08105H7.27441Z" fill="#7F7F7F"/></svg>
+              주의사항
+            </div>
+            <p>합의 완료 후에는 내용을 수정할 수 없으며,<br>추출된 pdf는 법적 분쟁 시 증빙 자료로 활용될 수 있습니다.</p>
+          </div>
+        </div>
+
+        <div class="agrees">
+          <div class="agree-list">
+            <label class="chk-row center"><input type="checkbox" class="agree"><i></i>계약자 본인이 맞습니까?</label>
+            <label class="chk-row"><input type="checkbox" class="agree"><i></i><span>위 협의 사항을 모두 숙지하였으며, 메이트 간 신뢰를<br>바탕으로 성실히 이행하시겠습니까?</span></label>
+            <label class="chk-row"><input type="checkbox" class="agree"><i></i><span>위 계약을 지키지 않아 발생하는 모든 법적 책임은<br>오롯이 본인에게 있음을 확인합니다.</span></label>
+          </div>
+          <hr>
+          <label class="chk-row chk-all"><input type="checkbox" id="agreeAll"><i></i><span><b>전체 동의</b><small>위 내용을 모두 확인하였고 전체 내용에 동의하겠습니다.</small></span></label>
+        </div>
+      </div>
+
+      <div class="status">
+        <div class="lead3">
+          <h2>합의서 최종 확인 현황</h2>
+          <p>모두 확인 완료 상태가 되어야 ‘합의 완료 및 pdf 추출’이 가능합니다.</p>
+        </div>
+        <div class="signers">
+          <div class="signer-list">
+            <div class="signer">
+              <div class="who-line"><span id="meRole">임대인</span></div>
+              <div class="sign-card">
+                <div class="nm"><b id="myName">유예현</b><span class="st-wait" id="myStatus">확인 중</span></div>
+                <div class="sign-box" id="mySign" role="button" tabindex="0" aria-label="본인 서명하기"><span>서명</span><canvas></canvas></div>
+              </div>
+            </div>
+            <div class="signer">
+              <div class="who-line"><span id="mateRole">임차인</span></div>
+              <div class="sign-card">
+                <div class="nm"><b>강은지</b><span class="st-mate-done">확인 완료</span></div>
+                <div class="sign-box">
+                  <svg width="98" height="38" viewBox="0 0 98 38" fill="none" aria-label="강은지 서명"><path d="M34.999 10.5947C47.3389 2.14247 50.6102 1.07662 51.9914 1.00095C52.7225 0.960897 53.3022 2.19152 53.6281 3.0847C53.9539 3.97788 53.9539 4.82202 53.6025 5.92517C53.2511 7.02832 52.5483 8.3649 50.8509 10.0383C49.1534 11.7117 46.4827 13.6814 37.9381 18.5299C29.3934 23.3784 15.0558 31.0461 8.47804 34.5741C1.90025 38.102 3.51676 37.2578 6.5634 35.3457C9.61004 33.4336 14.0378 30.479 25.1393 24.7714C36.2407 19.0638 53.8815 10.6927 62.8287 6.55614C71.7758 2.4196 71.4947 2.77134 68.6089 5.30912C65.723 7.8469 60.241 12.5601 57.1358 15.0584C53.6153 17.8909 51.4834 19.39 50.7593 20.7852C46.2148 29.5411 63.3164 11.7351 64.8403 11.2373C65.5018 11.0212 66.0127 11.1617 66.5473 11.7255C67.0818 12.2893 67.6441 13.3445 67.8986 14.0991C68.1531 14.8538 68.0828 15.2758 67.4844 15.7395C64.0074 18.4332 58.9419 17.9063 56.1636 19.4699C55.503 19.8417 55.0998 20.6008 54.8463 21.138C54.5929 21.6752 54.5929 22.0973 54.874 22.5257C55.5312 23.5274 56.7887 24.0925 58.0261 24.5189C62.6366 26.1074 70.1104 20.7756 72.6554 18.6301C73.496 17.9214 73.5478 16.7808 73.3721 16.071C72.8901 14.1236 66.69 15.4933 63.6529 16.3118C62.3531 16.6622 61.1994 17.0579 60.9119 17.5546C60.7848 17.7742 61.7489 17.9106 66.1171 17.6665C70.4852 17.4225 78.4974 16.7893 83.7846 16.2521C91.412 15.4772 94.4132 14.5766 95.5473 13.9041C96.0943 13.5797 96.4003 13.0205 96.8624 12.4854C97.3246 11.9504 97.8869 11.3876 75.651 10.0777C53.4151 8.76778 23.9621 6.72776 1 5.71201" stroke="black" stroke-width="2" stroke-linecap="round"/></svg>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="sign-date" id="signDate">2026년 06월 03일</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="topbar"></div>
+  <div class="progress"><i></i></div>
+  <div class="head">
+    <a href="" aria-label="처음으로">
+      <svg width="12" height="21" viewBox="0 0 12 21" fill="none"><path d="M10.9404 1L1.69307 8.98636C0.769391 9.78408 0.769392 11.2159 1.69307 12.0136L10.9404 20" stroke="#BABFCF" stroke-width="2" stroke-linecap="round"/></svg>
+    </a>
+    <h1 class="nps">틈새살이 합의서 작성</h1>
+  </div>
+
+  <!-- ponytail: 합의 완료 이후 화면(또는 pdf 추출)이 생기면 next.onclick의 3/3 분기에 붙인다 -->
+  <div class="cta"><button type="button" class="prev" id="prev">이전</button><button type="button" id="next">다음으로 이동하기</button></div>
+
+  <!-- ===== 서명 팝업 (본인 서명칸을 누르면) ===== -->
+  <div class="sign-modal" id="signModal" hidden>
+    <div class="sign-pad" id="signPad">
+      <div class="ph">(인)</div>
+      <canvas aria-label="서명 입력"></canvas>
+      <div class="sign-btns">
+        <button type="button" class="sign-redo" id="signRedo">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M7.07292 17.7393C6.16319 17.3435 5.37153 16.8088 4.69792 16.1352C4.02431 15.4616 3.48958 14.6699 3.09375 13.7602C2.69792 12.8505 2.5 11.8748 2.5 10.8331C2.5 10.597 2.57986 10.3991 2.73958 10.2393C2.89931 10.0796 3.09722 9.99977 3.33333 9.99977C3.56944 9.99977 3.76736 10.0796 3.92708 10.2393C4.08681 10.3991 4.16667 10.597 4.16667 10.8331C4.16667 12.4581 4.73264 13.8366 5.86458 14.9685C6.99653 16.1005 8.375 16.6664 10 16.6664C11.625 16.6664 13.0035 16.1005 14.1354 14.9685C15.2674 13.8366 15.8333 12.4581 15.8333 10.8331C15.8333 9.2081 15.2674 7.82963 14.1354 6.69768C13.0035 5.56574 11.625 4.99977 10 4.99977H9.875L10.5833 5.7081C10.75 5.87477 10.8299 6.06921 10.8229 6.29143C10.816 6.51365 10.7361 6.7081 10.5833 6.87477C10.4167 7.04143 10.2188 7.12824 9.98958 7.13518C9.76042 7.14213 9.5625 7.06227 9.39583 6.8956L7.25 4.74977C7.08333 4.5831 7 4.38865 7 4.16643C7 3.94421 7.08333 3.74977 7.25 3.5831L9.39583 1.43727C9.5625 1.2706 9.76042 1.19074 9.98958 1.19768C10.2188 1.20463 10.4167 1.29143 10.5833 1.4581C10.7361 1.62477 10.816 1.81921 10.8229 2.04143C10.8299 2.26365 10.75 2.4581 10.5833 2.62477L9.875 3.3331H10C11.0417 3.3331 12.0174 3.53102 12.9271 3.92685C13.8368 4.32268 14.6285 4.8574 15.3021 5.53102C15.9757 6.20463 16.5104 6.99629 16.9063 7.90602C17.3021 8.81574 17.5 9.79143 17.5 10.8331C17.5 11.8748 17.3021 12.8505 16.9063 13.7602C16.5104 14.6699 15.9757 15.4616 15.3021 16.1352C14.6285 16.8088 13.8368 17.3435 12.9271 17.7393C12.0174 18.1352 11.0417 18.3331 10 18.3331C8.95833 18.3331 7.98264 18.1352 7.07292 17.7393Z" fill="white"/></svg>
+          다시하기
+        </button>
+        <button type="button" class="sign-done" id="signDone">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M7.95842 12.625L15.0209 5.5625C15.1876 5.39583 15.382 5.3125 15.6043 5.3125C15.8265 5.3125 16.0209 5.39583 16.1876 5.5625C16.3543 5.72917 16.4376 5.92708 16.4376 6.15625C16.4376 6.38542 16.3543 6.58333 16.1876 6.75L8.54176 14.4167C8.37509 14.5833 8.18065 14.6667 7.95842 14.6667C7.7362 14.6667 7.54176 14.5833 7.37509 14.4167L3.79176 10.8333C3.62509 10.6667 3.54523 10.4688 3.55217 10.2396C3.55912 10.0104 3.64592 9.8125 3.81259 9.64583C3.97926 9.47917 4.17717 9.39583 4.40634 9.39583C4.63551 9.39583 4.83342 9.47917 5.00009 9.64583L7.95842 12.625Z" fill="white"/></svg>
+          서명 완료
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const next = document.getElementById('next'), step1 = document.querySelector('.step1');
+
+  const wrap = document.querySelector('.app-wrapper'), step2 = document.querySelector('.step2'), step3 = document.querySelector('.step3');
+  const prev = document.getElementById('prev');
+
+  // '본인' 서명란 이름: 게임 화면이 iframe을 열 때 ?name= 으로 넘겨준
+  // 관람객 이름으로 바꿔준다. 값이 없으면(단독 실행 등) 기본 이름을 그대로 둔다.
+  (function applyVisitorName(){
+    var myNameEl = document.getElementById('myName');
+    var params = new URLSearchParams(window.location.search);
+    var visitorName = (params.get('name') || '').trim();
+    if(myNameEl && visitorName){ myNameEl.textContent = visitorName; }
+    // 메이트 이름: 게임 화면이 ?mate= 로 넘겨준다(관람객 성별에 따라 강은지/강지혁). 문서 안의 '강은지'를 모두 바꾼다.
+    var mateName = (params.get('mate') || '').trim();
+    if(mateName && mateName !== '강은지'){
+      var walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+      while(walker.nextNode()){
+        var t = walker.currentNode;
+        if(t.nodeValue.indexOf('강은지') >= 0) t.nodeValue = t.nodeValue.split('강은지').join(mateName);
+      }
+      document.querySelectorAll('[data-who="강은지"]').forEach(function(el){ el.setAttribute('data-who', mateName); });
+      document.querySelectorAll('[alt="강은지"], [aria-label="강은지 서명"]').forEach(function(el){
+        if(el.alt) el.alt = mateName; else el.setAttribute('aria-label', mateName + ' 서명');
+      });
+    }
+  })();
+
+  // 다음 버튼 활성 조건 — 1/3: 계약 형태 + 지위 + 총 보증금 + 반환 확약 체크 / 2/3: 위약금 + 공석 분담 + 자유 합의 사항
+  const ready = () => wrap.classList.contains('s3') ? agrees.every(a => a.checked) && mySign.classList.contains('signed')
+    : wrap.classList.contains('s2')
+    ? [...step2.querySelectorAll('.resp .r')].every(r => r.querySelector(':checked'))   // 2/3: 책임 주체 4줄 + 방 사진 1장 이상 + 자유 합의
+      && !!roomPics.querySelector(viewMode ? '.pic.view' : '.pic:not(.view)') && !!freeNote.value.trim()
+    : !!(step1.querySelector('[name=ctype]:checked') && step1.querySelector('[name=party]:checked') && deposit.value.trim() && depositOk.checked
+         && (viewMode || !docsBox.classList.contains('open') || docs.every(d => d.classList.contains('has'))));   // 빌려주는 쪽이면 서류 2장까지
+  const check = () => next.classList.toggle('on', ready());
+  step1.addEventListener('input', check);
+  // 계약 형태에 따라 역할 이름을 바꾼다: 임대차 → 임대인/임차인, 전대차 → 전대인/전차인.
+  // 지위 줄은 계약 형태를 고른 뒤에 나타난다. 문구는 고르기 전엔 '임/전'으로 둘 다 가리킨다.
+  const ROLE = { 임대차: ['임대인', '임차인'], 전대차: ['전대인', '전차인'] };
+  step1.querySelectorAll('[name=ctype]').forEach(r => r.addEventListener('change', () => {
+    const type = step1.querySelector('[name=ctype]:checked');
+    // 계약 형태를 해제하면 지위 줄이 접히고 지위 선택도 풀린다 (문구는 다시 '임/전')
+    if (!type) step1.querySelectorAll('[name=party]').forEach(p => p.checked = false);
+    const [giver, taker] = type ? ROLE[type.value] : ['임/전대인', '임/전차인'];
+    document.querySelectorAll('[data-role=giver]').forEach(el => el.textContent = giver);   // 2/3 책임 주체 버튼까지
+    document.querySelectorAll('[data-role=taker]').forEach(el => el.textContent = taker);
+    docs.forEach(resetDoc);                            // 계약 형태가 바뀌면 올릴 서류도 달라진다
+    syncDocs();
+  }));
+  step1.querySelectorAll('[name=party]').forEach(r => r.addEventListener('change', () => syncDocs()));
+
+  // 이미 고른 버튼을 한 번 더 누르면 선택 해제 (라디오는 원래 해제가 안 되므로 누르기 직전 상태를 기억해 둔다)
+  document.querySelectorAll('.ctype input[type=radio]').forEach(i => {
+    i.closest('label').addEventListener('pointerdown', () => i._was = i.checked);
+    i.addEventListener('click', () => {
+      if (!i._was) return;
+      i._was = false;
+      i.checked = false;
+      i.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+  });
+
+  // ===== 빌려주는 쪽 서류 업로드 (시뮬레이션: 누르면 잠깐 '업로드 중' → '업로드 완료') =====
+  const DOCS = { 임대차: ['전입신고 확인증', '등기부등본 확인'], 전대차: ['기존 임대차 계약서', '집주인 전대 동의 증빙'] };
+  const docsBox = step1.querySelector('.docs'), docs = [...docsBox.querySelectorAll('.doc')];
+  const syncDocs = () => {
+    const type = (step1.querySelector('[name=ctype]:checked') || { value: '임대차' }).value;   // 형태를 고르기 전엔 임대차 기준
+    docsBox.classList.toggle('open', !!step1.querySelector('[name=party]:checked'));   // 빌린 쪽은 임대인이 올린 서류를 조회
+    setView(!!step1.querySelector('[name=party][value=taker]:checked'));
+    docsBox.querySelectorAll('[data-doc]').forEach((el, i) => el.textContent = DOCS[type][i]);
+    check();
+  };
+  const resetDoc = d => { clearTimeout(d._t); d.classList.remove('busy', 'has'); };
+  docs.forEach(d => {
+    const up = () => {
+      if (d.classList.contains('busy') || d.classList.contains('has')) return;
+      d.classList.add('busy');
+      d._t = setTimeout(() => { d.classList.replace('busy', 'has'); check(); }, 1500);
+    };
+    d.onclick = up;
+    d.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); up(); } };
+    d.querySelector('.del').onclick = e => { e.stopPropagation(); resetDoc(d); check(); };
+  });
+  step1.addEventListener('change', check);
+  step2.addEventListener('input', check);
+  step2.addEventListener('change', check);
+
+  // 방 사진 (시뮬레이션): Upload를 누르면 잠깐 '업로드 중' → images/의 방 사진 2장이 붙는다.
+  // ✕로 지운 뒤 다시 누르면 빠진 사진만 다시 올라간다.
+  const ROOM_PHOTOS = ['images/Rectangle 10230.png', 'images/Rectangle 10231.png'];
+  // 업로드가 끝나는 순간에야 그림을 받기 시작하면 1~3프레임 동안 빈 흰 칸이 보여 깜빡인다 → 서류·방 사진을 미리 받아 디코딩해 둔다
+  const PRELOAD = ['images/a.png', 'images/b.png', ...ROOM_PHOTOS].map(src => { const im = new Image(); im.src = src; im.decode().catch(() => {}); return im; });
+  const roomAdd = document.getElementById('roomAdd');
+  const addRoomPhotos = () => {
+    const have = [...roomPics.querySelectorAll('.pic')].map(p => p.dataset.src);
+    const missing = ROOM_PHOTOS.filter(src => !have.includes(src));
+    if (!missing.length || roomAdd.classList.contains('busy')) return;
+    roomAdd.classList.add('busy');
+    setTimeout(() => {
+      roomAdd.classList.remove('busy');
+      missing.forEach((src, k) => setTimeout(() => {   // 한 장씩 0.4초 간격으로
+        const pic = document.createElement('div');
+        pic.className = 'pic';
+        pic.dataset.src = src;
+        pic.style.backgroundImage = `url("${src}")`;   // 파일명에 공백이 있어 따옴표로 감싼다
+        pic.innerHTML = '<button type="button" aria-label="사진 삭제"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect width="23.4479" height="23.4479" rx="11.7239" fill="#474747"/><path d="M8.54212 8.54186L11.7241 11.7238M14.9061 14.9058L11.7241 11.7238M8.54214 14.9058L11.7241 11.7238M11.7241 11.7238L14.9061 8.54184" stroke="#F9F9F9" stroke-linecap="round"/></svg></button>';
+        pic.querySelector('button').onclick = () => { pic.remove(); check(); };
+        // 원래 순서(거실 → 침실)를 지키며 끼운다
+        const after = [...roomPics.querySelectorAll('.pic')].find(p => ROOM_PHOTOS.indexOf(p.dataset.src) > ROOM_PHOTOS.indexOf(src));
+        roomPics.insertBefore(pic, after || null);
+        pic.classList.add('enter');
+        pic.addEventListener('animationend', () => pic.classList.remove('enter'), { once: true });
+        // 새 사진이 보이도록 가로 목록을 부드럽게 넘긴다 — 펼쳐지는 동안 함께 따라가도록 끝 지점으로 바로 목표를 잡는다
+        setTimeout(() => roomPics.scrollTo({ left: roomPics.scrollWidth, behavior: 'smooth' }), 250);
+        check();
+      }, k * 400));
+    }, 1200);
+  };
+  roomAdd.onclick = addRoomPhotos;
+
+  // ===== 빌린 쪽(임차인·전차인) = 조회 모드 =====
+  // 조회/수정요청/서명 권한만 있으므로, 1/3·2/3은 임대인(메이트)이 이미 작성한 내용을 읽기 전용으로 보여 준다.
+  // 내가 빌려주는 쪽으로 쓰던 값은 따로 보관했다가, 지위를 다시 바꾸면 그대로 되살린다.
+  // ponytail: '수정요청' 버튼은 Figma에 아직 없어 생략
+  const VIEW = {
+    deposit: '금일천만원',
+    resp: ['taker', 'taker', 'giver', 'giver'],   // 전등·보일러 = 빌린 쪽, 수도·벽지 = 빌려주는 쪽 (Figma)
+    note: '1. 임대인으로부터 보증금을 반환받는 즉시, 각자의 기여분에 따라 영업일\n3일 이내에 상호 송금한다.\n2. 월세 및 공과금 이체를 지연하여 발생하는 연체료는 해당 지연자가 전액 부담한다.'
+  };
+  const respInputs = [...step2.querySelectorAll('.resp input')];
+  let viewMode = false;
+  const saved = {};
+  const setView = on => {
+    if (on === viewMode) return;
+    viewMode = on;
+    wrap.classList.toggle('viewer', on);
+    if (on) {
+      Object.assign(saved, { deposit: deposit.value, ok: depositOk.checked, note: freeNote.value, resp: respInputs.filter(i => i.checked) });
+      deposit.value = VIEW.deposit; depositOk.checked = true; freeNote.value = VIEW.note;
+      step2.querySelectorAll('.resp .r').forEach((row, k) => row.querySelector(`[value=${VIEW.resp[k]}]`).checked = true);
+      ROOM_PHOTOS.forEach(src => {                   // 임대인이 올린 방 사진 (✕ 없음)
+        const pic = document.createElement('div');
+        pic.className = 'pic view';
+        pic.style.backgroundImage = `url("${src}")`;
+        roomPics.append(pic);
+      });
+    } else {
+      deposit.value = saved.deposit; depositOk.checked = saved.ok; freeNote.value = saved.note;
+      respInputs.forEach(i => i.checked = saved.resp.includes(i));
+      roomPics.querySelectorAll('.pic.view').forEach(p => p.remove());
+    }
+    [deposit, freeNote].forEach(el => el.readOnly = on);
+    [depositOk, ...respInputs].forEach(el => el.disabled = on);
+    check();
+  };
+  roomAdd.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); addRoomPhotos(); } };
+
+  // 다음 = 한 단계 앞으로, 이전 = 한 단계 뒤로 (입력한 값은 그대로 남는다)
+  const NEXT = '다음으로 이동하기', DONE = '합의 완료 및 pdf 추출하기';
+  next.onclick = () => {
+    if (!next.classList.contains('on')) return;
+    if (!wrap.classList.contains('s2')) { wrap.classList.add('s2'); step2.scrollTop = 0; }
+    else if (!wrap.classList.contains('s3')) {
+      // 3/3 서명자 줄 이름 = 1/3에서 고른 계약 형태 + 내 지위 (메이트는 반대 역할)
+      const names = ROLE[step1.querySelector('[name=ctype]:checked').value];
+      const mine = step1.querySelector('[name=party]:checked').value === 'giver' ? 0 : 1;
+      meRole.textContent = names[mine]; mateRole.textContent = names[1 - mine];
+      wrap.classList.add('s3'); step3.scrollTop = 0; next.textContent = DONE;
+    }
+    else {
+      // 3/3 '합의 완료' - 부모 화면(틈새살이 메인)에 서명이 끝났다고 알린다
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({ source: 'teum-agreement', type: 'agreement-signed' }, '*');
+      }
+    }
+    check();
+  };
+  prev.onclick = () => {
+    if (wrap.classList.contains('s3')) { wrap.classList.remove('s3'); next.textContent = NEXT; }
+    else wrap.classList.remove('s2');
+    check();
+  };
+
+  // ===== 3/3 =====
+  // 전체 동의 ↔ 개별 동의 3개
+  const agrees = [...step3.querySelectorAll('.agree')];
+  // 본인 상태: 서명을 마치면 '확인 완료' (Figma). 완료 버튼은 동의 3개 + 서명 둘 다 있어야 켜진다
+  const sync3 = () => {
+    const signed = mySign.classList.contains('signed');
+    myStatus.textContent = signed ? '확인 완료' : '확인 중';
+    myStatus.className = signed ? 'st-me-done' : 'st-wait';
+    check();
+  };
+  agreeAll.onchange = () => { agrees.forEach(a => a.checked = agreeAll.checked); sync3(); };
+  agrees.forEach(a => a.onchange = () => { agreeAll.checked = agrees.every(x => x.checked); sync3(); });
+
+  // 서명일 = 오늘
+  const today = new Date(), p2 = n => String(n).padStart(2, '0');
+  signDate.textContent = `${today.getFullYear()}년 ${p2(today.getMonth() + 1)}월 ${p2(today.getDate())}일`;
+
+  // 본인 서명: 칸을 누르면 팝업에서 크게 쓰고, '서명 완료'면 쓴 서명을 칸 크기로 줄여 옮긴다
+  const pad = signPad.querySelector('canvas'), ctx = pad.getContext('2d');
+  const mini = mySign.querySelector('canvas'), mctx = mini.getContext('2d');
+  const K = () => devicePixelRatio || 1;
+  const size = c => { const r = c.getBoundingClientRect(); c.width = r.width * K(); c.height = r.height * K(); };
+  let drawing = false, inked = 0, last = null;
+  const clearPad = () => { ctx.clearRect(0, 0, pad.width, pad.height); inked = 0; signPad.classList.remove('inked'); };
+
+  const openSign = () => {
+    signModal.hidden = false;
+    if (pad.width !== Math.round(pad.getBoundingClientRect().width * K())) {   // 처음 열 때 해상도 맞추기
+      size(pad);
+      ctx.setTransform(K(), 0, 0, K(), 0, 0); ctx.lineWidth = 5; ctx.lineCap = ctx.lineJoin = 'round'; ctx.strokeStyle = 'black';
+    }
+  };
+  mySign.onclick = openSign;
+  mySign.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openSign(); } };
+  signModal.onclick = e => { if (e.target === signModal) signModal.hidden = true; };   // 바깥(어두운 곳)을 누르면 그냥 닫기
+
+  const at = e => { const r = pad.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+  pad.onpointerdown = e => { drawing = true; last = at(e); pad.setPointerCapture(e.pointerId); };
+  pad.onpointermove = e => {
+    if (!drawing) return;
+    const p = at(e);
+    ctx.beginPath(); ctx.moveTo(...last); ctx.lineTo(...p); ctx.stroke();
+    inked += Math.hypot(p[0] - last[0], p[1] - last[1]); last = p;
+    signPad.classList.add('inked');
+  };
+  // 서명 진행을 부모(틈새살이 매칭 화면)에 알린다 - 부모가 '서명 완료 / 합의 완료를 눌러주세요' 말풍선을 띄운다
+  const tellParent = step => { if (window.parent !== window) window.parent.postMessage({ source: 'teum-agreement', type: 'progress', step }, '*'); };
+  pad.onpointerup = pad.onpointercancel = () => { drawing = false; if (inked >= 20) tellParent('inked'); };
+
+  signRedo.onclick = clearPad;
+  signDone.onclick = () => {
+    if (inked < 20) return;                              // 점 하나는 서명이 아니다
+    // 잉크가 묻은 영역만 잘라서, 서명칸 안쪽(111×39 — 메이트 서명과 같은 크기감)에 비율 유지로 맞춘다
+    const d = ctx.getImageData(0, 0, pad.width, pad.height).data;
+    let x0 = pad.width, y0 = pad.height, x1 = 0, y1 = 0;
+    for (let y = 0; y < pad.height; y++) for (let x = 0; x < pad.width; x++)
+      if (d[(y * pad.width + x) * 4 + 3]) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    const w = x1 - x0 + 1, h = y1 - y0 + 1;
+    size(mini);
+    const s = Math.min(111 * K() / w, 39 * K() / h, 1);
+    mctx.clearRect(0, 0, mini.width, mini.height);
+    mctx.drawImage(pad, x0, y0, w, h, (mini.width - w * s) / 2, (mini.height - h * s) / 2, w * s, h * s);
+    mySign.classList.add('signed');
+    tellParent('signed');
+    signModal.hidden = true;
+    sync3();
+  };
+
+</script>
+<script>
+  // ===== 자동 시연 (동거 · 임대인): 서명만 사람이 한다 =====
+  // 페이지를 열면 '지금 작성하기'부터 1/3·2/3·3/3 동의까지 화면에서 직접 치고 누르는 것처럼 진행하고, 서명칸에서 멈춘다.
+  // ponytail: 시연 중엔 화면 전체를 잠가 사람 입력과 섞이지 않게 한다 (‹로 처음부터 다시 볼 수 있다)
+  // 자동 시연 속도 배율 - 1.3이면 모든 대기 시간이 1/1.3로 줄어 1.3배속으로 진행된다
+  const SPEED = 1.3;
+  const sleep = ms => new Promise(r => setTimeout(r, ms / SPEED));
+  // 진행 단계를 부모(틈새살이 매칭 화면)에 알린다 - 부모는 이걸로 나/메이트 말풍선을 띄운다
+  const tell = step => { if (window.parent !== window) window.parent.postMessage({ source: 'teum-agreement', type: 'progress', step }, '*'); };
+  const until = async cond => { while (!cond()) await sleep(100); };
+  const type = async (el, text) => {
+    // 진짜 focus()는 폰에서 키보드를 띄운다 - 서명 전까지는 쓰는 모습(초록 테두리)만 보여 준다
+    el.classList.add('typing');
+    for (const ch of text) { el.value += ch; el.dispatchEvent(new Event('input', { bubbles: true })); await sleep(ch === '\n' ? 250 : 45); }
+    el.classList.remove('typing');
+  };
+  const press = async el => { el.click(); if (document.activeElement !== document.body) document.activeElement.blur(); await sleep(450); };   // 라벨 클릭으로 잡힌 포커스도 바로 푼다
+  // 그 단계의 본문(.body)만 스크롤한다 - scrollIntoView는 바깥 화면(게임 페이지)까지 같이 움직여 스크롤이 두 번 되는 것처럼 보였다
+  const show = async (el, where = 'center') => {
+    const c = el.closest('.body'), r = el.getBoundingClientRect(), cr = c.getBoundingClientRect();
+    const off = where === 'center' ? (cr.height - r.height) / 2 : 0;
+    c.scrollTo({ top: c.scrollTop + r.top - cr.top - off, behavior: 'smooth' });
+    await sleep(600);
+  };
+  const pick = sel => document.querySelector(sel).closest('label');
+
+  const finish3 = async () => {        // 3/3 — 동의 3개를 차례로 → 서명칸으로 내려가 멈춤
+    await sleep(500);
+    await press(agreeAll.closest('label'));   // 전체 동의 한 번으로 3개 모두 체크
+    await sleep(300);
+    step3.scrollTo({ top: step3.scrollHeight, behavior: 'smooth' });
+    await sleep(700);
+    mySign.classList.add('nudge');
+  };
+
+  const autoplay = async () => {
+    wrap.style.pointerEvents = 'none';
+    await sleep(700);
+    // 1/3 — 임대차 · 임대인 → 서류 2장 → 보증금 → 반환 확약
+    await press(pick('[name=ctype][value=임대차]'));
+    await sleep(300);
+    await press(pick('[name=party][value=giver]'));
+    tell('role');
+    await sleep(300);
+    for (const d of docs) await press(d);
+    await until(() => docs.every(d => d.classList.contains('has')));
+    await sleep(400);
+    await show(deposit);
+    await type(deposit, '금일천만원');
+    await sleep(200);
+    await press(depositOk.closest('label'));
+    await sleep(500);
+    await press(next);
+    // 2/3 — 책임 주체 4줄 (Figma 활성: 전등·보일러 = 임차인, 수도·벽지 = 임대인) → 방 사진 → 자유 합의
+    await sleep(400);
+    for (const [k, v] of ['taker', 'taker', 'giver', 'giver'].entries()) await press(pick(`[name=resp${k}][value=${v}]`));
+    await show(roomAdd);
+    tell('photos');   // 2/3 방 사진 - 부모는 여기까지 '임대인 역할로 작성' 말풍선을 유지하다가 메이트 답을 띄운다
+    await press(roomAdd);
+    await until(() => roomPics.querySelectorAll('.pic:not(.view)').length === 2);
+    await sleep(800);
+    await show(freeNote);
+    await type(freeNote, '1. 임대인으로부터 보증금을 반환받는 즉시, 각자의 기여분에 따라 영업일 3일 이내에 상호 송금한다.\n2. 월세 및 공과금 이체를 지연하여 발생하는 연체료는 해당 지연자가 전액 부담한다.');
+    await sleep(600);
+    await press(next);
+    await finish3();
+    wrap.style.pointerEvents = '';
+    tell('sign');
+    await press(mySign);   // 서명칸까지 눌러 서명 패드를 열어 둔다 - 사람은 서명만 하면 된다
+  };
+  const go = document.querySelector('.btn-go');
+  go.addEventListener('click', autoplay, { once: true });
+  // 페이지가 열리면 안내 시트를 잠깐 보여 주고 '지금 작성하기'를 누른다 (눌리는 느낌만 살짝)
+  // 자동 시연이 도는 동안(안내 시트 단계 포함)은 사람이 누르거나 키보드로 조작하지 못하게 잠근다 - 서명칸에서 풀린다
+  document.addEventListener('keydown', e => { if (wrap.style.pointerEvents === 'none') e.preventDefault(); }, true);
+  (async () => {
+    wrap.style.pointerEvents = 'none';
+    // ?wait=1: 부모(매칭 화면)가 코드 입력 뒤 미리 불러와 화면 밖에서 그려 둔다 - 폰을 올릴 때 'agreement-start'를 보내면 그때 시연을 시작한다
+    if (new URLSearchParams(location.search).has('wait'))
+      await new Promise(r => addEventListener('message', function h(e) { if (e.data && e.data.type === 'agreement-start') { removeEventListener('message', h); r(); } }));
+    await sleep(1500);
+    go.style.transition = 'transform .15s ease'; go.style.transform = 'scale(0.97)';
+    await sleep(180);
+    go.style.transform = '';
+    go.click();
+  })();
+</script>
+</body>
+</html>

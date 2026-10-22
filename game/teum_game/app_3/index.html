@@ -1,0 +1,1060 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<!-- 폰 프레임(412) + 여백(20×2) = 452. 폰에서는 이 폭 전체가 화면에 맞게 축소된다 -->
+<meta name="viewport" content="width=452">
+<title>틈새살림</title>
+<link rel="stylesheet" href="../teum-cursor.css">
+<style>
+  @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+  @font-face {
+    font-family: 'NationalPension';
+    src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2310@1.0/NPSfontBold.woff2') format('woff2');
+    font-weight: 700;
+    font-display: swap;
+  }
+  /* 게임 화면 폰 안(iframe)은 해상도에 따라 축소 반올림으로 412x892보다 1px 작아질 때가 있다 → 페이지가 넘쳐 가로·세로 스크롤바가 생기며
+     화면이 작아 보였다(합의서와 같은 문제). 페이지 자체는 스크롤하지 않는다 (앱 안 스크롤 영역은 그대로) */
+  html, body { overflow: hidden; }
+  body {
+    margin: 0; padding: 0;
+    display: flex; justify-content: center; align-items: center;
+    background: #e2e8f0;
+    font-family: 'Pretendard', sans-serif;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+  .app-wrapper {
+    position: relative;
+    width: 412px; height: 892px; flex-shrink: 0;   /* 창이 좁아도 폰 프레임이 찌그러지지 않게 */
+    border-radius: 30px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.15);
+    background: #F7F8FA;
+    overflow: hidden;
+    user-select: none; -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    /* 한글은 어절 단위로만 줄바꿈, 띄어쓰기 없는 긴 문자열(URL 등)만 칸 끝에서 끊는다 */
+    word-break: keep-all; overflow-wrap: break-word;
+  }
+  /* ponytail: Figma dev-mode CSS emits width = full visual width with padding inside. */
+  .app-wrapper, .app-wrapper * { box-sizing: border-box; }
+  .nps { font-family: 'NationalPension', 'Pretendard', sans-serif; }
+
+  .card { background: white; border-radius: 12px; outline: 1px #DBDBDB solid; outline-offset: -1px;
+          position: absolute; }
+
+  /* ===== 금액 정산 ===== */
+  /* 테두리가 위→아래 초록→분홍 그라데이션. outline은 그라데이션을 못 받으므로
+     index.html의 .ai-chip과 같은 2겹 배경 기법을 쓴다. */
+  .pay { width: 380px; height: 163px; left: 16px; top: 144px; padding: 20px 16px;
+         outline: 0; border: 1px solid transparent;
+         background: linear-gradient(white, white) padding-box,
+                     linear-gradient(180deg, #71D369 0%, #FF9696 100%) border-box;
+         display: flex; align-items: center; }
+  .pay .ttl { display: flex; align-items: center; gap: 5px;
+              color: #499963; font-size: 20px; font-weight: 700; }
+  .pay .sum { padding-left: 16px; margin-top: 8px; display: flex; flex-direction: column; gap: 8px; }
+  .pay .amount { font-size: 24px; font-weight: 700; color: #474747; }
+  .pay .amount b { color: #499963; font-weight: 700; }
+  .pay .sub { color: #7F7F7F; font-size: 14px; }
+
+  /* 세로 막대 3개가 97px 기준선 위에 섬. SVG 좌표(x 253~350, y 29~136) 그대로.
+     기준선은 별도 div 대신 .chart의 border-bottom — box-sizing:border-box라
+     height 107 안에 1px 선 + 106px 막대 영역이 정확히 들어간다. */
+  .chart { position: absolute; left: 252px; top: 28px; width: 97px; height: 107px;
+           border-bottom: 1px solid #DBDBDB;
+           display: flex; justify-content: center; align-items: flex-end; gap: 6px; }
+  .chart .bar { border-radius: 50px 50px 0 0; }
+
+  /* ===== 하단 리포트 카드 2장 ===== */
+  .rcard { width: 183px; height: 220px; top: 322px; padding: 25px 16px 29px;
+           display: flex; flex-direction: column; align-items: center; }
+  .rcard h3 { margin: 0; color: #474747; font-size: 20px; font-weight: 700; text-align: center; }
+  .rcard .note { margin-top: 6px; color: #7F7F7F; font-size: 12px; font-weight: 400; text-align: center; }
+  .rcard .note b { font-weight: 700; }
+
+  /* 아래가 트인 게이지. 채워진 path 2개 대신 stroke 원 2개 —
+     구멍이 저절로 생기고 진행률이 dasharray 숫자 하나로 바뀐다.
+     r=40.5, stroke 18 → 안지름 63 / 바깥지름 99 (SVG와 동일).
+     둘레 C=254.47. 보이는 각도 x° → dash = C*x/360 - 18 (둥근 캡이 양끝 9px씩 더 그림).
+     트랙 244.4°, 진행 192.1° = 트랙의 78.6%. */
+  .gauge { width: 99px; height: 81px; position: relative; flex: 0 0 auto; }
+  .gauge circle { fill: none; stroke-width: 18; stroke-linecap: round;
+                  transform: rotate(160.53deg); transform-origin: 49.5px 49.5px; }
+  .gauge .track { stroke: #A6C673; stroke-opacity: .3; stroke-dasharray: 154.75 99.72; }
+  .gauge .fill  { stroke: #499963; stroke-dasharray: 117.79 136.68; }
+  /* 숫자는 SVG text 대신 HTML — Pretendard를 그대로 쓴다 */
+  .gauge .val { position: absolute; left: 0; top: 0; width: 99px; height: 99px;
+                display: flex; flex-direction: column; justify-content: center; align-items: center; }
+  .gauge .score { color: #499963; font-size: 20px; font-weight: 600; line-height: 1.2; }
+  .gauge hr { width: 30px; margin: 3px 0; border: 0; border-top: 0.5px solid #7F7F7F; }
+  .gauge .of { color: #7F7F7F; font-size: 12px; font-weight: 600; line-height: 1.2; }
+
+  .btn-feedback { align-self: stretch; padding: 10px 8px; background: #71D369; border: 0;
+                  border-radius: 23px; color: white; font: 500 16px 'Pretendard', sans-serif;
+                  cursor: pointer; }
+
+  /* ===== 하단 탭바 ===== */
+  /* ponytail: 탭바(64px) + 홈 인디케이터를 세로 flex로 쌓는다.
+     각각 절대좌표로 두면 탭바 실제 높이와 어긋나 겹친다. */
+  .bottom { width: 412px; left: 0; top: 798px; position: absolute;
+            display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .tabbar { width: 386px;
+            background: rgba(247, 248, 250, 0.75); border-radius: 60px;
+            display: flex; justify-content: center; align-items: center; gap: 20px; }
+  .tabbar > a { width: 56px; padding: 6px 0; text-decoration: none;
+                display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .tabbar .ico { align-self: stretch; height: 32px; position: relative;
+                 display: flex; justify-content: center; align-items: center; }
+  .tabbar span { color: #8FA18F; font-size: 12px; font-weight: 500; line-height: 16px;
+                 letter-spacing: 0.5px; text-align: center; }
+  /* ponytail: 채팅 아이콘만 중앙에서 1px 왼쪽 — Figma 배치 오차지만
+     app_1 하단 네비(left:17px)가 그대로 쓰고 있어서 두 화면을 맞춘다. */
+  .tabbar .chat svg { transform: translateX(-1px); }
+  .tabbar .on .ico { background: rgba(113, 211, 105, 0.25); border-radius: 39px; }
+  .tabbar .on span { color: #71D369; }
+  .home-ind { align-self: stretch; height: 24px; position: relative; }
+  .home-ind > div { width: 108px; height: 4px; left: 152px; top: 10px; position: absolute;
+                    background: #1D1B20; border-radius: 12px; }
+  /* ===== 금액 정산 상세 (금액 정산 카드 탭) ===== */
+  .pay { cursor: pointer; }
+  .detail { position: absolute; inset: 0; background: #F7F8FA; z-index: 5; }
+  .detail[hidden] { display: none; }
+  .detail .body { position: absolute; left: 0; top: 106px; width: 412px; height: 698px;
+                  overflow-y: auto; scrollbar-width: none; -ms-overflow-style: none; }
+  .detail .body::-webkit-scrollbar { display: none; }
+  .detail .body > div { padding: 8px 16px 24px; display: flex; flex-direction: column; gap: 24px; }
+  /* ponytail: Figma가 준 width(230/284)는 24px·20px 한글 한 줄보다 좁아 <br> 말고
+     자동 줄바꿈이 한 번 더 생긴다. 콘텐츠 폭(380) 그대로 두고 <br>만 쓴다. */
+  .lede { display: flex; flex-direction: column; gap: 5px; }
+  .lede p { margin: 0; font-size: 24px; font-weight: 600; line-height: 30px; color: black; }
+  .lede p b { color: #FF9696; font-weight: 700; }
+  .lede .delta { color: #7F7F7F; font-size: 14px; }
+
+  /* 누적 막대: 컨테이너가 radius 100 + overflow hidden이라 조각별 radius는 불필요 */
+  .stack { height: 22px; background: #EEEEEE; border-radius: 100px; overflow: hidden; display: flex; }
+
+  .items { padding: 16px; background: white; border-radius: 12px;
+           display: flex; flex-direction: column; gap: 10px; }
+  .items > div { display: flex; align-items: center; gap: 10px; }
+  .items .del { flex: 0 0 auto; padding: 0; background: none; border: 0; cursor: pointer; display: flex; }
+  /* 항목은 최소 1개 — 마지막 한 줄에선 제거 버튼이 사라진다 (JS 카운트 불필요) */
+  .items:has(> div:only-child) .del { display: none; }
+  .items .name { flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 8px; }
+  .items .name svg { flex: 0 0 auto; }
+  .items .name b { color: black; font-size: 16px; font-weight: 700; }
+  .items .name span { color: #474747; font-size: 12px; }
+  .items .amt { width: 128px; height: 44px; padding: 16px; border-radius: 12px;
+                background: rgba(209, 213, 220, 0.15);
+                outline: 1px #D1D5DC solid; outline-offset: -1px;
+                display: flex; justify-content: space-between; align-items: center;
+                color: #474747; font-size: 15px; }
+  .items .amt b { font-weight: 700; }
+
+  .adds { display: flex; gap: 16px; }
+  .adds button { width: 182px; height: 48px; padding: 14px 8px; background: #F9F9F9;
+                 border: 1px dashed #DBDBDB; border-radius: 30px; cursor: pointer;
+                 display: flex; justify-content: center; align-items: center; gap: 6px;
+                 color: #757C7D; font: 500 14px/20px 'Pretendard', sans-serif; white-space: nowrap; }
+
+  .total { display: flex; flex-direction: column; gap: 14px; }
+  .total .sub { display: flex; flex-direction: column; gap: 12px; }
+  .total .row { display: flex; justify-content: space-between; align-items: center; }
+  .total .row > :first-child { color: #7F7F7F; font-size: 14px; }
+  .total .row > :last-child { color: #7F7F7F; font-size: 15px; font-weight: 500; }
+  .total hr { margin: 0; border: 0; border-top: 1px solid #DBDBDB; }
+  .total .final > :first-child { color: black; }
+  .total .final > :last-child { color: #499963; font-size: 24px; font-weight: 700; }
+
+  .detail .cta { position: absolute; left: 0; top: 804px; width: 412px; height: 88px;
+                 background: rgba(247, 248, 250, 0.80);
+                 backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+  .detail .cta button { position: absolute; left: 16px; top: 12px; width: 380px; height: 52px;
+                        background: #71D369; border: 0; border-radius: 26px; cursor: pointer;
+                        color: white; font: 400 20px 'Pretendard', sans-serif; }   /* 피드백 1/3 버튼과 같은 글꼴 */
+  .detail .hd { position: absolute; left: 16px; top: 57px; display: flex; align-items: center; gap: 16px; }
+  .detail .hd button { padding: 0; background: none; border: 0; cursor: pointer; display: flex; }
+
+  /* 입력 → '정산 진행하기' → .done (결과 + 분석). 상단 블록을 복제하지 않고
+     같은 화면의 모드만 바꾼다 — 숫자를 두 벌 관리할 필요가 없다. */
+  .amt input { flex: 1 1 0; min-width: 0; width: 100%; border: 0; background: none; padding: 0;
+               outline: none; color: #474747; font: 700 15px 'Pretendard', sans-serif; }
+  .detail.done .amt input { pointer-events: none; }
+  .detail:not(.done) .analysis, .detail:not(.done) #editPill { display: none; }
+  .detail.done .adds { display: none; }   /* 결과 화면엔 추가·제거 버튼이 없다 */
+  .detail.done .items .del { display: none; }
+  .name b[contenteditable] { outline: none; min-width: 1em; overflow-wrap: anywhere; }
+  .name b:empty::before { content: '항목명'; color: #BABFCF; }
+  .detail.done .cta { display: none; }
+  .detail.done .body { height: 786px; }
+  .detail.done .body > div { padding-bottom: 174px; }   /* 24 + 여유 150 */
+
+  #editPill { height: 34px; padding: 6px 16px; background: #B3B3B3; border: 0; border-radius: 50px;
+              cursor: pointer; color: white; font: 600 12px/22px 'Pretendard', sans-serif; }
+  .analysis { display: flex; flex-direction: column; gap: 80px; }
+  .analysis hr { width: 380px; margin: 0; border: 0; border-top: 1px solid #DBDBDB; }
+  .sect { display: flex; flex-direction: column; gap: 20px; }
+  .sect h2 { margin: 0 0 5px; color: black; font-size: 20px; font-weight: 600; line-height: 25px; }
+  .sect .hint { color: #474747; font-size: 12px; font-weight: 300; }
+
+  /* ===== 상호 피드백 1/3 ===== */
+  .fb { position: absolute; inset: 0; background: #F7F8FA; z-index: 6; }
+  .fb[hidden] { display: none; }
+  /* 라디오/체크박스는 네이티브를 쓰고 화면 밖으로만 밀어낸다 — 상태 관리 JS가 없어진다.
+     display:none 대신 opacity:0 이라 키보드 포커스는 살아 있다. */
+  .fb input { position: absolute; width: 0; height: 0; opacity: 0; }
+
+  .fb .hd { position: absolute; left: 16px; top: 57px; z-index: 2;
+            display: flex; align-items: center; gap: 16px; }
+  .fb .hd button { padding: 0; background: none; border: 0; cursor: pointer; display: flex; }
+  .fb .hd h1 { margin: 0; font-size: 24px; font-weight: 700; color: black; }
+  .fb .bar { position: absolute; left: 16px; top: 96px; width: 380px; height: 6px; z-index: 2;
+             border-radius: 3px; background: #DBDBDB; overflow: hidden; }
+  .fb .bar div { width: 33.3%; height: 100%; border-radius: 3px;
+                 background: linear-gradient(90deg, #71D368, #FF9696);
+                 transition: width .45s cubic-bezier(.4, 0, .2, 1); }
+
+  .fb .body { position: absolute; left: 0; top: 106px; width: 412px; height: 698px;
+              padding: 38px 16px 24px; overflow-y: auto; scrollbar-width: none; }
+  .fb .body::-webkit-scrollbar { display: none; }
+  .fb h2 { margin: 0; font-size: 24px; font-weight: 700; line-height: 29px; color: black; }
+  .fb .sub { margin-top: 5px; color: #7F7F7F; font-size: 15px; }
+  .fb h3 { margin: 0; color: #474747; font-size: 20px; font-weight: 700; }
+  .fb h3 em { margin-left: 2px; color: #7F7F7F; font-size: 12px; font-weight: 400; font-style: normal; }
+
+  .fb .moods { margin-top: 20px; display: flex; gap: 26px; }
+  .fb .moods label { flex: 1; cursor: pointer;
+                     display: flex; flex-direction: column; align-items: center; gap: 13px; }
+  .fb .moods span { padding: 5px 10px; border-radius: 68px;
+                    color: #7F7F7F; font-size: 14px; font-weight: 500; }
+  .fb .moods :checked ~ span { background: #71D369; color: white; }
+
+  .fb hr { margin: 36px 0; border: 0; border-top: 1px solid #DBDBDB; }
+
+  .fb .opts { margin: 16px 0 24px; display: flex; flex-direction: column; gap: 12px; }
+  .fb .opts:last-child { margin-bottom: 0; }
+  .fb .opt { display: flex; align-items: center; gap: 24px; cursor: pointer;
+             color: #474747; font-size: 14px; }
+  .fb .opt i { width: 20px; height: 20px; flex: 0 0 auto; border-radius: 50%;
+               border: 1px solid #71D369; box-sizing: border-box;
+               background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M4.27 9.58 7.39 12.39c.4.36 1.01.34 1.39-.05L14.04 6.88' fill='none' stroke='white' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E")
+                           center / 0 no-repeat; }
+  .fb .opt :checked + i { background-color: #71D369; background-size: 20px; }
+
+  /* ===== 상호 피드백 2/3 (메시지) — 같은 화면의 모드만 바꾼다 ===== */
+  .fb.s2 .bar div { width: 66.7%; }
+  .fb .step2, .fb .step3 { display: none; }
+  .fb.s2 .step1, .fb.s3 .step1 { display: none; }
+  .fb.s2 .step2, .fb.s3 .step3 { display: block; }
+  .step2 .compose { margin-top: 36px; display: flex; flex-direction: column; gap: 16px; }
+  /* 업로드 칸 + 올린 사진들 — 칩과 같은 방식으로 오른쪽 화면 밖까지 가로 스크롤 */
+  .step2 .pics { margin-right: -16px; padding-right: 16px; display: flex; gap: 5px;
+                 overflow-x: auto; scrollbar-width: none; }
+  .step2 .pics::-webkit-scrollbar { display: none; }
+  .fb .pic { flex: 0 0 auto; position: relative; width: 160px; height: 160px;
+                background: white center / cover no-repeat;
+                border-radius: 12px; outline: 1px #71D369 solid; outline-offset: -1px; }
+  .step2 .pic button { position: absolute; left: 130px; top: 7.4px; padding: 0; border: 0;
+                       background: none; cursor: pointer; display: flex; }
+  .step2 .up { flex: 0 0 auto; width: 160px; height: 160px; background: white;
+               border-radius: 12px; outline: 1px #BABFCF solid; outline-offset: -1px; cursor: pointer;
+               display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 16px; }
+  .step2 .up span { color: #BABFCF; font: 500 15px 'Pretendard', sans-serif; text-transform: uppercase; }
+  .step2 textarea { width: 380px; height: 172px; padding: 16px 20px; box-sizing: border-box;
+                    background: white; border: 0; border-radius: 12px; resize: none;
+                    outline: 1px #DBDBDB solid; outline-offset: -1px;
+                    color: #474747; font: 400 15px/22px 'Pretendard', sans-serif; }
+  .step2 textarea::placeholder { color: #7F7F7F; }
+  .step2 .rec { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; }
+  .step2 .rec > div { color: #7F7F7F; font-size: 12px; }
+  /* 칩은 줄어들지 않고 오른쪽 화면 밖으로 이어진다 — 가로 스크롤 (body 패딩 16px 밖까지) */
+  .step2 .chips { margin-right: -16px; padding-right: 16px; display: flex; gap: 12px;
+                  overflow-x: auto; scrollbar-width: none; }
+  .step2 .chips::-webkit-scrollbar { display: none; }
+  /* 테두리가 위→아래 초록→분홍 그라데이션 — .pay와 같은 2겹 배경 기법 */
+  .step2 .chips button { flex: 0 0 auto; height: 56px; padding: 0 25px; border-radius: 28px;
+                         border: 1px solid transparent;
+                         background: linear-gradient(white, white) padding-box,
+                                     linear-gradient(180deg, #71D369 0%, #FF9696 100%) border-box;
+                         cursor: pointer; text-align: left;
+                         display: flex; align-items: center; gap: 6px;
+                         color: #474747; font: 400 12px/16px 'Pretendard', sans-serif; }
+  .step2 .chips svg { flex: 0 0 auto; }
+
+  /* ===== 상호 피드백 3/3 (확인) ===== */
+  .fb.s3 .bar div { width: 100%; }
+  /* ponytail: .card는 홈 화면 전역 클래스(position:absolute)라 여기선 .box를 쓴다 */
+  .step3 .box { margin-top: 36px; padding: 16px; background: white; border-radius: 12px;
+                outline: 1px #F0F0F0 solid; outline-offset: -1px;
+                display: flex; flex-direction: column; gap: 30px; }
+  .step3 .box + .box { margin-top: 16px; }
+  .step3 h3 { color: black; }
+  .step3 .picked { margin-top: 16px; display: flex; flex-direction: column; gap: 12px; }
+  .step3 .picked > div { display: flex; align-items: center; gap: 24px;
+                         color: #474747; font-size: 14px; }
+  /* 2/3에서 올린 사진 — 없으면 줄 자체가 사라진다 */
+  .step3 .pics { margin-top: 10px; display: flex; gap: 5px; overflow-x: auto; scrollbar-width: none; }
+  .step3 .pics::-webkit-scrollbar { display: none; }
+  .step3 .pics:empty { display: none; }
+  .step3 .msg { margin-top: 10px; min-height: 72px; padding: 16px 20px; box-sizing: border-box;
+                border-radius: 12px; outline: 1px #71D369 solid; outline-offset: -1px;
+                color: black; font: 400 15px/22px 'Pretendard', sans-serif; white-space: pre-wrap; }
+
+  /* 상대 피드백 메시지 — 아바타 + 말풍선 (왼쪽 아래 모서리만 각지게) */
+  /* 하단 버튼이 없으니 본문이 화면 끝까지 */
+  #peer .body { height: 786px; z-index: 1; }
+  #peer .deco { position: absolute; inset: 0; pointer-events: none; }
+  #peer .photos { margin-top: 16px; display: flex; gap: 5px; }
+  #peer .photos:empty { display: none; }
+  #peer .photos div { width: 160px; height: 160px; box-sizing: border-box; border-radius: 12px;
+                      border: 1px solid #71D369; background: #DEDEDE center / cover; }
+  #peer .photos:not(:empty) + .chat { margin-top: 10px; }
+  #peer .chat { margin-top: 16px; display: flex; align-items: flex-end; gap: 10px; }
+  #peer .who { width: 40px; display: flex; flex-direction: column; align-items: center; gap: 3px;
+               color: black; font-size: 10px; }
+  /* 흰 테두리는 inset 그림자로 — 사진 위에 겹쳐 그려진다 */
+  #peer .who i { width: 40px; height: 40px; border-radius: 50%; background: #C4C4C4 center / cover; /* 그림은 set-names(face)가 넣는다 */
+                 box-shadow: inset 0 0 0 2px white, 0 1px 2px rgba(0, 0, 0, .05); }
+  #peer .bubble { max-width: 268px; padding: 14px 25px; background: white;
+                  border-radius: 33px 33px 33px 0;
+                  color: #1A1A1A; font: 400 15px/22px 'Pretendard', sans-serif; white-space: pre-wrap; }
+
+  .fb .cta { position: absolute; left: 0; top: 804px; width: 412px; height: 88px;
+             background: rgba(247, 248, 250, 0.80);
+             backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+  /* 감정을 고르기 전까지는 비활성 — pointer-events로 눌림까지 막는다 */
+  .fb .cta button { position: absolute; left: 16px; top: 12px; width: 380px; height: 52px;
+                    background: #F2F7EA; border: 1px solid rgba(113, 211, 105, 0.15);
+                    border-radius: 26px; pointer-events: none;
+                    color: #499963; font: 400 20px 'Pretendard', sans-serif; }
+  /* 1/3은 세 질문 모두 응답('좋았던 점'은 최소 1개), 2/3은 메시지가 비어 있지 않아야 활성.
+     textarea 값은 :placeholder-shown으로 본다 — 칩으로 채워도 같이 풀린다 */
+  .fb:not(.s2) .step1:has(input[name="mood"]:checked):has(input[type="checkbox"]:checked):has(input[name="rule"]:checked) ~ .cta button:last-child,
+  .fb.s2 .step2:has(textarea:not(:placeholder-shown)) ~ .cta button:last-child,
+  .fb.s3 .step3 ~ .cta button:last-child {
+                    background: #71D369; border-color: #71D369; cursor: pointer; pointer-events: auto;
+                    color: white; }
+  /* 2/3·3/3은 '이전' 버튼이 생긴다 — 380 = 98 + 14 + 268.
+     #fb로 좁힌다: 상대 피드백 화면(.fb.s3)은 버튼 하나 그대로 */
+  .fb .cta .prev { display: none; }
+  #fb:is(.s2, .s3) .cta .prev { display: block; width: 98px; background: white; border: 0;
+                                cursor: pointer; pointer-events: auto; }
+  #fb:is(.s2, .s3) .cta button:last-child { left: 128px; width: 268px; }
+  #fb:is(.s2, .s3) .cta button { font: 500 18px 'Pretendard', sans-serif; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="aiStar" viewBox="0 0 19 19" fill="none"><path d="M1.80715 1.80506C1.78435 3.80386 2.53295 5.81026 4.05865 7.33596C5.26515 8.54246 6.77375 9.26256 8.33935 9.50006C6.77375 9.73756 5.26705 10.4596 4.06055 11.6642C2.53675 13.188 1.78815 15.1906 1.80905 17.1856C3.80595 17.2065 5.80855 16.4579 7.33045 14.9341C8.53885 13.7257 9.25895 12.2171 9.49645 10.6477C9.73205 12.219 10.454 13.7295 11.6624 14.9398C13.1862 16.4636 15.1926 17.2141 17.1914 17.1913C17.2142 15.1925 16.4656 13.188 14.9399 11.6623C13.7334 10.4558 12.2248 9.73566 10.6592 9.49816C12.2248 9.26066 13.7315 8.53866 14.938 7.33406C16.4618 5.81026 17.2104 3.80576 17.1895 1.80886C15.1926 1.78606 13.1881 2.53656 11.6643 4.06036C10.4559 5.26876 9.73585 6.77736 9.49835 8.34676C9.26275 6.77546 8.54075 5.26496 7.33235 4.05466C5.80855 2.53086 3.80405 1.78226 1.80715 1.80316V1.80506Z" fill="#BABFCF"/><path d="M9.5 7.59668C10.5575 7.59675 11.415 8.4542 11.415 9.51172C11.415 10.5692 10.5575 11.4267 9.5 11.4268C8.44248 11.4268 7.58504 10.5692 7.58496 9.51172C7.58496 8.45415 8.44243 7.59668 9.5 7.59668Z" fill="white" stroke="#BABFCF"/></symbol></svg>
+<div class="app-wrapper">
+
+  <!-- ===== 금액 정산 ===== -->
+  <div class="card pay">
+    <div>
+      <div class="ttl">
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+          <path d="M23.3943 4.61695C20.8043 2.01575 16.6015 2.01015 14.0003 4.59455C11.4019 2.01015 7.19632 2.01575 4.60632 4.61695C2.02752 7.20695 2.00512 11.3817 4.53912 13.9997C2.00792 16.6205 2.02752 20.7925 4.60632 23.3825C7.19632 25.9837 11.3991 25.9893 14.0003 23.4049C16.5987 25.9893 20.8043 25.9837 23.3943 23.3825C25.9731 20.7925 25.9955 16.6177 23.4615 13.9997C25.9927 11.3789 25.9731 7.20695 23.3943 4.61695Z" fill="#499963"/>
+          <path d="M17.559 14.0002C17.559 12.0347 15.9657 10.4414 14.0002 10.4414C12.0347 10.4414 10.4414 12.0347 10.4414 14.0002C10.4414 15.9657 12.0347 17.559 14.0002 17.559C15.9657 17.559 17.559 15.9657 17.559 14.0002Z" fill="#71D369"/>
+        </svg>
+        금액 정산
+      </div>
+      <div class="sum">
+        <div>
+          <div style="color: black; font-size: 14px">이번달 지출액</div>
+          <div class="amount"><b id="payTotal">781,810</b>원</div>
+        </div>
+        <div class="sub">이번 달 틈새살림 대기 1건</div>
+      </div>
+    </div>
+
+    <div class="chart">
+      <div class="bar" style="width: 24px; height: 106px; background: linear-gradient(180deg, #FF9696 0%, rgba(252,200,200,0.30) 100%)"></div>
+      <div class="bar" style="width: 24px; height: 92px;  background: linear-gradient(180deg, #499963 0%, rgba(153,223,155,0.30) 100%)"></div>
+      <div class="bar" style="width: 25px; height: 78px;  background: linear-gradient(180deg, #A6C673 0%, rgba(208,234,167,0.30) 100%)"></div>
+    </div>
+  </div>
+
+  <!-- ===== 틈새살이 리포트 ===== -->
+  <div class="card rcard" style="left: 16px; justify-content: space-between">
+    <div>
+      <h3>틈새살이 리포트</h3>
+      <div class="note"><b>리포트를 모두 확인했어요.</b><br>서로 배려한 따듯한 달이었네요!</div>
+    </div>
+    <div class="gauge">
+      <svg width="99" height="81" viewBox="0 0 99 81">
+        <circle class="track" cx="49.5" cy="49.5" r="40.5"/>
+        <circle class="fill"  cx="49.5" cy="49.5" r="40.5"/>
+      </svg>
+      <div class="val">
+        <div class="score">92</div>
+        <hr>
+        <div class="of">100</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 상호 피드백 ===== -->
+  <div class="card rcard" id="fbCard" style="left: 213px; justify-content: space-between">
+    <div>
+      <h3>상호 피드백</h3>
+      <div class="note"><b>피드백 대기 1건</b></div>
+    </div>
+    <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
+      <path d="M51 26.2222H26C22.5481 26.2222 19.75 28.9583 19.75 32.3334V44.5556C19.75 47.9308 22.5481 50.6667 26 50.6667H38.5L44.75 56.7779L51 50.6667C54.4518 50.6667 57.25 47.9308 57.25 44.5556V32.3334C57.25 28.9583 54.4518 26.2222 51 26.2222Z" fill="#C7CCDA"/>
+      <path d="M21 32.3334C21 29.6333 23.2385 27.4445 26 27.4445H51C53.7614 27.4445 56 29.6333 56 32.3334V44.5556C56 47.2558 53.7614 49.4445 51 49.4445C50.6685 49.4445 50.3506 49.5734 50.1162 49.8026L44.75 55.0496L39.3838 49.8026L39.3389 49.7608C39.1096 49.5578 38.8108 49.4445 38.5 49.4445H26C23.2385 49.4445 21 47.2558 21 44.5556V32.3334ZM18.5 44.5556C18.5 48.6058 21.8578 51.889 26 51.889H37.9824L43.8662 57.642C44.3544 58.1193 45.1456 58.1193 45.6338 57.642L51.5371 51.8699C55.4285 51.6006 58.5 48.4292 58.5 44.5556V32.3334C58.5 28.2833 55.1421 25 51 25H26C21.8578 25 18.5 28.2833 18.5 32.3334V44.5556Z" fill="#C7CCDA"/>
+      <path d="M17.9199 44.8003V41.5005C17.9199 40.7936 18.493 40.2205 19.1999 40.2205C19.9068 40.2205 20.4799 40.7936 20.4799 41.5005V44.8003C20.4799 47.6281 22.7722 49.9203 25.5999 49.9203H38.3999C38.7394 49.9203 39.0649 50.0553 39.3049 50.2953L44.7999 55.7903L50.2949 50.2953L50.3409 50.2516C50.5757 50.0389 50.8816 49.9203 51.1999 49.9203C54.0277 49.9203 56.3199 47.6281 56.3199 44.8003V32.0003C56.3199 29.1726 54.0277 26.8803 51.1999 26.8803H45C44.2931 26.8803 43.72 26.3072 43.72 25.6003C43.72 24.8934 44.2931 24.3203 45 24.3203L51.1999 24.3203C55.4416 24.3203 58.8799 27.7588 58.8799 32.0003V44.8003C58.8799 48.8571 55.7347 52.1785 51.7496 52.4603L45.7049 58.5053C45.205 59.0052 44.3948 59.0052 43.8949 58.5053L37.8699 52.4803H25.5999C21.3584 52.4803 17.9199 49.042 17.9199 44.8003Z" fill="#C7CCDA"/>
+      <path d="M44.7999 38.1203C45.5068 38.1203 46.0799 38.6934 46.0799 39.4003C46.0799 40.1072 45.5068 40.6803 44.7999 40.6803H31.9999C31.293 40.6803 30.7199 40.1072 30.7199 39.4003C30.7199 38.6934 31.293 38.1203 31.9999 38.1203H44.7999Z" fill="white"/>
+      <path d="M38.3999 43.5203C39.1068 43.5203 39.6799 44.0934 39.6799 44.8003C39.6799 45.5072 39.1068 46.0803 38.3999 46.0803H31.9999C31.293 46.0803 30.7199 45.5072 30.7199 44.8003C30.7199 44.0934 31.293 43.5203 31.9999 43.5203H38.3999Z" fill="white"/>
+      <path d="M12.8001 9.60031H38.4001C41.9348 9.60031 44.8001 12.4657 44.8001 16.0003V28.8003C44.8001 32.335 41.9348 35.2003 38.4001 35.2003H25.6001L19.2001 41.6003L12.8001 35.2003C9.26549 35.2003 6.40012 32.335 6.40012 28.8003V16.0003C6.40012 12.4657 9.26549 9.60031 12.8001 9.60031Z" fill="#499963"/>
+      <path d="M43.5201 16.0003C43.5201 13.1726 41.2279 10.8803 38.4001 10.8803H12.8001C9.97242 10.8803 7.68012 13.1726 7.68012 16.0003V28.8003C7.68012 31.6281 9.9724 33.9203 12.8001 33.9203C13.1396 33.9203 13.4651 34.0553 13.7051 34.2953L19.2001 39.7903L24.6951 34.2953L24.7411 34.2516C24.9759 34.0389 25.2818 33.9203 25.6001 33.9203H38.4001C41.2279 33.9203 43.5201 31.6281 43.5201 28.8003V16.0003ZM46.0801 28.8003C46.0801 33.042 42.6418 36.4803 38.4001 36.4803H26.1301L20.1051 42.5053C19.6052 43.0052 18.795 43.0052 18.2951 42.5053L12.2501 36.4603C8.2653 36.1783 5.12012 32.857 5.12012 28.8003V16.0003C5.12012 11.7588 8.55857 8.32031 12.8001 8.32031H38.4001C42.6418 8.32031 46.0801 11.7588 46.0801 16.0003V28.8003Z" fill="#499963"/>
+      <path d="M25.5426 20H25.4574C24.4362 20 23.5 20.8696 23.5 22C23.5 23.1304 24.3511 24 25.4574 24H25.5426C26.5638 24 27.5 23.1304 27.5 22C27.5 20.8696 26.6489 20 25.5426 20Z" fill="white"/>
+      <path d="M16.5426 20H16.4574C15.4362 20 14.5 20.8696 14.5 22C14.5 23.1304 15.3511 24 16.4574 24H16.5426C17.5638 24 18.5 23.1304 18.5 22C18.5 20.8696 17.6489 20 16.5426 20Z" fill="white"/>
+      <path d="M34.5426 20H34.4574C33.4362 20 32.5 20.8696 32.5 22C32.5 23.1304 33.3511 24 34.4574 24H34.5426C35.5638 24 36.5 23.1304 36.5 22C36.5 20.8696 35.6489 20 34.5426 20Z" fill="white"/>
+    </svg>
+    <button class="btn-feedback">피드백 작성하기</button>
+  </div>
+
+  <!-- ===== 고정 헤더 ===== -->
+  <div style="width: 412px; height: 106px; left: 0; top: 0; position: absolute; background: rgba(247, 248, 250, 0.80); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: 1; pointer-events: none"></div>
+  <div class="nps" style="left: 16px; top: 57px; position: absolute; color: black; font-size: 24px; font-weight: 700; z-index: 2">틈새살림</div>
+  <div style="left: 372px; top: 62px; position: absolute; z-index: 2; cursor: pointer">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+      <path d="M14.4551 21.5459C14.4551 22.9015 13.3556 24 12 24C10.6446 23.9998 9.5459 22.9014 9.5459 21.5459H14.4551ZM12 0C13.004 0.000192283 13.8174 0.814324 13.8174 1.81836V3C13.8174 3.10667 13.8067 3.21086 13.7891 3.3125C16.9402 4.10989 19.2723 6.96436 19.2725 10.3633V16.8184H18.7227C20.2811 16.8184 21.5449 18.0821 21.5449 19.6406C21.5447 20.0401 21.2208 20.3643 20.8213 20.3643H3.17773C2.77825 20.3643 2.4543 20.0401 2.4541 19.6406C2.4541 18.0821 3.71788 16.8184 5.27637 16.8184H4.72656V10.3633C4.72668 6.96421 7.05863 4.10974 10.21 3.3125C10.1923 3.21088 10.1816 3.10666 10.1816 3V1.81836C10.1816 0.814206 10.9958 0 12 0Z" fill="#BABFCF"/>
+    </svg>
+  </div>
+
+  <!-- ===== 하단 탭바 ===== -->
+  <div class="bottom">
+  <nav class="tabbar">
+    <a>
+      <div class="ico">
+        <svg width="56" height="32" viewBox="0 0 56 32" fill="none">
+          <path d="M21.0468 26C20.4968 26 20.0262 25.8043 19.6348 25.413C19.2428 25.021 19.0468 24.55 19.0468 24V16.05C18.6635 15.7 18.3678 15.25 18.1598 14.7C17.9512 14.15 17.9468 13.55 18.1468 12.9L19.1968 9.5C19.3302 9.06667 19.5678 8.70833 19.9098 8.425C20.2512 8.14167 20.6468 8 21.0968 8H34.9968C35.4468 8 35.8385 8.13733 36.1718 8.412C36.5052 8.68733 36.7468 9.05 36.8968 9.5L37.9468 12.9C38.1468 13.55 38.1428 14.1417 37.9348 14.675C37.7262 15.2083 37.4302 15.6667 37.0468 16.05V24C37.0468 24.55 36.8512 25.021 36.4598 25.413C36.0678 25.8043 35.5968 26 35.0468 26H21.0468ZM30.2468 15C30.6968 15 31.0385 14.8457 31.2718 14.537C31.5052 14.229 31.5968 13.8833 31.5468 13.5L30.9968 10H29.0468V13.7C29.0468 14.05 29.1635 14.3543 29.3968 14.613C29.6302 14.871 29.9135 15 30.2468 15ZM25.7468 15C26.1302 15 26.4428 14.871 26.6848 14.613C26.9262 14.3543 27.0468 14.05 27.0468 13.7V10H25.0968L24.5468 13.5C24.4802 13.9 24.5678 14.25 24.8098 14.55C25.0512 14.85 25.3635 15 25.7468 15ZM21.2968 15C21.5968 15 21.8592 14.8917 22.0838 14.675C22.3092 14.4583 22.4468 14.1833 22.4968 13.85L23.0468 10H21.0968L20.0968 13.35C19.9968 13.6833 20.0508 14.0417 20.2588 14.425C20.4675 14.8083 20.8135 15 21.2968 15ZM34.7968 15C35.2802 15 35.6302 14.8083 35.8468 14.425C36.0635 14.0417 36.1135 13.6833 35.9968 13.35L34.9468 10H33.0468L33.5968 13.85C33.6468 14.1833 33.7845 14.4583 34.0098 14.675C34.2345 14.8917 34.4968 15 34.7968 15Z" fill="#8FA18F"/>
+        </svg>
+      </div>
+      <span>골목 생활</span>
+    </a>
+
+    <a class="on">
+      <div class="ico">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <path fill-rule="evenodd" clip-rule="evenodd" d="M5 0C5.78897 0 6.42857 0.639593 6.42857 1.42857V2.85714H13.5716V1.42857C13.5716 0.639593 14.2112 0 15.0001 0C15.7891 0 16.4287 0.639593 16.4287 1.42857V2.85714H17.8571C19.0406 2.85714 20 3.81653 20 5V17.8571C20 19.0406 19.0406 20 17.8571 20H2.14286C0.95939 20 0 19.0406 0 17.8571V5C0 3.81653 0.95939 2.85714 2.14286 2.85714H3.57143V1.42857C3.57143 0.639593 4.21103 0 5 0ZM12.2325 7.24746C12.1655 7.18044 12.0745 7.1428 11.9798 7.14286C11.885 7.14291 11.7941 7.18063 11.7271 7.24773L5.83741 13.15C5.78276 13.2048 5.74737 13.2758 5.73657 13.3524L5.36063 16.0216C5.34503 16.1324 5.38224 16.2441 5.46117 16.3234C5.54009 16.4027 5.65161 16.4404 5.76247 16.4253L8.43164 16.0619C8.509 16.0514 8.58079 16.0157 8.636 15.9606L14.5383 10.0583C14.6777 9.91883 14.6777 9.6927 14.5383 9.55323L12.2325 7.24746Z" fill="#71D369"/>
+        </svg>
+      </div>
+      <span>틈새살림</span>
+    </a>
+
+    <a>
+      <div class="ico">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <path fill-rule="evenodd" clip-rule="evenodd" d="M0.454546 8.63557C0.164634 8.90579 0 9.28429 0 9.6806V17.8571C0 19.0406 0.95939 20 2.14286 20H8.57143V15.7143C8.57143 14.9253 9.21103 14.2857 10 14.2857C10.789 14.2857 11.4286 14.9253 11.4286 15.7143V20H17.8571C19.0406 20 20 19.0406 20 17.8571V9.6806C20 9.28429 19.8354 8.90579 19.5454 8.63557L10.4649 0.17196C10.1974 -0.0573198 9.80264 -0.0573201 9.53514 0.17196L0.454546 8.63557Z" fill="#8FA18F"/>
+        </svg>
+      </div>
+      <span>홈</span>
+    </a>
+
+    <a class="chat">
+      <div class="ico">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <path fill-rule="evenodd" clip-rule="evenodd" d="M7.87886 1.71768e-06C5.78927 1.71768e-06 3.78526 0.830093 2.30769 2.30766C0.830126 3.78523 3.92072e-05 5.78923 3.92072e-05 7.87883C-0.00488129 9.42969 0.453443 10.9467 1.31627 12.2354L0.263526 15.0526C0.147239 15.3637 0.413911 15.6831 0.740871 15.6244L4.43071 14.9606C4.79717 15.1391 5.17587 15.2887 5.56327 15.4081C5.4284 14.8176 5.35716 14.2028 5.35716 13.5714C5.35716 9.0348 9.03481 5.35714 13.5714 5.35714C14.2055 5.35714 14.8227 5.42897 15.4154 5.56494C15.1264 4.62397 14.663 3.74377 14.0476 2.97097C13.3091 2.04357 12.3709 1.29477 11.3028 0.78037C10.2347 0.265966 9.06436 -0.000781025 7.87886 1.71768e-06ZM18.1174 9.02575C16.9117 7.82016 15.2766 7.14286 13.5717 7.14286C12.6044 7.14222 11.6494 7.35987 10.778 7.77959C9.90649 8.1993 9.14096 8.81027 8.53843 9.56696C7.93589 10.3237 7.51187 11.2066 7.29799 12.1499C7.0841 13.0932 7.08583 14.0727 7.30309 15.0153C7.52033 15.9579 7.94747 16.8393 8.5527 17.5937C9.15793 18.3483 9.92563 18.9566 10.7986 19.3731C11.6716 19.7897 12.6273 20.004 13.5946 20C14.5619 19.9959 15.5157 19.7736 16.3851 19.3496L19.2594 19.8667C19.5864 19.9256 19.853 19.6061 19.7367 19.2949L18.9263 17.126C19.6303 16.0746 20.0043 14.8369 20.0003 13.5714C20.0003 11.8665 19.323 10.2313 18.1174 9.02575Z" fill="#8FA18F"/>
+        </svg>
+      </div>
+      <span>채팅</span>
+    </a>
+
+    <a>
+      <div class="ico">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <path d="M10 10C8.625 10 7.44792 9.51042 6.46875 8.53125C5.48958 7.55208 5 6.375 5 5C5 3.625 5.48958 2.44792 6.46875 1.46875C7.44792 0.489584 8.625 0 10 0C11.375 0 12.5521 0.489584 13.5312 1.46875C14.5104 2.44792 15 3.625 15 5C15 6.375 14.5104 7.55208 13.5312 8.53125C12.5521 9.51042 11.375 10 10 10ZM2.5 20C1.8125 20 1.22417 19.7554 0.735 19.2663C0.245 18.7763 0 18.1875 0 17.5V16.5C0 15.7917 0.1825 15.1404 0.5475 14.5463C0.911667 13.9529 1.39583 13.5 2 13.1875C3.29167 12.5417 4.60417 12.0571 5.9375 11.7338C7.27083 11.4113 8.625 11.25 10 11.25C11.375 11.25 12.7292 11.4113 14.0625 11.7338C15.3958 12.0571 16.7083 12.5417 18 13.1875C18.6042 13.5 19.0883 13.9529 19.4525 14.5463C19.8175 15.1404 20 15.7917 20 16.5V17.5C20 18.1875 19.7554 18.7763 19.2663 19.2663C18.7763 19.7554 18.1875 20 17.5 20H2.5Z" fill="#8FA18F"/>
+        </svg>
+      </div>
+      <span>마이</span>
+    </a>
+  </nav>
+  <div class="home-ind"><div></div></div>
+  </div>
+
+  <!-- ===== 금액 정산 상세 ===== -->
+  <div class="detail" id="detail" hidden>
+    <div class="body">
+      <div>
+        <div class="lede">
+          <p>이번 달 우리 집 총 지출은<br><b id="ledeTotal">781,810원</b>이에요.</p>
+          <div class="delta">지난달보다 전체 금액이 21% 늘었어요.</div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 16px">
+          <div class="stack">
+            <div style="width: 243px; background: #71D369"></div>
+            <div style="width: 51px;  background: #D2E6B0"></div>
+            <div style="width: 35px;  background: #FFD3D7"></div>
+            <div style="width: 33px;  background: #FF9696"></div>
+            <div style="width: 18px;  background: #EBEBEB"></div>
+          </div>
+
+          <div class="items">
+            <div>
+              <div class="name">
+                <svg width="12" height="15" viewBox="0 0 12 15" fill="none"><path d="M6 15C4.4125 15 3.01575 14.4364 1.80975 13.3093C0.60325 12.1817 0 10.6561 0 8.73248C0 7.52229 0.45 6.21019 1.35 4.79618C2.25 3.38217 3.6125 1.8535 5.4375 0.210191C5.5125 0.146497 5.6 0.0955414 5.7 0.0573249C5.8 0.0191083 5.9 0 6 0C6.1 0 6.2 0.0191083 6.3 0.0573249C6.4 0.0955414 6.4875 0.146497 6.5625 0.210191C8.3875 1.8535 9.75 3.38217 10.65 4.79618C11.55 6.21019 12 7.52229 12 8.73248C12 10.6561 11.3967 12.1817 10.1903 13.3093C8.98425 14.4364 7.5875 15 6 15ZM6.20625 12.707C6.35625 12.6943 6.4845 12.6339 6.591 12.5259C6.697 12.4173 6.75 12.2866 6.75 12.1338C6.75 11.9554 6.69375 11.8122 6.58125 11.7042C6.46875 11.5957 6.325 11.5478 6.15 11.5605C5.6375 11.5987 5.09375 11.4555 4.51875 11.131C3.94375 10.8059 3.58125 10.2166 3.43125 9.36306C3.40625 9.22293 3.3405 9.10828 3.234 9.01911C3.128 8.92994 3.00625 8.88535 2.86875 8.88535C2.69375 8.88535 2.55 8.9521 2.4375 9.08561C2.325 9.21962 2.2875 9.3758 2.325 9.55414C2.5375 10.7134 3.0375 11.5414 3.825 12.0382C4.6125 12.535 5.40625 12.758 6.20625 12.707Z" fill="#EBEBEB"/></svg>
+                <b>수도</b><span>3.40%</span>
+              </div>
+              <div class="amt"><input inputmode="numeric" value="26,590"><span>원</span></div>
+            </div>
+            <div>
+              <div class="name">
+                <svg width="12" height="15" viewBox="0 0 12 15" fill="none"><path d="M8.01853 0.158625L0.244578 7.12216C-0.235665 7.55738 0.0344716 8.36029 0.679799 8.42032L6.75038 9.00562L3.11103 14.0782C2.94595 14.3108 2.96846 14.6335 3.17106 14.8361C3.39618 15.0612 3.74886 15.0687 3.98148 14.8511L11.7554 7.88755C12.2357 7.45233 11.9655 6.64942 11.3202 6.58939L5.24962 6.00409L8.88897 0.931518C9.05405 0.6989 9.03154 0.376236 8.82894 0.173633C8.60382 -0.0514814 8.25114 -0.0589852 8.01853 0.158625Z" fill="#FFD3D7"/></svg>
+                <b>전기</b><span>6.83%</span>
+              </div>
+              <div class="amt"><input inputmode="numeric" value="53,400"><span>원</span></div>
+            </div>
+            <div>
+              <div class="name">
+                <svg width="11" height="15" viewBox="0 0 11 15" fill="none"><path d="M6.53125 0C6.53125 0 7.04 1.86357 7.04 3.37553C7.04 4.82419 6.11187 5.99859 4.69562 5.99859C3.2725 5.99859 2.2 4.82419 2.2 3.37553L2.22062 3.12236C0.831875 4.81013 0 6.99719 0 9.37412C0 12.4824 2.46125 15 5.5 15C8.53875 15 11 12.4824 11 9.37412C11 5.58369 9.21938 2.20113 6.53125 0ZM5.30062 12.8903C4.07687 12.8903 3.08687 11.9058 3.08687 10.6821C3.08687 9.5429 3.80875 8.74121 5.01875 8.48804C5.56643 8.3741 6.12246 8.19036 6.63232 7.9349C7.37349 7.56354 8.49697 7.83691 8.5655 8.66307C8.58886 8.9447 8.60063 9.22883 8.60063 9.51477C8.60063 11.3783 7.1225 12.8903 5.30062 12.8903Z" fill="#FF9696"/></svg>
+                <b>난방</b><span>3.95%</span>
+              </div>
+              <div class="amt"><input inputmode="numeric" value="30,910"><span>원</span></div>
+            </div>
+            <div>
+              <div class="name">
+                <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M7.45255 1.27061C6.4557 0.276768 5.09288 -0.133289 3.79348 0.0377482C3.11147 0.12752 2.9609 0.946833 3.44804 1.43251L5.3691 3.34778L3.35286 5.35793L1.43135 3.44222C0.944331 2.95667 0.125106 3.10925 0.0365257 3.79123C-0.131496 5.08484 0.279909 6.43518 1.27613 7.4284C2.5262 8.6747 4.35426 9.00303 5.90676 8.42008L11.2633 13.7605C11.9506 14.4457 13.0626 14.4457 13.7498 13.7605C14.4398 13.0726 14.4401 11.9553 13.7505 11.2671L8.42706 5.95428C9.04537 4.38636 8.72278 2.53701 7.45255 1.27061Z" fill="#D2E6B0"/></svg>
+                <b>관리비</b><span>7.67%</span>
+              </div>
+              <div class="amt"><input inputmode="numeric" value="60,000"><span>원</span></div>
+            </div>
+            <div>
+              <div class="name">
+                <svg width="14" height="13" viewBox="0 0 14 13" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" d="M7.70711 0.292891C7.31658 -0.0976303 6.68342 -0.0976303 6.29289 0.292891L0.292893 6.29289C-0.097631 6.68342 -0.097631 7.31658 0.292893 7.70711C0.683417 8.09763 1.31658 8.09763 1.70711 7.70711L2 7.41421V12C2 12.5523 2.44772 13 3 13H11C11.5523 13 12 12.5523 12 12V7.41421L12.2929 7.70711C12.6834 8.09763 13.3166 8.09763 13.7071 7.70711C14.0976 7.31658 14.0976 6.68342 13.7071 6.29289L7.70711 0.292891Z" fill="#71D369"/></svg>
+                <b>월세</b><span>78.14%</span>
+              </div>
+              <div class="amt"><input inputmode="numeric" value="610,910"><span>원</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="adds">
+          <button>
+            <svg width="22" height="18" viewBox="0 0 22 18" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" d="M7.22857 0.314286C7.37696 0.116443 7.60983 0 7.85714 0H14.1429C14.3902 0 14.623 0.116443 14.7714 0.314286L16.8929 3.14286H19.6429C20.268 3.14286 20.8676 3.39121 21.3097 3.83325C21.7517 4.27529 22 4.87484 22 5.5V14.9286C22 15.5537 21.7517 16.1533 21.3097 16.5954C20.8676 17.0374 20.268 17.2857 19.6429 17.2857H2.35714C1.73198 17.2857 1.13244 17.0374 0.690391 16.5954C0.248341 16.1533 0 15.5537 0 14.9286V5.5C0 4.87485 0.248341 4.27529 0.690391 3.83325C1.13244 3.39121 1.73198 3.14286 2.35714 3.14286H5.10714L7.22857 0.314286ZM14.8678 9.76065C14.8678 11.8968 13.1361 13.6284 11 13.6284C8.86386 13.6284 7.1322 11.8968 7.1322 9.76065C7.1322 7.62452 8.86386 5.89286 11 5.89286C13.1361 5.89286 14.8678 7.62452 14.8678 9.76065Z" fill="#757C7D"/></svg>
+            고지서 사진으로 추가
+          </button>
+          <button id="addItem">
+            <svg width="20" height="21" viewBox="0 0 20 21" fill="none"><path d="M2 20.025C1.45 20.025 0.979167 19.8292 0.5875 19.4375C0.195833 19.0458 0 18.575 0 18.025V4.025C0 3.475 0.195833 3.00417 0.5875 2.6125C0.979167 2.22083 1.45 2.025 2 2.025H10.925L8.925 4.025H2V18.025H16V11.075L18 9.075V18.025C18 18.575 17.8042 19.0458 17.4125 19.4375C17.0208 19.8292 16.55 20.025 16 20.025H2ZM6 14.025V9.775L15.175 0.6C15.375 0.4 15.6 0.25 15.85 0.15C16.1 0.05 16.35 0 16.6 0C16.8667 0 17.1208 0.05 17.3625 0.15C17.6042 0.25 17.825 0.4 18.025 0.6L19.425 2.025C19.6083 2.225 19.75 2.44583 19.85 2.6875C19.95 2.92917 20 3.175 20 3.425C20 3.675 19.9542 3.92083 19.8625 4.1625C19.7708 4.40417 19.625 4.625 19.425 4.825L10.25 14.025H6ZM8 12.025H9.4L15.2 6.225L14.5 5.525L13.775 4.825L8 10.6V12.025Z" fill="#757C7D"/></svg>
+            직접 항목 추가
+          </button>
+        </div>
+
+        <div class="total">
+          <div class="sub">
+            <div class="row"><div>전체 금액</div><div id="sumAll">781,810원</div></div>
+            <div class="row"><div>메이트와 나눌 금액</div><div id="sumMate">- 390,905원</div></div>
+          </div>
+          <hr>
+          <div class="row final"><div>내가 지불해야 될 금액</div><div id="sumMine">390,905원</div></div>
+        </div>
+
+        <button id="editPill">수정하기</button>
+
+        <div class="analysis">
+          <hr>
+          <div class="sect">
+            <div>
+              <h2>수도세와 기타 비용이 <br>지난달보다 5.5% 상승했어요.</h2>
+              <div class="hint">샤워 시간이나 세탁 횟수 등 공동 규칙을 한번 점검해 볼까요?</div>
+            </div>
+            <svg width="380" height="260" viewBox="0 0 380 260" fill="none">
+              <rect width="380" height="260" rx="12" fill="white"/>
+              <line x1="16" y1="217.5" x2="364" y2="217.5" stroke="#EBEBEB"/>
+              <rect x="22" y="19.5459" width="14.9697" height="6.90909" rx="3.45455" fill="#FF9696"/>
+              <path d="M43.4199 20.7305C43.4199 22.5 44.709 24.293 46.2441 24.9609L45.7285 25.6875C44.5098 25.1309 43.4551 23.9297 42.9746 22.4883C42.4824 24.0176 41.4336 25.3477 40.2441 25.9453L39.6934 25.2188C41.1816 24.5039 42.4824 22.5352 42.4941 20.7305V19.3711H40.0332V18.6094H45.9043V19.3711H43.4199V20.7305ZM48.2832 17.5312V27.9492H47.3574V17.5312H48.2832ZM51.4941 18.293V22.3945C52.9766 22.4004 54.5176 22.3066 56.2168 21.9492L56.3223 22.7109C54.5527 23.0859 52.9707 23.1797 51.4004 23.1797H50.5684V18.293H51.4941ZM58.209 17.543V20.6367H59.7793V21.4336H58.209V25.0664H57.2949V17.543H58.209ZM58.584 26.9531V27.7266H51.7285V24.3281H52.6426V26.9531H58.584ZM68.5566 18.1406V18.8906H64.8301V21.6328C66.8691 21.6445 68.0996 21.5684 69.5293 21.2812L69.6465 22.0195C68.1582 22.3359 66.8809 22.3945 64.7363 22.3828H63.9277V18.1406H68.5566ZM71.5918 17.5312V19.7461H73.1621V20.5078H71.5918V22.793H70.6777V17.5312H71.5918ZM71.5918 23.3086V25.875H65.873V27.0586H71.9785V27.8086H64.9707V25.1484H70.6777V24.0586H64.9473V23.3086H71.5918Z" fill="black"/>
+              <rect x="82.2715" y="19.5459" width="14.9697" height="6.90909" rx="3.45455" fill="#71D369"/>
+              <path d="M108.557 17.5312V27.9727H107.631V17.5312H108.557ZM103.014 18.3398C104.561 18.3516 105.674 19.7578 105.674 21.9727C105.674 24.1875 104.561 25.5938 103.014 25.5938C101.455 25.5938 100.354 24.1875 100.354 21.9727C100.354 19.7578 101.455 18.3516 103.014 18.3398ZM103.014 19.1602C101.971 19.1719 101.244 20.2734 101.244 21.9727C101.244 23.6719 101.971 24.7734 103.014 24.7734C104.057 24.7734 104.783 23.6719 104.783 21.9727C104.783 20.2734 104.057 19.1719 103.014 19.1602ZM118.975 17.543V25.2539H118.049V21.2461H115.588V23.4727H110.865V18.2344H111.779V20.0859H114.686V18.2344H115.588V20.4727H118.049V17.543H118.975ZM119.209 26.9531V27.7266H112.236V24.4922H113.162V26.9531H119.209ZM111.779 22.7109H114.686V20.8125H111.779V22.7109ZM128.83 18.1406V18.8906H125.104V21.6328C127.143 21.6445 128.373 21.5684 129.803 21.2812L129.92 22.0195C128.432 22.3359 127.154 22.3945 125.01 22.3828H124.201V18.1406H128.83ZM131.865 17.5312V19.7461H133.436V20.5078H131.865V22.793H130.951V17.5312H131.865ZM131.865 23.3086V25.875H126.146V27.0586H132.252V27.8086H125.244V25.1484H130.951V24.0586H125.221V23.3086H131.865Z" fill="black"/>
+              <path d="M22.0605 128.909C22.0605 120.323 29.0205 113.363 37.606 113.363C46.1915 113.363 53.1515 120.323 53.1515 128.909V217H22.0605V128.909Z" fill="#FF9696"/>
+              <path d="M57.1514 106.454C57.1514 98.1865 63.8535 91.4844 72.1211 91.4844C80.3886 91.4844 87.0908 98.1865 87.0908 106.454V217H57.1514V106.454Z" fill="#71D369"/>
+              <path d="M44.6675 229.504C44.6675 230.969 46.5894 232.246 48.4644 232.504L48.0894 233.254C46.4722 232.984 44.8726 232.088 44.1987 230.805C43.5308 232.094 41.9253 232.984 40.3081 233.254L39.9331 232.504C41.8081 232.246 43.7183 230.992 43.7183 229.504V228.906H44.6675V229.504ZM48.9331 234.402V235.176H44.6206V238.949H43.7183V235.176H39.4409V234.402H48.9331ZM58.2261 233.418V234.168H55.0034V236.863H59.3511V237.637H49.812V236.863H54.1011V234.168H51.0308V229.387H58.1206V230.137H51.9566V233.418H58.2261ZM63.2769 231.496C63.2769 233.148 64.0855 234.941 65.4683 235.762L64.9409 236.477C63.939 235.867 63.2183 234.754 62.855 233.488C62.4683 234.871 61.6948 236.061 60.6519 236.699L60.0659 236.008C61.5073 235.164 62.3862 233.312 62.3862 231.531V229.516H63.2769V231.496ZM69.1128 228.531V238.949H68.2222V228.531H69.1128ZM66.9566 228.754V238.422H66.0894V233.055H64.3198V232.27H66.0894V228.754H66.9566Z" fill="#7F7F7F"/>
+              <path d="M111.091 143.878C111.091 135.293 118.051 128.333 126.636 128.333C135.222 128.333 142.182 135.293 142.182 143.878V217H111.091V143.878Z" fill="#FFD3D7"/>
+              <path d="M146.182 151.363C146.182 143.096 152.884 136.394 161.151 136.394C169.419 136.394 176.121 143.096 176.121 151.363V217H146.182V151.363Z" fill="#D2E6B0"/>
+              <path d="M137.108 228.543V236.184H136.182V232.188H134.038V231.426H136.182V228.543H137.108ZM137.401 237.953V238.727H130.417V235.492H131.342V237.953H137.401ZM132.092 230.688C132.092 232.035 133.135 233.348 134.659 233.863L134.178 234.602C133.001 234.18 132.092 233.301 131.647 232.223C131.196 233.424 130.235 234.385 128.999 234.848L128.518 234.098C130.053 233.559 131.167 232.188 131.167 230.688V230.148H128.811V229.387H134.424V230.148H132.092V230.688ZM147.456 228.531V238.949H146.53V228.531H147.456ZM144.374 229.668C144.362 232.668 142.967 235.316 139.475 236.992L138.971 236.242C141.79 234.906 143.225 232.908 143.436 230.418H139.452V229.668H144.374ZM152.307 231.496C152.307 233.148 153.116 234.941 154.499 235.762L153.971 236.477C152.969 235.867 152.249 234.754 151.885 233.488C151.499 234.871 150.725 236.061 149.682 236.699L149.096 236.008C150.538 235.164 151.417 233.312 151.417 231.531V229.516H152.307V231.496ZM158.143 228.531V238.949H157.252V228.531H158.143ZM155.987 228.754V238.422H155.12V233.055H153.35V232.27H155.12V228.754H155.987Z" fill="#7F7F7F"/>
+              <path d="M200.121 99.2578C200.121 90.9902 206.823 84.2881 215.091 84.2881C223.358 84.2881 230.06 90.9902 230.06 99.2578V216.712H200.121V99.2578Z" fill="#FFD3D7"/>
+              <path d="M234.061 99.8335C234.061 91.248 241.02 84.2881 249.606 84.2881C258.192 84.2881 265.151 91.248 265.151 99.8335V216.712H234.061V99.8335Z" fill="#D2E6B0"/>
+              <path d="M231.277 228.543V234.684H230.351V234.109H228.242V233.5H230.351V228.543H231.277ZM222.652 232.469C224.667 232.48 227.246 232.457 229.496 232.211L229.554 232.809C228.535 232.955 227.474 233.043 226.437 233.09V234.719H225.535V233.125C224.55 233.16 223.607 233.166 222.757 233.16L222.652 232.469ZM231.277 235.059V237.215H225.195V238.152H231.617V238.832H224.292V236.57H230.363V235.727H224.246V235.059H231.277ZM226.05 228.742C227.597 228.742 228.628 229.352 228.64 230.312C228.628 231.285 227.597 231.871 226.05 231.871C224.48 231.871 223.46 231.285 223.46 230.312C223.46 229.352 224.48 228.742 226.05 228.742ZM226.05 229.387C224.996 229.387 224.316 229.75 224.328 230.312C224.316 230.863 224.996 231.238 226.05 231.238C227.093 231.238 227.773 230.863 227.773 230.312C227.773 229.75 227.093 229.387 226.05 229.387ZM236.152 231.496C236.152 233.148 236.96 234.941 238.343 235.762L237.816 236.477C236.814 235.867 236.093 234.754 235.73 233.488C235.343 234.871 234.57 236.061 233.527 236.699L232.941 236.008C234.382 235.164 235.261 233.312 235.261 231.531V229.516H236.152V231.496ZM241.988 228.531V238.949H241.097V228.531H241.988ZM239.832 228.754V238.422H238.964V233.055H237.195V232.27H238.964V228.754H239.832Z" fill="#7F7F7F"/>
+              <path d="M289.151 173.242C289.151 164.975 295.854 158.272 304.121 158.272C312.389 158.272 319.091 164.975 319.091 173.242V217H289.151V173.242Z" fill="#FF9696"/>
+              <path d="M323.091 136.969C323.091 128.384 330.051 121.424 338.636 121.424C347.222 121.424 354.182 128.384 354.182 136.969V217H323.091V136.969Z" fill="#71D369"/>
+              <path d="M320.331 228.531V238.949H319.405V228.531H320.331ZM317.249 229.668C317.237 232.668 315.842 235.316 312.35 236.992L311.846 236.242C314.665 234.906 316.1 232.908 316.311 230.418H312.327V229.668H317.249ZM327.432 229.48V230.254H323.471V232.41H327.198V233.16H323.471V235.68C325.346 235.68 326.665 235.604 328.229 235.34L328.334 236.102C326.706 236.371 325.334 236.43 323.366 236.441H322.545V229.48H327.432ZM330.151 228.531V232.727H331.897V233.512H330.151V238.949H329.237V228.531H330.151Z" fill="#7F7F7F"/>
+            </svg>
+          </div>
+
+          <hr>
+          <div class="sect">
+            <div>
+              <h2>우리 집이 구독 중인 '세탁 서비스' <br>이용률이 지난달 대비 30% 하락했어요.</h2>
+              <div class="hint">멤버십 등급을 낮추면 매달 12,000원을 더 아낄 수 있어요.</div>
+            </div>
+            <svg width="380" height="260" viewBox="0 0 380 260" fill="none">
+              <rect width="380" height="260" rx="12" fill="white"/>
+              <rect x="22" y="19.5459" width="14.9697" height="6.90909" rx="3.45455" fill="#FF9696"/>
+              <path d="M43.4199 20.7305C43.4199 22.5 44.709 24.293 46.2441 24.9609L45.7285 25.6875C44.5098 25.1309 43.4551 23.9297 42.9746 22.4883C42.4824 24.0176 41.4336 25.3477 40.2441 25.9453L39.6934 25.2188C41.1816 24.5039 42.4824 22.5352 42.4941 20.7305V19.3711H40.0332V18.6094H45.9043V19.3711H43.4199V20.7305ZM48.2832 17.5312V27.9492H47.3574V17.5312H48.2832ZM51.4941 18.293V22.3945C52.9766 22.4004 54.5176 22.3066 56.2168 21.9492L56.3223 22.7109C54.5527 23.0859 52.9707 23.1797 51.4004 23.1797H50.5684V18.293H51.4941ZM58.209 17.543V20.6367H59.7793V21.4336H58.209V25.0664H57.2949V17.543H58.209ZM58.584 26.9531V27.7266H51.7285V24.3281H52.6426V26.9531H58.584ZM68.5566 18.1406V18.8906H64.8301V21.6328C66.8691 21.6445 68.0996 21.5684 69.5293 21.2812L69.6465 22.0195C68.1582 22.3359 66.8809 22.3945 64.7363 22.3828H63.9277V18.1406H68.5566ZM71.5918 17.5312V19.7461H73.1621V20.5078H71.5918V22.793H70.6777V17.5312H71.5918ZM71.5918 23.3086V25.875H65.873V27.0586H71.9785V27.8086H64.9707V25.1484H70.6777V24.0586H64.9473V23.3086H71.5918Z" fill="black"/>
+              <rect x="82.2715" y="19.5459" width="14.9697" height="6.90909" rx="3.45455" fill="#71D369"/>
+              <path d="M108.557 17.5312V27.9727H107.631V17.5312H108.557ZM103.014 18.3398C104.561 18.3516 105.674 19.7578 105.674 21.9727C105.674 24.1875 104.561 25.5938 103.014 25.5938C101.455 25.5938 100.354 24.1875 100.354 21.9727C100.354 19.7578 101.455 18.3516 103.014 18.3398ZM103.014 19.1602C101.971 19.1719 101.244 20.2734 101.244 21.9727C101.244 23.6719 101.971 24.7734 103.014 24.7734C104.057 24.7734 104.783 23.6719 104.783 21.9727C104.783 20.2734 104.057 19.1719 103.014 19.1602ZM118.975 17.543V25.2539H118.049V21.2461H115.588V23.4727H110.865V18.2344H111.779V20.0859H114.686V18.2344H115.588V20.4727H118.049V17.543H118.975ZM119.209 26.9531V27.7266H112.236V24.4922H113.162V26.9531H119.209ZM111.779 22.7109H114.686V20.8125H111.779V22.7109ZM128.83 18.1406V18.8906H125.104V21.6328C127.143 21.6445 128.373 21.5684 129.803 21.2812L129.92 22.0195C128.432 22.3359 127.154 22.3945 125.01 22.3828H124.201V18.1406H128.83ZM131.865 17.5312V19.7461H133.436V20.5078H131.865V22.793H130.951V17.5312H131.865ZM131.865 23.3086V25.875H126.146V27.0586H132.252V27.8086H125.244V25.1484H130.951V24.0586H125.221V23.3086H131.865Z" fill="black"/>
+              <path d="M23.7969 226.516V235H22.7305V227.617H22.6836L20.6211 228.988V227.922L22.7305 226.516H23.7969ZM34.2734 225.543V231.684H33.3477V231.109H31.2383V230.5H33.3477V225.543H34.2734ZM25.6484 229.469C27.6641 229.48 30.2422 229.457 32.4922 229.211L32.5508 229.809C31.5312 229.955 30.4707 230.043 29.4336 230.09V231.719H28.5312V230.125C27.5469 230.16 26.6035 230.166 25.7539 230.16L25.6484 229.469ZM34.2734 232.059V234.215H28.1914V235.152H34.6133V235.832H27.2891V233.57H33.3594V232.727H27.2422V232.059H34.2734ZM29.0469 225.742C30.5938 225.742 31.625 226.352 31.6367 227.312C31.625 228.285 30.5938 228.871 29.0469 228.871C27.4766 228.871 26.457 228.285 26.457 227.312C26.457 226.352 27.4766 225.742 29.0469 225.742ZM29.0469 226.387C27.9922 226.387 27.3125 226.75 27.3242 227.312C27.3125 227.863 27.9922 228.238 29.0469 228.238C30.0898 228.238 30.7695 227.863 30.7695 227.312C30.7695 226.75 30.0898 226.387 29.0469 226.387Z" fill="#7F7F7F"/>
+              <path d="M85.5895 235L85.5778 234.227L88.4723 231.18C89.4801 230.113 89.9606 229.539 89.9606 228.754C89.9606 227.887 89.2223 227.312 88.2731 227.312C87.2653 227.312 86.6208 227.957 86.6208 228.906H85.6247C85.613 227.406 86.7731 226.398 88.3083 226.398C89.8434 226.398 90.945 227.43 90.945 228.754C90.945 229.703 90.4997 230.441 88.9997 231.988L87.0544 233.992V234.062H91.0973V235H85.5895ZM100.847 225.543V231.684H99.9215V231.109H97.8122V230.5H99.9215V225.543H100.847ZM92.2223 229.469C94.238 229.48 96.8161 229.457 99.0661 229.211L99.1247 229.809C98.1051 229.955 97.0446 230.043 96.0075 230.09V231.719H95.1051V230.125C94.1208 230.16 93.1774 230.166 92.3278 230.16L92.2223 229.469ZM100.847 232.059V234.215H94.7653V235.152H101.187V235.832H93.863V233.57H99.9333V232.727H93.8161V232.059H100.847ZM95.6208 225.742C97.1676 225.742 98.1989 226.352 98.2106 227.312C98.1989 228.285 97.1676 228.871 95.6208 228.871C94.0505 228.871 93.0309 228.285 93.0309 227.312C93.0309 226.352 94.0505 225.742 95.6208 225.742ZM95.6208 226.387C94.5661 226.387 93.8864 226.75 93.8981 227.312C93.8864 227.863 94.5661 228.238 95.6208 228.238C96.6637 228.238 97.3434 227.863 97.3434 227.312C97.3434 226.75 96.6637 226.387 95.6208 226.387Z" fill="#7F7F7F"/>
+              <path d="M152.672 235.117C150.984 235.117 149.777 234.215 149.718 232.867H150.785C150.843 233.676 151.652 234.18 152.66 234.18C153.773 234.18 154.593 233.57 154.593 232.691C154.593 231.766 153.855 231.109 152.531 231.109H151.84V230.184H152.531C153.562 230.184 154.277 229.609 154.277 228.73C154.277 227.887 153.656 227.312 152.695 227.312C151.793 227.312 150.961 227.816 150.914 228.648H149.894C149.953 227.301 151.195 226.398 152.707 226.398C154.324 226.398 155.308 227.453 155.297 228.672C155.308 229.633 154.746 230.348 153.855 230.594V230.652C154.957 230.828 155.636 231.613 155.625 232.691C155.636 234.086 154.359 235.117 152.672 235.117ZM165.363 225.543V231.684H164.437V231.109H162.328V230.5H164.437V225.543H165.363ZM156.738 229.469C158.754 229.48 161.332 229.457 163.582 229.211L163.64 229.809C162.621 229.955 161.56 230.043 160.523 230.09V231.719H159.621V230.125C158.636 230.16 157.693 230.166 156.843 230.16L156.738 229.469ZM165.363 232.059V234.215H159.281V235.152H165.703V235.832H158.379V233.57H164.449V232.727H158.332V232.059H165.363ZM160.136 225.742C161.683 225.742 162.715 226.352 162.726 227.312C162.715 228.285 161.683 228.871 160.136 228.871C158.566 228.871 157.547 228.285 157.547 227.312C157.547 226.352 158.566 225.742 160.136 225.742ZM160.136 226.387C159.082 226.387 158.402 226.75 158.414 227.312C158.402 227.863 159.082 228.238 160.136 228.238C161.179 228.238 161.859 227.863 161.859 227.312C161.859 226.75 161.179 226.387 160.136 226.387Z" fill="#7F7F7F"/>
+              <path d="M213.823 233.266V232.398L217.643 226.516H218.944V232.34H220.128V233.266H218.944V235H217.936V233.266H213.823ZM214.96 232.34H217.936V227.852H217.831L214.96 232.27V232.34ZM229.737 225.543V231.684H228.811V231.109H226.702V230.5H228.811V225.543H229.737ZM221.112 229.469C223.128 229.48 225.706 229.457 227.956 229.211L228.014 229.809C226.995 229.955 225.934 230.043 224.897 230.09V231.719H223.995V230.125C223.01 230.16 222.067 230.166 221.217 230.16L221.112 229.469ZM229.737 232.059V234.215H223.655V235.152H230.077V235.832H222.753V233.57H228.823V232.727H222.706V232.059H229.737ZM224.51 225.742C226.057 225.742 227.089 226.352 227.1 227.312C227.089 228.285 226.057 228.871 224.51 228.871C222.94 228.871 221.921 228.285 221.921 227.312C221.921 226.352 222.94 225.742 224.51 225.742ZM224.51 226.387C223.456 226.387 222.776 226.75 222.788 227.312C222.776 227.863 223.456 228.238 224.51 228.238C225.553 228.238 226.233 227.863 226.233 227.312C226.233 226.75 225.553 226.387 224.51 226.387Z" fill="#7F7F7F"/>
+              <path d="M281.297 235.117C279.761 235.117 278.601 234.168 278.543 232.867H279.562C279.644 233.629 280.382 234.191 281.297 234.191C282.398 234.191 283.195 233.383 283.195 232.316C283.195 231.215 282.363 230.406 281.226 230.395C280.511 230.383 279.961 230.605 279.644 231.156H278.625L279.222 226.516H283.816V227.453H280.101L279.785 229.938H279.867C280.242 229.645 280.816 229.445 281.414 229.445C283.031 229.445 284.226 230.641 284.226 232.293C284.226 233.934 282.984 235.117 281.297 235.117ZM293.906 225.543V231.684H292.98V231.109H290.871V230.5H292.98V225.543H293.906ZM285.281 229.469C287.297 229.48 289.875 229.457 292.125 229.211L292.183 229.809C291.164 229.955 290.103 230.043 289.066 230.09V231.719H288.164V230.125C287.179 230.16 286.236 230.166 285.386 230.16L285.281 229.469ZM293.906 232.059V234.215H287.824V235.152H294.246V235.832H286.922V233.57H292.992V232.727H286.875V232.059H293.906ZM288.679 225.742C290.226 225.742 291.257 226.352 291.269 227.312C291.257 228.285 290.226 228.871 288.679 228.871C287.109 228.871 286.09 228.285 286.09 227.312C286.09 226.352 287.109 225.742 288.679 225.742ZM288.679 226.387C287.625 226.387 286.945 226.75 286.957 227.312C286.945 227.863 287.625 228.238 288.679 228.238C289.722 228.238 290.402 227.863 290.402 227.312C290.402 226.75 289.722 226.387 288.679 226.387Z" fill="#7F7F7F"/>
+              <path d="M345.417 235.117C343.94 235.094 342.323 234.227 342.323 231.086C342.323 228.086 343.554 226.398 345.546 226.398C347.034 226.398 348.077 227.312 348.3 228.648H347.257C347.058 227.898 346.495 227.336 345.546 227.336C344.151 227.336 343.319 228.531 343.319 230.57H343.425C343.917 229.867 344.69 229.445 345.604 229.445C347.116 229.445 348.37 230.617 348.37 232.258C348.37 233.852 347.198 235.129 345.417 235.117ZM345.417 234.191C346.519 234.191 347.339 233.324 347.351 232.27C347.339 231.227 346.554 230.371 345.44 230.371C344.327 230.371 343.472 231.273 343.46 232.281C343.46 233.277 344.28 234.191 345.417 234.191ZM358.038 225.543V231.684H357.112V231.109H355.003V230.5H357.112V225.543H358.038ZM349.413 229.469C351.429 229.48 354.007 229.457 356.257 229.211L356.315 229.809C355.296 229.955 354.235 230.043 353.198 230.09V231.719H352.296V230.125C351.312 230.16 350.368 230.166 349.519 230.16L349.413 229.469ZM358.038 232.059V234.215H351.956V235.152H358.378V235.832H351.054V233.57H357.124V232.727H351.007V232.059H358.038ZM352.812 225.742C354.358 225.742 355.39 226.352 355.401 227.312C355.39 228.285 354.358 228.871 352.812 228.871C351.241 228.871 350.222 228.285 350.222 227.312C350.222 226.352 351.241 225.742 352.812 225.742ZM352.812 226.387C351.757 226.387 351.077 226.75 351.089 227.312C351.077 227.863 351.757 228.238 352.812 228.238C353.854 228.238 354.534 227.863 354.534 227.312C354.534 226.75 353.854 226.387 352.812 226.387Z" fill="#7F7F7F"/>
+              <g clip-path="url(#areaClip)">
+                <path d="M20.5 116.862L97 86L160.458 89.0947L219.687 104.126L291 125L359.5 164.5V217H20.5V116.862Z" fill="#F297A0" fill-opacity="0.3"/>
+                <path d="M97.112 83.3354C98.4125 83.3902 99.4543 84.3686 99.6364 85.6108L157.485 88.0454C157.949 86.8062 159.273 86.0831 160.592 86.4057C161.857 86.7149 162.693 87.8796 162.635 89.1352L217.806 102.62C218.421 101.604 219.663 101.088 220.853 101.446C222.1 101.82 222.868 103.026 222.737 104.275L287.603 123.757C287.653 123.65 287.709 123.543 287.775 123.441C288.57 122.201 290.211 121.854 291.44 122.665C292.065 123.078 292.46 123.711 292.594 124.396C292.697 124.835 292.692 125.305 292.553 125.767C292.55 125.778 292.545 125.789 292.542 125.799L355.003 161.862C355.85 160.851 357.33 160.613 358.463 161.361C359.691 162.172 360.043 163.835 359.248 165.075C358.453 166.314 356.813 166.662 355.584 165.851C354.544 165.164 354.136 163.869 354.515 162.735L292.069 126.681C291.408 127.495 290.299 127.875 289.233 127.555C287.986 127.181 287.218 125.975 287.348 124.726L222.449 105.233C221.87 106.347 220.565 106.93 219.318 106.555C218.018 106.164 217.238 104.869 217.457 103.564L162.404 90.1088C161.892 91.2533 160.624 91.9042 159.36 91.5952C158.154 91.3003 157.34 90.2274 157.316 89.0395L99.5944 86.6098C99.3086 87.8325 98.188 88.7202 96.8874 88.6655C95.9893 88.6276 95.2155 88.148 94.7614 87.4467L25.614 115.48C25.8604 116.711 25.208 117.983 24.0017 118.472C22.6368 119.025 21.0813 118.367 20.528 117.002C19.9748 115.638 20.6329 114.082 21.9978 113.529C23.204 113.04 24.5575 113.498 25.238 114.553L94.3864 86.52C94.3461 86.3162 94.3255 86.1049 94.3347 85.8881C94.3967 84.4167 95.6406 83.2735 97.112 83.3354Z" fill="#FF9696"/>
+                <path d="M20.5 172.577L97.5 167L160 164L221.46 163.5L297.015 178L359.5 196V217H20.5V172.577Z" fill="#71D369"/>
+                <path d="M217.379 162.506C217.652 161.058 219.047 160.106 220.494 160.379C221.773 160.62 222.663 161.737 222.665 162.993L286.517 175.023C286.569 174.893 286.632 174.769 286.701 174.651C286.712 174.632 286.723 174.612 286.735 174.592C286.762 174.55 286.79 174.508 286.819 174.467C286.837 174.441 286.856 174.416 286.875 174.39C286.907 174.348 286.942 174.307 286.976 174.266C286.991 174.25 287.005 174.233 287.019 174.216C287.058 174.173 287.099 174.131 287.14 174.091C287.154 174.078 287.167 174.065 287.18 174.052C287.225 174.011 287.271 173.97 287.318 173.931C287.328 173.923 287.339 173.916 287.349 173.908C287.4 173.868 287.451 173.83 287.504 173.794C287.547 173.765 287.591 173.738 287.636 173.712C287.675 173.688 287.716 173.665 287.757 173.643C287.807 173.616 287.858 173.589 287.91 173.565C287.938 173.553 287.967 173.543 287.995 173.532C288.041 173.513 288.088 173.494 288.136 173.477C288.163 173.468 288.191 173.459 288.219 173.451C288.271 173.435 288.324 173.42 288.378 173.407C288.405 173.4 288.432 173.395 288.46 173.389C288.511 173.379 288.563 173.37 288.616 173.362C288.648 173.357 288.681 173.353 288.714 173.349C288.761 173.344 288.809 173.341 288.857 173.339C288.894 173.337 288.931 173.334 288.968 173.334C289.014 173.333 289.06 173.335 289.106 173.337C289.144 173.338 289.181 173.339 289.219 173.342C289.27 173.347 289.321 173.354 289.373 173.361C289.405 173.366 289.438 173.369 289.47 173.375C289.478 173.376 289.486 173.377 289.494 173.379C289.534 173.386 289.573 173.398 289.612 173.407C289.647 173.415 289.683 173.422 289.718 173.431L289.759 173.443C289.783 173.45 289.807 173.461 289.831 173.468C289.882 173.485 289.932 173.502 289.981 173.521C290.013 173.534 290.043 173.548 290.074 173.561C290.118 173.581 290.161 173.6 290.204 173.622C290.24 173.64 290.275 173.659 290.31 173.678C290.35 173.701 290.388 173.724 290.426 173.748C290.456 173.767 290.487 173.787 290.516 173.807C290.552 173.832 290.587 173.858 290.621 173.884C290.654 173.91 290.687 173.935 290.719 173.962C290.748 173.986 290.775 174.013 290.803 174.039C290.834 174.067 290.865 174.094 290.894 174.124C290.931 174.161 290.965 174.2 291 174.239C291.018 174.259 291.036 174.279 291.053 174.299C291.085 174.337 291.113 174.377 291.142 174.417C291.165 174.448 291.189 174.478 291.211 174.51C291.251 174.57 291.288 174.631 291.323 174.693C291.348 174.738 291.37 174.784 291.392 174.83C291.403 174.851 291.414 174.872 291.424 174.894C291.448 174.948 291.471 175.003 291.492 175.058C291.498 175.075 291.504 175.092 291.511 175.109C291.531 175.168 291.55 175.227 291.567 175.288C291.571 175.301 291.574 175.314 291.578 175.327C291.594 175.389 291.608 175.452 291.62 175.516C291.622 175.527 291.624 175.538 291.626 175.549C291.637 175.611 291.646 175.674 291.652 175.738C291.655 175.768 291.656 175.799 291.658 175.83C291.666 175.959 291.669 176.09 291.658 176.222L354.612 193.814C355.17 192.689 356.464 192.082 357.718 192.432C359.136 192.829 359.964 194.3 359.568 195.718C359.172 197.137 357.7 197.965 356.282 197.569C355.029 197.219 354.237 196.029 354.344 194.778L291.387 177.186C291.356 177.248 291.323 177.307 291.288 177.365C291.28 177.378 291.272 177.391 291.263 177.404C291.229 177.459 291.193 177.513 291.155 177.565C291.147 177.576 291.139 177.587 291.131 177.598C291.094 177.648 291.056 177.696 291.015 177.742C291.002 177.757 290.988 177.773 290.974 177.788C290.934 177.832 290.894 177.875 290.851 177.917C290.838 177.93 290.823 177.941 290.809 177.954C290.769 177.991 290.728 178.028 290.685 178.063C290.657 178.086 290.627 178.108 290.597 178.13C290.461 178.232 290.316 178.322 290.162 178.397C290.136 178.41 290.11 178.422 290.084 178.434C290.047 178.451 290.009 178.465 289.971 178.48C289.931 178.496 289.891 178.511 289.85 178.525C289.815 178.537 289.778 178.548 289.742 178.558C289.702 178.57 289.662 178.582 289.622 178.591C289.58 178.602 289.538 178.61 289.496 178.618C289.46 178.625 289.423 178.631 289.387 178.636C289.342 178.643 289.297 178.649 289.252 178.653C289.206 178.657 289.16 178.66 289.113 178.662C289.083 178.663 289.054 178.665 289.024 178.666C288.956 178.666 288.888 178.664 288.82 178.659C288.802 178.658 288.784 178.658 288.766 178.656C288.682 178.648 288.598 178.638 288.513 178.622C288.511 178.621 288.508 178.621 288.506 178.621C288.443 178.609 288.381 178.593 288.32 178.577C288.308 178.574 288.295 178.572 288.282 178.568L288.28 178.567C288.195 178.543 288.113 178.516 288.032 178.485C288.007 178.475 287.983 178.463 287.958 178.453C287.907 178.431 287.857 178.409 287.807 178.384C287.772 178.367 287.739 178.348 287.705 178.329C287.666 178.307 287.628 178.286 287.591 178.262C287.559 178.243 287.528 178.222 287.497 178.201C287.46 178.175 287.423 178.15 287.387 178.123C287.355 178.098 287.322 178.072 287.291 178.046C287.264 178.023 287.237 177.999 287.211 177.975C287.177 177.945 287.145 177.914 287.113 177.883C287.087 177.856 287.061 177.828 287.036 177.8C287.006 177.768 286.976 177.736 286.948 177.702C286.93 177.68 286.914 177.657 286.896 177.634C286.847 177.57 286.8 177.504 286.757 177.436C286.732 177.398 286.707 177.361 286.684 177.322L286.677 177.308C286.663 177.283 286.651 177.257 286.637 177.232C286.616 177.191 286.594 177.15 286.575 177.107C286.556 177.066 286.54 177.024 286.523 176.982C286.51 176.95 286.497 176.918 286.485 176.885C286.469 176.839 286.455 176.791 286.441 176.744C286.433 176.717 286.425 176.689 286.418 176.662C286.403 176.606 286.392 176.55 286.382 176.494C286.378 176.477 286.375 176.459 286.372 176.442C286.362 176.383 286.353 176.323 286.347 176.262C286.345 176.239 286.343 176.215 286.342 176.191C286.339 176.153 286.335 176.116 286.334 176.078V176.007L222.48 163.976C222.022 165.145 220.785 165.862 219.506 165.621C218.412 165.415 217.602 164.568 217.388 163.543L162.626 164.456C162.412 165.693 161.346 166.645 160.045 166.667C158.772 166.688 157.693 165.813 157.408 164.624L99.6385 167.375C99.4632 168.618 98.427 169.602 97.1267 169.664C95.8469 169.725 94.7354 168.873 94.4217 167.681L25.6463 172.499C25.4989 173.746 24.4848 174.752 23.1863 174.843C21.7172 174.946 20.4426 173.839 20.3396 172.37C20.2367 170.901 21.3442 169.626 22.8133 169.523C24.1118 169.432 25.2572 170.287 25.5769 171.502L94.3533 166.683C94.5038 165.412 95.5523 164.399 96.8728 164.336C98.1731 164.274 99.299 165.155 99.5916 166.376L157.362 163.625C157.542 162.348 158.625 161.355 159.955 161.333C161.256 161.311 162.354 162.226 162.609 163.456L217.373 162.543C217.375 162.53 217.376 162.518 217.379 162.506Z" fill="#499963"/>
+              </g>
+              <line x1="16" y1="217.5" x2="364" y2="217.5" stroke="#EBEBEB"/>
+              <defs><clipPath id="areaClip"><rect width="340" height="134" fill="white" transform="translate(20 83)"/></clipPath></defs>
+            </svg>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="width: 412px; height: 106px; left: 0; top: 0; position: absolute; background: rgba(247, 248, 250, 0.80); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); pointer-events: none"></div>
+    <div class="hd">
+      <button id="detailBack" aria-label="뒤로">
+        <svg width="29" height="29" viewBox="0 0 29 29" fill="none"><path d="M20 5L10.7526 12.9864C9.82896 13.7841 9.82896 15.2159 10.7526 16.0136L20 24" stroke="#BABFCF" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+      <div class="nps" style="color: black; font-size: 24px; font-weight: 700">금액 정산</div>
+    </div>
+
+    <div class="cta"><button>이번 달 금액 정산 진행하기</button></div>
+  </div>
+
+
+  <!-- ===== 상호 피드백 1/3 ===== -->
+  <div class="fb" id="fb" hidden>
+    <div class="hd">
+      <button id="fbBack" aria-label="뒤로">
+        <svg width="29" height="29" viewBox="0 0 29 29" fill="none">
+          <path d="M20 5L10.7526 12.9864C9.82896 13.7841 9.82896 15.2159 10.7526 16.0136L20 24"
+                stroke="#BABFCF" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </button>
+      <h1 class="nps">나의 피드백</h1>
+    </div>
+    <div class="bar"><div></div></div>
+
+    <div class="body step1">
+      <h2>메이트 강은지님과<br>함께 보낸 이번 달은 어땠나요?</h2>
+      <div class="sub">소중한 후기는 메이트와의 틈새살이 후기로 기록될 거에요!</div>
+
+      <!-- 클로버 얼굴은 Figma 좌표 그대로 두고 viewBox로 잘라 쓴다 — path 재계산이 없다 -->
+      <div class="moods">
+        <label>
+          <input type="radio" name="mood">
+          <svg width="70" height="70" viewBox="35.6665 245 70 70" fill="none">
+            <path d="M48.4902 257.726C54.6774 251.539 64.5769 251.539 70.764 257.726C76.9512 251.539 86.8507 251.539 93.0379 257.726C99.2251 263.913 99.2251 273.813 93.0379 280C99.2251 286.187 99.2251 296.087 93.0379 302.274C86.8507 308.461 76.9512 308.461 70.764 302.274C64.5769 308.461 54.6774 308.461 48.4902 302.274C42.303 296.087 42.303 286.187 48.4902 280C42.303 273.813 42.303 263.913 48.4902 257.726Z" fill="#557C55"/>
+            <path d="M54.4509 263.666C58.9056 259.211 66.3303 259.211 70.785 263.666C75.2398 259.211 82.6644 259.211 87.1192 263.666C91.574 268.121 91.574 275.545 87.1192 280C91.574 284.455 91.574 291.879 87.1192 296.334C82.6644 300.789 75.2398 300.789 70.785 296.334C66.3303 300.789 58.9056 300.789 54.4509 296.334C49.9961 291.879 49.9961 284.455 54.4509 280C49.9961 275.545 49.9961 268.121 54.4509 263.666Z" fill="#71D369"/>
+            <path d="M65.4167 275.8C65.4167 275.416 65.274 275.188 65.0896 275.037C64.8801 274.865 64.5583 274.75 64.1917 274.75C63.8251 274.75 63.5033 274.865 63.2938 275.037C63.1094 275.188 62.9667 275.416 62.9667 275.8C62.9667 276.38 62.4966 276.85 61.9167 276.85C61.3368 276.85 60.8667 276.38 60.8667 275.8C60.8667 274.785 61.2928 273.962 61.9615 273.414C62.6051 272.886 63.4208 272.65 64.1917 272.65C64.9626 272.65 65.7783 272.886 66.4219 273.414C67.0906 273.962 67.5167 274.785 67.5167 275.8C67.5167 276.38 67.0466 276.85 66.4667 276.85C65.8868 276.85 65.4167 276.38 65.4167 275.8Z" fill="#557C55"/>
+            <path d="M78.3664 275.8C78.3664 275.416 78.2237 275.188 78.0393 275.037C77.8298 274.865 77.508 274.75 77.1414 274.75C76.7748 274.75 76.453 274.865 76.2435 275.037C76.0591 275.188 75.9164 275.416 75.9164 275.8C75.9164 276.38 75.4463 276.85 74.8664 276.85C74.2865 276.85 73.8164 276.38 73.8164 275.8C73.8164 274.785 74.2425 273.962 74.9112 273.414C75.5548 272.886 76.3705 272.65 77.1414 272.65C77.9123 272.65 78.728 272.886 79.3716 273.414C80.0403 273.962 80.4664 274.785 80.4664 275.8C80.4664 276.38 79.9963 276.85 79.4164 276.85C78.8365 276.85 78.3664 276.38 78.3664 275.8Z" fill="#557C55"/>
+            <path d="M76.0573 282.975C76.3472 282.473 76.9893 282.301 77.4915 282.591C77.9936 282.881 78.1656 283.523 77.8756 284.025C76.4841 286.435 73.3731 287.386 70.6097 287.358C69.1871 287.343 67.747 287.075 66.4969 286.542C65.2526 286.012 64.1294 285.189 63.4573 284.025C63.1673 283.523 63.3393 282.881 63.8415 282.591C64.3436 282.301 64.9857 282.473 65.2756 282.975C65.6536 283.63 66.3526 284.198 67.3203 284.61C68.2822 285.02 69.4442 285.246 70.6313 285.258C73.0871 285.283 75.2261 284.415 76.0573 282.975Z" fill="#557C55"/>
+          </svg>
+          <span>최고예요</span>
+        </label>
+        <label>
+          <input type="radio" name="mood">
+          <svg width="70" height="70" viewBox="171 245 70 70" fill="none">
+            <path d="M183.824 257.726C190.011 251.539 199.91 251.539 206.098 257.726C212.285 251.539 222.184 251.539 228.371 257.726C234.559 263.913 234.559 273.813 228.371 280C234.559 286.187 234.559 296.087 228.371 302.274C222.184 308.461 212.285 308.461 206.098 302.274C199.91 308.461 190.011 308.461 183.824 302.274C177.636 296.087 177.636 286.187 183.824 280C177.636 273.813 177.636 263.913 183.824 257.726Z" fill="#557C55"/>
+            <path d="M189.784 263.666C194.239 259.211 201.664 259.211 206.119 263.666C210.573 259.211 217.998 259.211 222.453 263.666C226.907 268.121 226.907 275.545 222.453 280C226.907 284.455 226.907 291.879 222.453 296.334C217.998 300.789 210.573 300.789 206.119 296.334C201.664 300.789 194.239 300.789 189.784 296.334C185.33 291.879 185.33 284.455 189.784 280C185.33 275.545 185.33 268.121 189.784 263.666Z" fill="#71D369"/>
+            <path d="M211.391 282.975C211.681 282.473 212.323 282.301 212.825 282.591C213.327 282.881 213.499 283.523 213.209 284.025C211.818 286.435 208.707 287.386 205.943 287.358C204.521 287.343 203.08 287.075 201.83 286.542C200.586 286.012 199.463 285.189 198.791 284.025C198.501 283.523 198.673 282.881 199.175 282.591C199.677 282.301 200.319 282.473 200.609 282.975C200.987 283.63 201.686 284.198 202.654 284.61C203.616 285.02 204.778 285.246 205.965 285.258C208.421 285.283 210.56 284.415 211.391 282.975Z" fill="#557C55"/>
+            <path d="M200.75 277.2C202.103 277.2 203.2 276.103 203.2 274.75C203.2 273.397 202.103 272.3 200.75 272.3C199.397 272.3 198.3 273.397 198.3 274.75C198.3 276.103 199.397 277.2 200.75 277.2Z" fill="#557C55"/>
+            <path d="M211.25 277.2C212.603 277.2 213.7 276.103 213.7 274.75C213.7 273.397 212.603 272.3 211.25 272.3C209.897 272.3 208.8 273.397 208.8 274.75C208.8 276.103 209.897 277.2 211.25 277.2Z" fill="#557C55"/>
+          </svg>
+          <span>만족해요</span>
+        </label>
+        <label>
+          <input type="radio" name="mood">
+          <svg width="70" height="70" viewBox="306.333 245 70 70" fill="none">
+            <path d="M319.157 257.726C325.344 251.539 335.243 251.539 341.431 257.726C347.618 251.539 357.517 251.539 363.704 257.726C369.892 263.913 369.892 273.813 363.704 280C369.892 286.187 369.892 296.087 363.704 302.274C357.517 308.461 347.618 308.461 341.431 302.274C335.243 308.461 325.344 308.461 319.157 302.274C312.969 296.087 312.969 286.187 319.157 280C312.969 273.813 312.969 263.913 319.157 257.726Z" fill="#557C55"/>
+            <path d="M325.117 263.666C329.572 259.211 336.997 259.211 341.452 263.666C345.906 259.211 353.331 259.211 357.786 263.666C362.24 268.121 362.24 275.545 357.786 280C362.24 284.455 362.24 291.879 357.786 296.334C353.331 300.789 345.906 300.789 341.452 296.334C336.997 300.789 329.572 300.789 325.117 296.334C320.663 291.879 320.663 284.455 325.117 280C320.663 275.545 320.663 268.121 325.117 263.666Z" fill="#71D369"/>
+            <path d="M346.724 282.975C347.014 282.473 347.656 282.301 348.158 282.591C348.66 282.881 348.832 283.523 348.542 284.025C347.151 286.435 344.04 287.386 341.276 287.358C339.854 287.343 338.413 287.075 337.163 286.542C335.919 286.012 334.796 285.189 334.124 284.025C333.834 283.523 334.006 282.881 334.508 282.591C335.01 282.301 335.652 282.473 335.942 282.975C336.32 283.63 337.019 284.198 337.987 284.61C338.949 285.02 340.111 285.246 341.298 285.258C343.754 285.283 345.893 284.415 346.724 282.975Z" fill="#557C55"/>
+            <path d="M335.733 278.25C337.086 278.25 338.183 277.153 338.183 275.8C338.183 274.447 337.086 273.35 335.733 273.35C334.38 273.35 333.283 274.447 333.283 275.8C333.283 277.153 334.38 278.25 335.733 278.25Z" fill="#557C55"/>
+            <path d="M346.233 278.25C347.586 278.25 348.683 277.153 348.683 275.8C348.683 274.447 347.586 273.35 346.233 273.35C344.88 273.35 343.783 274.447 343.783 275.8C343.783 277.153 344.88 278.25 346.233 278.25Z" fill="#557C55"/>
+            <path d="M349.733 282.8C349.733 284.9 348.333 286.3 346.583 286.3C344.833 286.3 343.433 284.9 343.433 282.8C343.433 280.7 346.583 278.6 346.583 278.6C346.583 278.6 349.733 280.7 349.733 282.8Z" fill="#3399FF"/>
+          </svg>
+          <span>아쉬워요</span>
+        </label>
+      </div>
+
+      <hr>
+
+      <h3>이번 달 메이트의 좋았던 점은 무엇인가요?</h3>
+      <div class="opts">
+        <label class="opt"><input type="checkbox"><i></i>틈새살림이 빨라요</label>
+        <label class="opt"><input type="checkbox"><i></i>규칙을 잘 지켜요</label>
+        <label class="opt"><input type="checkbox"><i></i>깔끔해요</label>
+        <label class="opt"><input type="checkbox"><i></i>프라이버시를 잘 지켜요</label>
+        <label class="opt"><input type="checkbox"><i></i>나랑 잘 맞아요</label>
+      </div>
+
+      <h3>우리 집 규칙, 얼마나 잘 지켜졌나요? <em>(1개선택)</em></h3>
+      <div class="opts">
+        <label class="opt"><input type="radio" name="rule"><i></i>잘 지켜졌어요</label>
+        <label class="opt"><input type="radio" name="rule"><i></i>적당히 지켜졌어요</label>
+        <label class="opt"><input type="radio" name="rule"><i></i>아쉬워요</label>
+      </div>
+    </div>
+
+
+    <div class="body step2">
+      <h2>강은지님께<br>전하고 싶은 메시지가 있나요?</h2>
+      <div class="sub">사진과 글로 메이트에게 전달하고 싶은 이야기를 적어주세요.</div>
+
+      <div class="compose">
+        <div class="pics">
+        <label class="up" id="fbUp">
+          <input type="file" accept="image/*" multiple>
+          <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+            <rect width="48" height="48" rx="24" fill="#71D369"/>
+            <path d="M24 15.5V32.5M15.5 24H32.5" stroke="white" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          <span>Upload</span>
+        </label>
+        </div>
+
+        <div>
+          <textarea id="fbMsg" placeholder="메이트에게 전달하고 싶은 말을 작성해주세요."></textarea>
+          <div class="rec">
+            <div class="chips">
+              <button><svg width="19" height="19"><use href="#aiStar"/></svg>집 청소를 깔끔하게 해주셔서<br>항상 감사해요.</button>
+              <button><svg width="19" height="19"><use href="#aiStar"/></svg>덕분에 집이 매일 깨끗한 거 같아요<br>고맙습니다!</button>
+            </div>
+            <div>AI 채팅 추천</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="body step3">
+      <h2>강은지님께 소중한 후기를 전할게요!</h2>
+      <div class="sub">유예현님 덕분에 우리 집 틈새살이가 더 따뜻하고 든든해졌어요.<br>남겨주신 이야기는 메이트의 신뢰를 쌓는 데 사용됩니다.</div>
+
+      <div class="box">
+        <div>
+          <h3>이번 달 메이트의 좋았던 점은 무엇인가요?</h3>
+          <div class="picked" id="sumGood"></div>
+        </div>
+        <div>
+          <h3>우리 집 규칙, 얼마나 잘 지켜졌나요?</h3>
+          <div class="picked" id="sumRule"></div>
+        </div>
+      </div>
+
+      <div class="box">
+        <div>
+          <h3>강은지님께 전하고 싶은 메시지가 있나요?</h3>
+          <div class="pics" id="sumPics"></div>
+          <div class="msg" id="sumMsg"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cta"><button class="prev">이전</button><button>다음으로 이동하기</button></div>
+  </div>
+
+  <!-- ===== 상대 피드백 — 3/3 확인 화면의 레이아웃(.fb.s3 .step3)을 그대로 빌려 쓴다 ===== -->
+  <div class="fb s3" id="peer" hidden>
+    <div class="hd">
+      <button id="peerBack" aria-label="뒤로">
+        <svg width="29" height="29" viewBox="0 0 29 29" fill="none">
+          <path d="M20 5L10.7526 12.9864C9.82896 13.7841 9.82896 15.2159 10.7526 16.0136L20 24"
+                stroke="#BABFCF" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </button>
+      <h1 class="nps">상대 피드백</h1>
+    </div>
+
+    <!-- ponytail: 상대 응답은 목업 고정값 — 서버가 생기면 여기만 채우면 된다 -->
+    <div class="body step3">
+      <h2>메이트의 따뜻한 후기가 도착했어요!</h2>
+
+      <div class="box" style="margin-top: 28px">
+        <div>
+          <h3>이번 달 유예현님의 이런 부분이 좋았어요!</h3>
+          <div class="picked"><div><span>틈새살림이 빨라요</span></div><div><span>규칙을 잘 지켜요</span></div><div><span>깔끔해요</span></div></div>
+        </div>
+        <div>
+          <h3>우리 집 규칙, 메이트는 이렇게 느꼈어요.</h3>
+          <div class="picked"><div><span>잘 지켜졌어요</span></div></div>
+        </div>
+      </div>
+
+      <h3 style="margin-top: 36px">메이트가 전하는 메시지</h3>
+      <!-- 메이트가 보낸 사진 — 비우면 줄째 사라진다 -->
+      <div class="photos"><div style="background-image: url(images/mate_1.jpg)"></div><div style="background-image: url(images/mate_2.jpg)"></div></div>
+      <div class="chat">
+        <div class="who"><i></i>강은지</div>
+        <div class="bubble">주방 사용 후 바로 정리하는 것만 더 주의해주시면 더 좋을 것 같아요!
+집 관리 잘 해주셔서 항상 감사합니다!</div>
+      </div>
+    </div>
+
+    <!-- 하단 장식 방울 — 본문 뒤에 깔린다 -->
+    <svg class="deco" width="412" height="892" fill="white" fill-opacity=".61" aria-hidden="true">
+      <circle cx="3" cy="835" r="88" fill-opacity=".49"/>
+      <circle cx="84.5" cy="866.5" r="62.5"/><circle cx="185.5" cy="896.5" r="62.5"/>
+      <circle cx="360.5" cy="854.5" r="62.5"/><circle cx="407.5" cy="834.5" r="62.5"/>
+      <circle cx="294" cy="810" r="31"/><circle cx="127" cy="766" r="18"/><circle cx="35" cy="530" r="18"/>
+      <circle cx="162" cy="779" r="6"/><circle cx="345" cy="554" r="6"/>
+      <circle cx="396" cy="751" r="12"/><circle cx="271" cy="648" r="12"/>
+    </svg>
+  </div>
+
+<script>
+  const detail = document.getElementById('detail');
+  const scroll = detail.querySelector('.body');
+  const won = n => n.toLocaleString('ko-KR');
+  const num = s => +String(s).replace(/\D/g, '') || 0;
+  const items = detail.querySelector('.items');
+  const rows = [...items.children];
+  // 직접 추가한 항목: 아이콘은 고정색이 없으므로 중립 회색 점 하나
+  const NEW_ROW = `<div>
+      <div class="name">
+        <svg width="12" height="12" viewBox="0 0 12 12"><circle cx="6" cy="6" r="6" fill="#BABFCF"/></svg>
+        <b contenteditable></b><span>0.00%</span>
+      </div>
+      <div class="amt"><input inputmode="numeric"><span>원</span></div>
+    </div>`;
+  // 제거 버튼(⊖)은 마크업 5벌을 고치는 대신 bind()에서 한 번만 찍는다 — 새 항목도 자동으로 붙는다
+  const DEL = `<button class="del" aria-label="항목 제거">
+      <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+        <circle cx="7.5" cy="7.5" r="7" stroke="#D8DEE9"/>
+        <path d="M4.5 7.5H10.5" stroke="#D1D5DC" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+    </button>`;
+  const stack = detail.querySelector('.stack');
+  // 색은 항목에 고정 — 마크업의 아이콘 fill이 유일한 출처다 (수도 회색 … 월세 초록)
+  const color = r => r.querySelector('svg [fill]').getAttribute('fill');
+
+  const calc = () => {
+    const v = rows.map(r => num(r.querySelector('input').value));
+    const total = v.reduce((a, b) => a + b, 0);
+    const mine = Math.round(total / 2);   // 홀수 원은 나에게 — 두 몫의 합이 총액과 어긋나지 않는다
+    const pct = x => total ? x / total * 100 : 0;
+    rows.forEach((r, i) => r.querySelector('.name span').textContent = pct(v[i]).toFixed(2) + '%');
+    const order = rows.map((r, i) => [v[i], r]).sort((a, b) => b[0] - a[0]);
+    stack.innerHTML = order.map(([x, r]) =>
+      `<div style="width:${pct(x)}%;background:${color(r)}"></div>`).join('');
+    reorder(order.map(([, r]) => r));
+    ledeTotal.textContent = won(total) + '원';
+    payTotal.textContent = won(total);   // 홈 카드 '이번달 지출액'도 같은 출처를 쓴다
+    sumAll.textContent  = won(total) + '원';
+    sumMate.textContent = '- ' + won(total - mine) + '원';
+    sumMine.textContent = won(mine) + '원';
+  };
+
+  const reorder = want => {
+    if (want.every((r, k) => r === items.children[k])) return;
+    const a = document.activeElement, at = a && a.selectionStart;
+    want.forEach(r => items.append(r));
+    if (items.contains(a)) { a.focus(); a.setSelectionRange(at, at); }
+  };
+
+  // ponytail: 입력 중 콤마를 다시 찍으면 커서가 끝으로 간다. 뒤에 붙여 치는 흐름이라 그대로 둔다.
+  const bind = r => {
+    const i = r.querySelector('input');
+    i.oninput = () => { const n = num(i.value); i.value = n ? won(n) : ''; calc(); };
+    const del = document.createRange().createContextualFragment(DEL).firstElementChild;
+    del.onclick = () => { r.remove(); rows.splice(rows.indexOf(r), 1); calc(); };
+    // 항목명은 한 줄 — Enter는 입력 끝내기, 붙여넣은 줄바꿈/서식은 글자만 남긴다
+    const nm = r.querySelector('[contenteditable]');
+    if (nm) {
+      nm.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); nm.blur(); } };
+      nm.oninput = () => { if (nm.children.length || /\n/.test(nm.textContent)) nm.textContent = nm.textContent.replace(/\s+/g, ' '); };
+    }
+    r.prepend(del);
+  };
+  rows.forEach(bind);
+
+  addItem.onclick = () => {
+    const row = document.createRange().createContextualFragment(NEW_ROW).firstElementChild;
+    items.append(row); rows.push(row); bind(row); calc();
+    row.querySelector('[contenteditable]').focus();
+  };
+
+  document.querySelector('.pay').onclick = () => {
+    detail.hidden = false; calc();
+    // 금액 정산 카드를 눌러 상세 화면에 들어왔음을 부모 창(틈새살이 메인 화면)에 알려준다.
+    try { window.parent.postMessage({ source: 'teum-app3', type: 'detail-opened' }, '*'); } catch (e) {}
+  };
+  document.getElementById('detailBack').onclick = () => detail.hidden = true;
+  detail.querySelector('.cta button').onclick = () => {
+    calc(); detail.classList.add('done'); scroll.scrollTop = 0;
+    // [이번 달 금액 정산 진행하기] 버튼을 눌러 정산을 요청했음을 부모 창에 알려준다 -
+    // 부모가 상단 알림 팝업을 띄우고 미션2를 완료 처리한다.
+    try { window.parent.postMessage({ source: 'teum-app3', type: 'settle-requested' }, '*'); } catch (e) {}
+  };
+  editPill.onclick = () => { detail.classList.remove('done'); scroll.scrollTop = 0; };
+  calc();
+
+  // ===== 상호 피드백 =====
+  const fb = document.getElementById('fb');
+  const fbCard = document.getElementById('fbCard');
+  const fbBtn = fbCard.querySelector('.btn-feedback');
+  fbBtn.onclick = () => fbCard.classList.contains('done') ? peer.hidden = false : (fb.hidden = false, fbStep(1));
+  const fbCta = fb.querySelector('.cta button:last-child');
+  const CHK = `<svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+      <rect x=".5" y=".5" width="19" height="19" rx="9.5" fill="#71D369" stroke="#71D369"/>
+      <path d="M4.76631 10.0794L7.88937 12.8914C8.28999 13.2522 8.90443 13.2304 9.27853 12.8422L14.5387 7.38441" stroke="white" stroke-width="2" stroke-linecap="round"/>
+    </svg>`;
+  // 3/3은 1·2단계 응답을 그대로 다시 읽는다 — 별도 상태 객체가 없다
+  const summarize = () => {
+    const rows = sel => [...fb.querySelectorAll('.step1 ' + sel)]
+      .map(i => `<div>${CHK}<span>${i.closest('.opt').textContent.trim()}</span></div>`).join('');
+    sumGood.innerHTML = rows('input[type="checkbox"]:checked');
+    sumRule.innerHTML = rows('input[name="rule"]:checked');
+    sumMsg.textContent = fbMsg.value;
+    // 썸네일을 그대로 복제하고 X 버튼만 뗀다
+    sumPics.replaceChildren(...[...fb.querySelectorAll('.step2 .pic')].map(p => {
+      const c = p.cloneNode(true); c.querySelector('button').remove(); return c;
+    }));
+  };
+  const fbStep = n => {
+    fb.classList.toggle('s2', n === 2);
+    fb.classList.toggle('s3', n === 3);
+    fbCta.textContent = n === 3 ? '완료하기' : '다음으로 이동하기';
+    if (n === 3) summarize();
+  };
+  // 상단 뒤로 = 화면 나가기, 하단 '이전' = 한 단계 전 (이전은 2/3·3/3에만 보인다)
+  fbBack.onclick = () => fb.hidden = true;
+  fb.querySelector('.cta .prev').onclick = () => fbStep(fb.classList.contains('s3') ? 2 : 1);
+  // 완료하기 → 홈으로. 새 화면이 아니라 이 카드의 문구/버튼만 '보낸 뒤' 상태로 바뀐다
+  // CSS(:has)로 버튼이 비활성처럼 보여도 키보드로는 눌린다 — 같은 조건을 여기서도 확인한다
+  const stepReady = n => n === 1
+    ? !!(fb.querySelector('[name=mood]:checked') && fb.querySelector('.step1 input[type=checkbox]:checked') && fb.querySelector('[name=rule]:checked'))
+    : n === 2 ? fbMsg.value !== '' : true;
+  fbCta.onclick = () => {
+    const n = fb.classList.contains('s3') ? 3 : fb.classList.contains('s2') ? 2 : 1;
+    if (!stepReady(n)) return;
+    if (n < 3) return fbStep(n + 1);
+    fb.hidden = true;
+    fbCard.classList.add('done');
+    fbCard.querySelector('.note').innerHTML = '<b>상대 피드백 미확인 1건</b>';
+    fbBtn.textContent = '상대 피드백 보기';
+  };
+  peer.querySelectorAll('.picked > div').forEach(d => d.insertAdjacentHTML('afterbegin', CHK));
+  peerBack.onclick = () => peer.hidden = true;
+
+  // 사진은 고른 파일마다 썸네일 칸을 하나씩 뒤에 붙인다 — 파일을 칸 배경으로 바로 쓴다
+  const X = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+      <rect width="23.4479" height="23.4479" rx="11.7239" fill="#474747"/>
+      <path d="M8.54212 8.54235L11.7241 11.7243M14.9061 14.9063L11.7241 11.7243M8.54214 14.9063L11.7241 11.7243M11.7241 11.7243L14.9061 8.54233" stroke="#F9F9F9" stroke-linecap="round"/>
+    </svg>`;
+  fbUp.querySelector('input').onchange = e => {
+    for (const f of e.target.files) {
+      const url = URL.createObjectURL(f);
+      const pic = document.createElement('div');
+      pic.className = 'pic';
+      pic.style.backgroundImage = `url(${url})`;
+      pic.innerHTML = `<button aria-label="사진 삭제">${X}</button>`;
+      pic.firstChild.onclick = () => { pic.remove(); URL.revokeObjectURL(url); };
+      fbUp.parentNode.append(pic);
+    }
+    e.target.value = '';   // 같은 사진을 지운 뒤 다시 골라도 change가 뜨게
+  };
+  // 스크롤바를 숨겨서 마우스로는 옆으로 넘길 방법이 없다 → 끌어서 넘기기. 터치는 브라우저 기본 스크롤.
+  // 5px 넘게 움직였을 때만 드래그로 보고 뒤따르는 click(업로드 열기·X)을 삼킨다
+  fb.querySelectorAll('.pics').forEach(el => {
+    let x0 = null, s0, moved;
+    el.onpointerdown = e => {
+      if (e.pointerType === 'mouse') { x0 = e.clientX; s0 = el.scrollLeft; moved = false; }
+    };
+    el.onpointermove = e => {
+      if (x0 === null) return;
+      const dx = e.clientX - x0;
+      if (!moved && Math.abs(dx) > 5) { moved = true; el.setPointerCapture(e.pointerId); }
+      if (moved) el.scrollLeft = s0 - dx;
+    };
+    el.onpointerup = el.onpointercancel = () => x0 = null;
+    el.addEventListener('click', e => {
+      if (moved) { e.preventDefault(); e.stopPropagation(); moved = false; }
+    }, true);
+  });
+  // AI 추천 칩: 문구를 본문에 넣는다 (<br>은 줄바꿈으로)
+  fb.querySelectorAll('.chips button').forEach(b => b.onclick = () => {
+    fbMsg.value = b.innerHTML.replace(/<br>/g, ' ').replace(/<svg[\s\S]*<\/svg>/, '').trim();
+    fbMsg.focus();
+  });
+</script>
+<!-- 틈새살이 체험용 미션 가이드 연결 (화면 구성은 그대로, 가이드 대상만 등록) -->
+<script src="../app-guide-bridge.js"></script>
+<script>
+  TeumGuide.register({
+    pay:   () => document.querySelector('.pay'),
+    items: () => document.querySelector('#detail .items'),
+    total: () => document.querySelector('#detail .total'),
+    cta:   () => document.querySelector('#detail .cta button'),
+    // 정산 진행 후(.done) 아래에 나타나는 지출 분석 두 칸
+    sect1: () => document.querySelectorAll('#detail .analysis .sect')[0],
+    sect2: () => document.querySelectorAll('#detail .analysis .sect')[1],
+    edit:  () => document.getElementById('editPill'), // 정산 진행 후(.done) 나타나는 [수정하기]
+    // 감정형 미션2 (상호 피드백 작성 → 상대 피드백 확인)
+    fbBtn:    () => document.querySelector('#fbCard .btn-feedback'),
+    moods:    () => document.querySelector('#fb .moods'),
+    good:     () => document.querySelectorAll('#fb .step1 .opts')[0],
+    rule:     () => document.querySelectorAll('#fb .step1 .opts')[1],
+    fbNext:   () => document.querySelector('#fb .cta button:last-child'),
+    chip:     () => document.querySelector('#fb .step2 .chips button'),
+    msg:      () => document.querySelector('#fb .step2 .compose'),
+    sum:      () => document.querySelector('#fb .step3'),
+    peerGood: () => document.querySelector('#peer .box'),
+    peerMsg:  () => document.querySelector('#peer .chat')
+  }, {
+    // 미션 시작 전: 열려 있던 상세/피드백 화면을 닫고 홈 카드 화면으로
+    'reset-view': () => {
+      ['fb', 'peer', 'detail'].forEach(id => { const el = document.getElementById(id); if (el) el.hidden = true; });
+      detail.classList.remove('done');
+      detail.querySelector('.body').scrollTop = 0;
+    },
+    // 피드백 미션 시작 전: 작성한 내용·보낸 상태를 처음으로 되돌린다
+    'reset-fb': () => {
+      // 규칙형 정산을 마친 뒤 감정형으로 오면 금액 정산 상세 화면이 열린 채 남아 있어 [피드백 작성하기]를 누를 수 없었다 → 홈 카드 화면으로
+      detail.hidden = true; detail.classList.remove('done'); detail.querySelector('.body').scrollTop = 0;
+      fb.hidden = true; peer.hidden = true; fbStep(1);
+      fb.querySelectorAll('input').forEach(i => { i.checked = false; });
+      fbMsg.value = '';
+      fb.querySelectorAll('.step2 .pic').forEach(p => p.remove());
+      fbCard.classList.remove('done');
+      fbCard.querySelector('.note').innerHTML = '<b>피드백 대기 1건</b>';
+      fbBtn.textContent = '피드백 작성하기';
+      fb.querySelectorAll('.body').forEach(b => b.scrollTop = 0);
+    },
+    // 마크업의 메이트(강은지)·나(유예현) 자리를 게임 이름으로 - value = { mate, me, face }. 처음 글을 기억해 두고 매번 원본에서 바꾼다
+    'set-names': v => {
+      if (!v) return;
+      if (!window.__nameNodes) {
+        window.__nameNodes = [];
+        const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+        for (let n; (n = w.nextNode());) if (/강은지|유예현/.test(n.nodeValue)) window.__nameNodes.push([n, n.nodeValue]);
+      }
+      window.__nameNodes.forEach(([n, o]) => { n.nodeValue = o.replaceAll('강은지', v.mate || '강은지').replaceAll('유예현', v.me || '유예현'); });
+      if (v.face) peer.querySelector('.who i').style.backgroundImage = `url(${v.face})`;
+    },
+    // 1/3 자동 선택: 표정 '최고예요', 좋았던 점 2개, 규칙 '잘 지켜졌어요'
+    'pick-mood': () => { fb.querySelector('[name=mood]').checked = true; },
+    'pick-good': () => {
+      const opts = [...fb.querySelectorAll('.step1 input[type=checkbox]')];
+      opts.forEach(i => { i.checked = /나랑 잘 맞아요|프라이버시/.test(i.closest('.opt').textContent); });
+    },
+    'pick-rule': () => { fb.querySelector('[name=rule]').checked = true; },
+    // 2/3: AI 추천 문구 뒤에 조심스러운 부탁을 타자 치듯 덧붙인다
+    'append-msg': v => new Promise(done => {
+      const base = fbMsg.value.trim() ? fbMsg.value.trim() + ' ' : '';
+      let i = 0;
+      (function tick(){
+        fbMsg.value = base + v.slice(0, ++i);
+        fbMsg.scrollTop = fbMsg.scrollHeight;
+        if (i < v.length) setTimeout(tick, 35); else done();
+      })();
+    })
+  });
+</script>
+
+</div>
+</body>
+</html>

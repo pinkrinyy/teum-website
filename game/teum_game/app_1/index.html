@@ -1,0 +1,1257 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<!-- 폰 프레임(412) + 여백(20×2) = 452. 폰에서는 이 폭 전체가 화면에 맞게 축소된다 -->
+<meta name="viewport" content="width=452">
+<title>골목 생활</title>
+<link rel="stylesheet" href="../teum-cursor.css">
+<style>
+  @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+  @font-face {
+    font-family: 'NationalPension';
+    src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2310@1.0/NPSfontBold.woff2') format('woff2');
+    font-weight: 700;
+    font-display: swap;
+  }
+  body {
+    margin: 0; padding: 20px;
+    display: flex; justify-content: center; align-items: center;
+    background: #e2e8f0;
+    font-family: 'Pretendard', sans-serif;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+  /* 게임 화면 폰 안(iframe 412x892)에 들어갈 땐 미리보기용 여백·회색 배경·그림자를 없애 화면이 딱 맞게 */
+  html.embedded body { padding: 0; min-height: 0; background: none; overflow: hidden; }
+  html.embedded .app-wrapper { border-radius: 0; box-shadow: none; }
+  /* 미션 중 화면 가이드 - 규칙형 앱(app-guide-bridge.js)의 초록 테두리와 같은 모양.
+     .mission-pulse = 지금 눌러야 할 곳, .mission-show = 내용만 보여주는 단계([다음]으로 넘김). 테두리 모양은 둘 다 같다(실선·숨쉬기) */
+  /* 하단 메뉴 바 뒤·아래로 목록이 비쳐 앱 아래 틀 너머까지 보이던 것 - 메뉴 바 뒤에 시트 바탕색을 깔고(위쪽 24px는 서서히) 그 아래는 가린다 */
+  #bottomNav::before { content: ''; position: absolute; left: 0; right: 0; top: -24px; bottom: -60px; z-index: -1; pointer-events: none;
+    background: linear-gradient(to bottom, rgba(247,248,250,0), #F7F8FA 24px); }
+  /* 버튼·카드 자체엔 효과를 넣지 않는다 (.mission-pulse/.mission-show는 대상 표시용 이름표일 뿐) - 규칙형처럼 대상 둘레에
+     따로 그린 가이드 테두리(#missionRing)만 보인다. 모양은 app-guide-bridge.js의 .teum-guide-ring과 똑같이 */
+  #missionRing { position: fixed; z-index: 2147483000; pointer-events: none; border-radius: 14px; box-sizing: border-box;
+    border: 3px solid #71D369; box-shadow: 0 0 0 4px rgba(113,211,105,.28), 0 0 10px rgba(113,211,105,.45);
+    opacity: 0; transition: opacity .2s ease; animation: missionRingPulse 1.4s ease-in-out infinite; }
+  #missionRing.show { opacity: 1; }
+  @keyframes missionRingPulse {
+    0%, 100% { box-shadow: 0 0 0 4px rgba(113,211,105,.28), 0 0 10px rgba(113,211,105,.45); }
+    50% { box-shadow: 0 0 0 7px rgba(113,211,105,.2), 0 0 12px rgba(113,211,105,.7); }
+  }
+  /* '지도' 보여주기 단계: 지도는 화면 전체 크기라 테두리를 걸 수 없어서, 시트 위로 보이는 지도 부분에 맞춘 빈 상자에 건다 */
+  #missionMapArea { position: absolute; left: 14px; top: 14px; width: 384px; border-radius: 18px; z-index: 2; pointer-events: none; display: none; }
+  #missionMapArea.mission-show { display: block; }
+  .app-wrapper {
+    position: relative;
+    width: 412px; height: 892px; flex-shrink: 0;   /* 창이 좁아도 폰 프레임이 찌그러지지 않게 */
+    border-radius: 30px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.15);
+    background: #F7F8FA;
+    overflow: hidden;
+    user-select: none; -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    /* 한글은 어절 단위로만 줄바꿈, 띄어쓰기 없는 긴 문자열(URL 등)만 칸 끝에서 끊는다 */
+    word-break: keep-all; overflow-wrap: break-word;
+  }
+  /* ponytail: Figma dev-mode CSS emits width = full visual width with padding inside,
+     i.e. border-box. Without this every `width + padding` node overflows. */
+  .app-wrapper, .app-wrapper * { box-sizing: border-box; }
+  .app-wrapper img { -webkit-user-drag: none; }
+  /* Full-bleed strip: content still starts at the 16px gutter, but the next image
+     runs off the screen edge instead of stopping short and looking chopped. */
+  .photo-strip { overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding-left: 16px;
+    margin-left: -16px; margin-right: -16px; padding-left: 16px; padding-right: 16px;
+    scrollbar-width: none; -ms-overflow-style: none; cursor: grab; }
+  .photo-strip::-webkit-scrollbar { display: none; }
+  .photo-strip.dragging { cursor: grabbing; scroll-snap-type: none; }
+  .photo-strip > img { scroll-snap-align: start; flex: 0 0 auto; object-fit: cover; }
+  .hide-scrollbar::-webkit-scrollbar { display: none; }
+  .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  .cat-chip { padding: 6px 12px; background: white; border-radius: 20px; outline: 1px #DBDBDB solid; outline-offset: -1px;
+    color: #7F7F7F; font-size: 14px; line-height: 19.60px; cursor: pointer; }
+  .cat-chip.on { background: #499963; outline-color: #499963; color: white; }
+  #catList > [hidden] { display: none !important; }  /* 카드의 인라인 display:flex가 hidden을 덮는다 */
+</style>
+</head>
+<body>
+<script>if (window.parent !== window) document.documentElement.classList.add('embedded', 'teum-app'); /* teum-app: 앱 커서는 초록 화살표, 가이드 테두리 안만 손가락 (teum-cursor.css) */</script>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="chev" viewBox="0 0 23 23"><path d="M7.78177 8.90336L11.5001 12.6217L15.2184 8.90336C15.5922 8.52961 16.1959 8.52961 16.5697 8.90336C16.9434 9.27711 16.9434 9.88086 16.5697 10.2546L12.1709 14.6534C11.7972 15.0271 11.1934 15.0271 10.8197 14.6534L6.42094 10.2546C6.04719 9.88086 6.04719 9.27711 6.42094 8.90336C6.79469 8.53919 7.40802 8.52961 7.78177 8.90336Z"/></symbol><symbol id="star14" viewBox="0 0 14 14"><path d="M6.00785 0.690983C6.3072 -0.230328 7.61084 -0.230328 7.91019 0.690983L8.86722 3.63727C9.00114 4.0491 9.38535 4.3276 9.8184 4.3277H12.917C13.8854 4.32809 14.2875 5.56796 13.5039 6.13727L10.9981 7.95758C10.6476 8.21221 10.501 8.66376 10.6348 9.07575L11.5918 12.022C11.8911 12.9432 10.8374 13.7092 10.0537 13.1402L7.54691 11.3189C7.19645 11.0644 6.72154 11.0643 6.37113 11.3189L3.86527 13.1402C3.08156 13.7096 2.02686 12.9433 2.32621 12.022L3.28324 9.07575C3.41711 8.66373 3.27045 8.21223 2.91996 7.95758L0.4141 6.13727C-0.369614 5.56787 0.0332669 4.3277 1.00199 4.3277H4.09965C4.53276 4.3277 4.91685 4.04911 5.05082 3.63727L6.00785 0.690983Z"/></symbol><symbol id="star" viewBox="0 0 19 18"><path d="M8.06456 0.690514C8.36416 -0.230179 9.6673 -0.230163 9.96691 0.690514L11.4093 5.13094C11.5432 5.5427 11.9275 5.82125 12.3605 5.82137H17.0294C17.9982 5.82137 18.4011 7.06161 17.6173 7.63094L13.8409 10.3741C13.4903 10.6288 13.3437 11.0802 13.4777 11.4923L14.92 15.9307C15.2192 16.8519 14.1647 17.6181 13.381 17.0489L9.60363 14.3048C9.25319 14.0502 8.77829 14.0502 8.42785 14.3048L4.6505 17.0489C3.8668 17.6181 2.81228 16.8519 3.11144 15.9307L4.5548 11.4923C4.68873 11.0802 4.54113 10.6288 4.19054 10.3741L0.414174 7.63094C-0.369671 7.06161 0.0332766 5.82138 1.00206 5.82137H5.67101C6.10403 5.82129 6.48822 5.54272 6.62218 5.13094L8.06456 0.690514Z"/></symbol></svg>
+<div class="app-wrapper">
+  <!-- Interactive Map -->
+  <div id="mapContainer" style="position: absolute; top: 0; left: 0; width: 412px; height: 892px; overflow: hidden; background: #F7F8FA; cursor: grab; z-index: 0;">
+    <div id="mapContent" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; transform-origin: 0 0; pointer-events: none;">
+      <img id="mapImage" src="37612049_map_styled.webp" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none;" alt="지도">
+      <div id="userMarker" style="width: 133px; height: 133px; position: absolute; left: 139.5px; top: 245px; transform: scale(0.333333);">
+        <div style="width: 133px; height: 133px; position: absolute; background: rgba(113, 211, 105, 0.15); border-radius: 9999px; border: 1px #71D369 solid"></div>
+        <div style="left: 54px; top: 54px; position: absolute">
+          <svg width="25" height="25" viewBox="0 0 25 25" fill="none"><circle cx="12.5" cy="12.5" r="11.5" fill="#499963" stroke="white" stroke-width="2"/></svg>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reset location FAB -->
+  <div id="resetLocationBtn" style="width: 58px; height: 58px; left: 334px; top: 435px; position: absolute; background: white; border-radius: 9999px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 1; transition: transform 0.15s, top 0.3s cubic-bezier(0.2,0.8,0.2,1)">
+    <svg width="26" height="26" viewBox="0 0 26 26" fill="none"><path d="M13 0C20.1797 0 26 5.8203 26 13C26 20.1797 20.1797 26 13 26C5.8203 26 0 20.1797 0 13C0 5.8203 5.8203 0 13 0ZM13.75 3.01758C13.75 3.43179 13.4142 3.76758 13 3.76758C12.5858 3.76758 12.25 3.43179 12.25 3.01758V1.52637C6.49636 1.89683 1.89683 6.49636 1.52637 12.25H2.91504C3.32925 12.25 3.66504 12.5858 3.66504 13C3.66504 13.4142 3.32925 13.75 2.91504 13.75H1.52637C1.89698 19.5059 6.50002 24.1064 12.2568 24.4736C12.2526 24.4413 12.25 24.4085 12.25 24.375V22.625C12.25 22.2108 12.5858 21.875 13 21.875C13.4142 21.875 13.75 22.2108 13.75 22.625V24.375C13.75 24.4085 13.7464 24.4413 13.7422 24.4736C19.4995 24.1068 24.103 19.5062 24.4736 13.75H23.2139C22.7997 13.75 22.4639 13.4142 22.4639 13C22.4639 12.5858 22.7997 12.25 23.2139 12.25H24.4736C24.1032 6.49636 19.5036 1.89683 13.75 1.52637V3.01758ZM13 11.5C13.8284 11.5 14.5 12.1716 14.5 13C14.5 13.8284 13.8284 14.5 13 14.5C12.1716 14.5 11.5 13.8284 11.5 13C11.5 12.1716 12.1716 11.5 13 11.5Z" fill="black"/></svg>
+  </div>
+
+  <!-- Bottom Sheet (draggable) -->
+  <div id="bottomSheet" style="left: 0px; top: 510px; position: absolute; width: 412px; height: 892px; z-index: 3; transition: top 0.3s cubic-bezier(0.2,0.8,0.2,1)">
+    <div style="width: 412px; height: 100%; position: relative; background: #F7F8FA; border-top-left-radius: 12px; border-top-right-radius: 12px; box-shadow: 0 -6px 20px rgba(0,0,0,0.06)">
+      <div id="sheetHandle" style="position: absolute; top: 0; left: 0; width: 412px; height: 30px; cursor: grab; z-index: 2; touch-action: none">
+        <div style="width: 55px; height: 3px; left: 178.50px; top: 12px; position: absolute; background: #DADDE9; border-radius: 2px"></div>
+      </div>
+      <div class="hide-scrollbar" id="sheetScroll" style="position: absolute; top: 30px; left: 0; width: 412px; height: calc(100% - 30px); overflow-y: auto">
+      <div style="width: 380px; margin: 5px 16px 140px 16px; flex-direction: column; justify-content: flex-start; align-items: flex-start; gap: 28px; display: flex">
+        <div id="catChips" style="justify-content: flex-start; align-items: center; gap: 8px; display: inline-flex">
+          <div class="cat-chip on">전체</div>
+          <div class="cat-chip">반찬가게</div>
+          <div class="cat-chip">세탁소</div>
+          <div class="cat-chip">마트</div>
+          <div class="cat-chip">청소</div>
+          <div class="cat-chip">기타</div>
+        </div>
+        <div id="catList" style="align-self: stretch; flex-direction: column; justify-content: flex-start; align-items: flex-start; gap: 14px; display: flex">
+          <div id="catEmpty" hidden style="align-self: stretch; padding: 40px 0; text-align: center; color: #B2B6C5; font-size: 14px">이 카테고리의 구독권이 아직 없어요.</div>
+          <!-- Card 1 -->
+          <div data-cat="반찬가게" onclick="(window.markerElements||[])[0] && window.markerElements[0].click()" style="align-self: stretch; padding: 14px 16px; background: white; border-radius: 12px; outline: 1px #DBDBDB solid; outline-offset: -1px; flex-direction: column; gap: 10px; display: flex; cursor: pointer">
+            <div style="flex-direction: column; gap: 14px; display: flex">
+              <div style="justify-content: space-between; align-items: center; display: flex">
+                <div style="flex: 1; min-width: 0; justify-content: flex-start; align-items: center; gap: 21px; display: flex">
+                  <img style="width: 71px; height: 71px; border-radius: 8px; object-fit: cover" src="images/thumb-sukja-banchan.png" />
+                  <div style="flex: 1; min-width: 0; flex-direction: column; gap: 6px; display: flex">
+                    <div style="flex-direction: column; gap: 3px; display: flex">
+                      <div style="color: #7F7F7F; font-size: 12px">숙자네 반찬가게</div>
+                      <div style="color: black; font-size: 20px; font-weight: 700">정기 반찬 구독권</div>
+                    </div>
+                    <div style="color: #499963; font-size: 20px; font-weight: 700">월 35,000원</div>
+                  </div>
+                </div>
+                <svg width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 1L7.27983 6.49485C8.19048 7.29167 8.19048 8.70833 7.27982 9.50515L1 15" stroke="#BABFCF" stroke-width="2" stroke-linecap="round"/></svg>
+              </div>
+              <div style="align-self: stretch; height: 1px; background: #EBEBEB"></div>
+              <div style="color: #575757; font-size: 12px; line-height: 20px">매 2주마다 원하는 반찬 2가지 택하여 가져갈 수 있습니다^^<br/>첫 달 구독자에게 반찬 1가지를 써비스로 드립니다~</div>
+            </div>
+          </div>
+          <!-- Card 2 -->
+          <div data-cat="세탁소" onclick="(window.markerElements||[])[1] && window.markerElements[1].click()" style="align-self: stretch; padding: 14px 16px; background: white; border-radius: 12px; outline: 1px #DBDBDB solid; outline-offset: -1px; flex-direction: column; gap: 10px; display: flex; cursor: pointer">
+            <div style="flex-direction: column; gap: 14px; display: flex">
+              <div style="justify-content: space-between; align-items: center; display: flex">
+                <div style="flex: 1; min-width: 0; justify-content: flex-start; align-items: center; gap: 21px; display: flex">
+                  <img style="width: 71px; height: 71px; border-radius: 8px; object-fit: cover" src="images/thumb-bangbang-laundry.png" />
+                  <div style="flex: 1; min-width: 0; flex-direction: column; gap: 6px; display: flex">
+                    <div style="flex-direction: column; gap: 3px; display: flex">
+                      <div style="color: #7F7F7F; font-size: 12px">방방 세탁소</div>
+                      <div style="color: black; font-size: 20px; font-weight: 700">생활빨래 정기권</div>
+                    </div>
+                    <div style="color: #499963; font-size: 20px; font-weight: 700">월 19,900원</div>
+                  </div>
+                </div>
+                <svg width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 1L7.27983 6.49485C8.19048 7.29167 8.19048 8.70833 7.27982 9.50515L1 15" stroke="#BABFCF" stroke-width="2" stroke-linecap="round"/></svg>
+              </div>
+              <div style="align-self: stretch; height: 1px; background: #EBEBEB"></div>
+              <div style="color: #575757; font-size: 12px; line-height: 20px">월 최대 8kg까지 세탁·건조해 문 앞까지 배송해 드립니다.</div>
+            </div>
+          </div>
+          <!-- Card 3 -->
+          <div data-cat="세탁소" style="align-self: stretch; padding: 14px 16px; background: white; border-radius: 12px; outline: 1px #DBDBDB solid; outline-offset: -1px; flex-direction: column; gap: 10px; display: flex">
+            <div style="flex-direction: column; gap: 14px; display: flex">
+              <div style="justify-content: space-between; align-items: center; display: flex">
+                <div style="flex: 1; min-width: 0; justify-content: flex-start; align-items: center; gap: 21px; display: flex">
+                  <img style="width: 71px; height: 71px; border-radius: 8px; object-fit: cover" src="images/thumb-cleantopia.png" />
+                  <div style="flex: 1; min-width: 0; flex-direction: column; gap: 6px; display: flex">
+                    <div style="flex-direction: column; gap: 3px; display: flex">
+                      <div style="color: #7F7F7F; font-size: 12px">크린토피아</div>
+                      <div style="color: black; font-size: 20px; font-weight: 700">크린토피아 비즈니스권</div>
+                    </div>
+                    <div style="color: #499963; font-size: 20px; font-weight: 700">월 25,000원</div>
+                  </div>
+                </div>
+                <svg width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 1L7.27983 6.49485C8.19048 7.29167 8.19048 8.70833 7.27982 9.50515L1 15" stroke="#BABFCF" stroke-width="2" stroke-linecap="round"/></svg>
+              </div>
+              <div style="align-self: stretch; height: 1px; background: #EBEBEB"></div>
+              <div style="color: #575757; font-size: 12px; line-height: 20px">셔츠 10벌 + 정장 2벌<br/>바쁜 직장인을 위해 제작된 비즈니스 구독</div>
+            </div>
+          </div>
+          <!-- Card 4 -->
+          <div data-cat="마트" style="align-self: stretch; padding: 14px 16px; background: white; border-radius: 12px; outline: 1px #DBDBDB solid; outline-offset: -1px; flex-direction: column; gap: 10px; display: flex">
+            <div style="flex-direction: column; gap: 14px; display: flex">
+              <div style="justify-content: space-between; align-items: center; display: flex">
+                <div style="flex: 1; min-width: 0; justify-content: flex-start; align-items: center; gap: 21px; display: flex">
+                  <img style="width: 71px; height: 71px; border-radius: 8px; object-fit: cover" src="images/thumb-jungang-mart.png" />
+                  <div style="flex: 1; min-width: 0; flex-direction: column; gap: 6px; display: flex">
+                    <div style="flex-direction: column; gap: 3px; display: flex">
+                      <div style="color: #7F7F7F; font-size: 12px">중앙할인마트</div>
+                      <div style="color: black; font-size: 20px; font-weight: 700">생필품 정기 배송</div>
+                    </div>
+                    <div style="color: #499963; font-size: 20px; font-weight: 700">월 35,900원</div>
+                  </div>
+                </div>
+                <svg width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 1L7.27983 6.49485C8.19048 7.29167 8.19048 8.70833 7.27982 9.50515L1 15" stroke="#BABFCF" stroke-width="2" stroke-linecap="round"/></svg>
+              </div>
+              <div style="align-self: stretch; height: 1px; background: #EBEBEB"></div>
+              <div style="color: #575757; font-size: 12px; line-height: 20px">리빙(세제/섬유) + 생수(2L 12병) + 욕실용품(샴푸/치약) + 종량제<br/>매 월 1일, 15일에 정기적으로 배송됩니다~</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Nav -->
+  <div id="bottomNav" style="width: 412px; left: 0px; top: 798px; position: absolute; flex-direction: column; justify-content: flex-start; align-items: center; gap: 6px; display: inline-flex; z-index: 4">
+    <div style="width: 386px; background: rgba(247, 248, 250, 0.75); backdrop-filter: blur(8px); border-radius: 60px; justify-content: center; align-items: center; gap: 20px; display: inline-flex">
+      <div style="width: 56px; padding-top: 6px; padding-bottom: 6px; flex-direction: column; justify-content: flex-start; align-items: center; gap: 4px; display: inline-flex">
+        <svg width="56" height="32" viewBox="0 0 56 32" fill="none"><rect width="56" height="32" rx="16" fill="#71D369" fill-opacity="0.25"/><path d="M21.0468 26C20.4968 26 20.0262 25.8043 19.6348 25.413C19.2428 25.021 19.0468 24.55 19.0468 24V16.05C18.6635 15.7 18.3678 15.25 18.1598 14.7C17.9512 14.15 17.9468 13.55 18.1468 12.9L19.1968 9.5C19.3302 9.06667 19.5678 8.70833 19.9098 8.425C20.2512 8.14167 20.6468 8 21.0968 8H34.9968C35.4468 8 35.8385 8.13733 36.1718 8.412C36.5052 8.68733 36.7468 9.05 36.8968 9.5L37.9468 12.9C38.1468 13.55 38.1428 14.1417 37.9348 14.675C37.7262 15.2083 37.4302 15.6667 37.0468 16.05V24C37.0468 24.55 36.8512 25.021 36.4598 25.413C36.0678 25.8043 35.5968 26 35.0468 26H21.0468ZM30.2468 15C30.6968 15 31.0385 14.8457 31.2718 14.537C31.5052 14.229 31.5968 13.8833 31.5468 13.5L30.9968 10H29.0468V13.7C29.0468 14.05 29.1635 14.3543 29.3968 14.613C29.6302 14.871 29.9135 15 30.2468 15ZM25.7468 15C26.1302 15 26.4428 14.871 26.6848 14.613C26.9262 14.3543 27.0468 14.05 27.0468 13.7V10H25.0968L24.5468 13.5C24.4802 13.9 24.5678 14.25 24.8098 14.55C25.0512 14.85 25.3635 15 25.7468 15ZM21.2968 15C21.5968 15 21.8592 14.8917 22.0838 14.675C22.3092 14.4583 22.4468 14.1833 22.4968 13.85L23.0468 10H21.0968L20.0968 13.35C19.9968 13.6833 20.0508 14.0417 20.2588 14.425C20.4675 14.8083 20.8135 15 21.2968 15ZM34.7968 15C35.2802 15 35.6302 14.8083 35.8468 14.425C36.0635 14.0417 36.1135 13.6833 35.9968 13.35L34.9468 10H33.0468L33.5968 13.85C33.6468 14.1833 33.7845 14.4583 34.0098 14.675C34.2345 14.8917 34.4968 15 34.7968 15Z" fill="#71D369"/></svg>
+        <div style="align-self: stretch; text-align: center; color: #71D369; font-size: 12px; font-weight: 500; line-height: 16px; letter-spacing: 0.50px">골목 생활</div>
+      </div>
+      <div style="width: 56px; padding-top: 6px; padding-bottom: 6px; flex-direction: column; justify-content: flex-start; align-items: center; gap: 4px; display: inline-flex">
+        <div style="align-self: stretch; height: 32px; position: relative"><div style="left: 18px; top: 6px; position: absolute"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><g clip-path="url(#n1)"><path fill-rule="evenodd" clip-rule="evenodd" d="M5 0C5.78897 0 6.42857 0.639593 6.42857 1.42857V2.85714H13.5716V1.42857C13.5716 0.639593 14.2112 0 15.0001 0C15.7891 0 16.4287 0.639593 16.4287 1.42857V2.85714H17.8571C19.0406 2.85714 20 3.81653 20 5V17.8571C20 19.0406 19.0406 20 17.8571 20H2.14286C0.95939 20 0 19.0406 0 17.8571V5C0 3.81653 0.95939 2.85714 2.14286 2.85714H3.57143V1.42857C3.57143 0.639593 4.21103 0 5 0ZM12.2325 7.24746C12.1655 7.18044 12.0745 7.1428 11.9798 7.14286C11.885 7.14291 11.7941 7.18063 11.7271 7.24773L5.83741 13.15C5.78276 13.2048 5.74737 13.2758 5.73657 13.3524L5.36063 16.0216C5.34503 16.1324 5.38224 16.2441 5.46117 16.3234C5.54009 16.4027 5.65161 16.4404 5.76247 16.4253L8.43164 16.0619C8.509 16.0514 8.58079 16.0157 8.636 15.9606L14.5383 10.0583C14.6777 9.91883 14.6777 9.6927 14.5383 9.55323L12.2325 7.24746Z" fill="#8FA18F"/></g><defs><clipPath id="n1"><rect width="20" height="20" fill="white"/></clipPath></defs></svg></div></div>
+        <div style="align-self: stretch; text-align: center; color: #8FA18F; font-size: 12px; font-weight: 500; line-height: 16px; letter-spacing: 0.50px">틈새살림</div>
+      </div>
+      <div style="width: 56px; padding-top: 6px; padding-bottom: 6px; flex-direction: column; justify-content: flex-start; align-items: center; gap: 4px; display: inline-flex">
+        <div style="align-self: stretch; height: 32px; position: relative"><div style="left: 18px; top: 6px; position: absolute"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" d="M0.454546 8.63557C0.164634 8.90579 0 9.28429 0 9.6806V17.8571C0 19.0406 0.95939 20 2.14286 20H8.57143V15.7143C8.57143 14.9253 9.21103 14.2857 10 14.2857C10.789 14.2857 11.4286 14.9253 11.4286 15.7143V20H17.8571C19.0406 20 20 19.0406 20 17.8571V9.6806C20 9.28429 19.8354 8.90579 19.5454 8.63557L10.4649 0.17196C10.1974 -0.0573198 9.80264 -0.0573201 9.53514 0.17196L0.454546 8.63557Z" fill="#8FA18F"/></svg></div></div>
+        <div style="align-self: stretch; text-align: center; color: #8FA18F; font-size: 12px; font-weight: 500; line-height: 16px; letter-spacing: 0.50px">홈</div>
+      </div>
+      <div style="width: 56px; padding-top: 6px; padding-bottom: 6px; flex-direction: column; justify-content: flex-start; align-items: center; gap: 4px; display: inline-flex">
+        <div style="align-self: stretch; height: 32px; position: relative"><div style="left: 17px; top: 6px; position: absolute"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><g clip-path="url(#n2)"><path fill-rule="evenodd" clip-rule="evenodd" d="M7.87886 1.71768e-06C5.78927 1.71768e-06 3.78526 0.830093 2.30769 2.30766C0.830126 3.78523 3.92072e-05 5.78923 3.92072e-05 7.87883C-0.00488129 9.42969 0.453443 10.9467 1.31627 12.2354L0.263526 15.0526C0.147239 15.3637 0.413911 15.6831 0.740871 15.6244L4.43071 14.9606C4.79717 15.1391 5.17587 15.2887 5.56327 15.4081C5.4284 14.8176 5.35716 14.2028 5.35716 13.5714C5.35716 9.0348 9.03481 5.35714 13.5714 5.35714C14.2055 5.35714 14.8227 5.42897 15.4154 5.56494C15.1264 4.62397 14.663 3.74377 14.0476 2.97097C13.3091 2.04357 12.3709 1.29477 11.3028 0.78037C10.2347 0.265966 9.06436 -0.000781025 7.87886 1.71768e-06ZM18.1174 9.02575C16.9117 7.82016 15.2766 7.14286 13.5717 7.14286C12.6044 7.14222 11.6494 7.35987 10.778 7.77959C9.90649 8.1993 9.14096 8.81027 8.53843 9.56696C7.93589 10.3237 7.51187 11.2066 7.29799 12.1499C7.0841 13.0932 7.08583 14.0727 7.30309 15.0153C7.52033 15.9579 7.94747 16.8393 8.5527 17.5937C9.15793 18.3483 9.92563 18.9566 10.7986 19.3731C11.6716 19.7897 12.6273 20.004 13.5946 20C14.5619 19.9959 15.5157 19.7736 16.3851 19.3496L19.2594 19.8667C19.5864 19.9256 19.853 19.6061 19.7367 19.2949L18.9263 17.126C19.6303 16.0746 20.0043 14.8369 20.0003 13.5714C20.0003 11.8665 19.323 10.2313 18.1174 9.02575Z" fill="#8FA18F"/></g><defs><clipPath id="n2"><rect width="20" height="20" fill="white"/></clipPath></defs></svg></div></div>
+        <div style="align-self: stretch; text-align: center; color: #8FA18F; font-size: 12px; font-weight: 500; line-height: 16px; letter-spacing: 0.50px">채팅</div>
+      </div>
+      <div style="width: 56px; padding-top: 6px; padding-bottom: 6px; flex-direction: column; justify-content: flex-start; align-items: center; gap: 4px; display: inline-flex">
+        <div style="align-self: stretch; height: 32px; position: relative"><div style="left: 18px; top: 6px; position: absolute"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 10C8.625 10 7.44792 9.51042 6.46875 8.53125C5.48958 7.55208 5 6.375 5 5C5 3.625 5.48958 2.44792 6.46875 1.46875C7.44792 0.489584 8.625 0 10 0C11.375 0 12.5521 0.489584 13.5312 1.46875C14.5104 2.44792 15 3.625 15 5C15 6.375 14.5104 7.55208 13.5312 8.53125C12.5521 9.51042 11.375 10 10 10ZM2.5 20C1.8125 20 1.22417 19.7554 0.735 19.2663C0.245 18.7763 0 18.1875 0 17.5V16.5C0 15.7917 0.1825 15.1404 0.5475 14.5463C0.911667 13.9529 1.39583 13.5 2 13.1875C3.29167 12.5417 4.60417 12.0571 5.9375 11.7338C7.27083 11.4113 8.625 11.25 10 11.25C11.375 11.25 12.7292 11.4113 14.0625 11.7338C15.3958 12.0571 16.7083 12.5417 18 13.1875C18.6042 13.5 19.0883 13.9529 19.4525 14.5463C19.8175 15.1404 20 15.7917 20 16.5V17.5C20 18.1875 19.7554 18.7763 19.2663 19.2663C18.7763 19.7554 18.1875 20 17.5 20H2.5Z" fill="#8FA18F"/></svg></div></div>
+        <div style="align-self: stretch; text-align: center; color: #8FA18F; font-size: 12px; font-weight: 500; line-height: 16px; letter-spacing: 0.50px">마이</div>
+      </div>
+    </div>
+    <div style="align-self: stretch; height: 24px; position: relative"><div style="width: 108px; height: 4px; left: 152px; top: 10px; position: absolute; background: #1D1B20; border-radius: 12px"></div></div>
+  </div>
+
+  <!-- Top Header -->
+  <div id="listHeader" style="width: 412px; height: 106px; left: 0px; top: 0px; position: absolute; background: rgba(247, 248, 250, 0.80); backdrop-filter: blur(6px); z-index: 10; pointer-events: none">
+    <div style="left: 16px; top: 57px; position: absolute; color: black; font-size: 24px; font-weight: 700; font-family: 'NationalPension', 'Pretendard', sans-serif">골목 생활</div>
+    <div style="left: 372px; top: 62px; position: absolute"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M14.4541 21.5459C14.4539 22.9013 13.3555 24 12 24C10.6445 24 9.54614 22.9013 9.5459 21.5459H14.4541ZM12 0C13.004 0.000192283 13.8174 0.814324 13.8174 1.81836V3C13.8174 3.10701 13.8068 3.21154 13.7891 3.31348C16.9402 4.11081 19.2723 6.96437 19.2725 10.3633V16.8184H18.7236C20.2819 16.8184 21.5457 18.0814 21.5459 19.6396C21.5459 20.0391 21.2217 20.3631 20.8223 20.3633H3.17773C2.77829 20.3631 2.4541 20.0391 2.4541 19.6396C2.45433 18.0814 3.71805 16.8184 5.27637 16.8184H4.72656V10.3633C4.72675 6.96446 7.05894 4.1109 10.21 3.31348C10.1922 3.21156 10.1816 3.10699 10.1816 3V1.81836C10.1816 0.814206 10.9958 0 12 0Z" fill="#BABFCF"/></svg></div>
+  </div>
+
+  <!-- Detail View: 식당 (숙자네 반찬가게) -->
+  <div id="detailRestaurant" class="detail-view" style="position: absolute; inset: 0; z-index: 11; display: none; pointer-events: none">
+    <!-- Detail Sheet -->
+    <div class="hide-scrollbar" style="position: absolute; left: 0; top: 510px; bottom: 0; width: 412px; z-index: 0; background: #F7F8FA; border-top-left-radius: 12px; border-top-right-radius: 12px; overflow-y: auto; overflow-x: hidden; pointer-events: auto; box-shadow: 0 -6px 20px rgba(0,0,0,0.06); transition: top 0.3s cubic-bezier(0.2,0.8,0.2,1)">
+      <div class="detailHandle" style="position: sticky; top: 0; z-index: 2; width: 412px; height: 30px; background: #F7F8FA; border-top-left-radius: 12px; border-top-right-radius: 12px; cursor: grab; touch-action: none">
+        <div style="width: 55px; height: 3px; left: 178.50px; top: 12px; position: absolute; background: #DADDE9; border-radius: 2px"></div>
+      </div>
+      <div style="width: 380px; margin: 23px 16px 40px 16px; flex-direction: column; justify-content: flex-start; align-items: flex-start; gap: 40px; display: flex">
+        <div style="align-self: stretch; flex-direction: column; justify-content: flex-start; align-items: flex-start; gap: 13px; display: flex">
+          <div style="align-self: stretch; flex-direction: column; justify-content: flex-start; align-items: flex-start; gap: 8px; display: flex">
+            <div style="align-self: stretch; flex-direction: column; justify-content: flex-start; align-items: flex-start; gap: 4px; display: flex">
+              <div style="align-self: stretch; color: black; font-size: 12px; font-family: Pretendard; font-weight: 400">숙자네 반찬가게</div>
+              <div style="align-self: stretch; color: black; font-size: 20px; font-family: Pretendard; font-weight: 700">정기 반찬 구독권・월 35,000원</div>
+            </div>
+            <div style="flex-direction: column; justify-content: flex-start; align-items: flex-start; gap: 4px; display: flex">
+              <div style="justify-content: flex-start; align-items: center; gap: 4px; display: inline-flex">
+                <div style="color: #E84646; font-size: 12px; font-family: Pretendard; font-weight: 400">4.5</div>
+                <div style="justify-content: flex-start; align-items: center; gap: 4px; display: flex">
+                  <svg width="14" height="14" style="fill: #E84646"><use href="#star14"/></svg>
+                  <svg width="14" height="14" style="fill: #E84646"><use href="#star14"/></svg>
+                  <svg width="14" height="14" style="fill: #E84646"><use href="#star14"/></svg>
+                  <svg width="14" height="14" style="fill: #E84646"><use href="#star14"/></svg>
+                  <svg width="14" height="14" style="fill: #DBDBDB"><use href="#star14"/></svg>
+                </div>
+                <div style="color: #7F7F7F; font-size: 12px; font-family: Pretendard; font-weight: 400">(38)</div>
+              </div>
+              <div data-peek-anchor style="color: #7F7F7F; font-size: 12px; font-family: Pretendard; font-weight: 400">632m・서울 성동구 행복로 7길 10-1 (행복동)</div>
+            </div>
+          </div>
+          <div class="photo-strip" style="align-self: stretch; justify-content: flex-start; align-items: center; gap: 18px; display: flex">
+            <img style="width: 359px; height: 209px; border-radius: 12px" src="images/banchan-shop-0.jpg" />
+            <img style="width: 359px; height: 209px; border-radius: 12px" src="images/banchan-shop-1.jpg" />
+          </div>
+        </div>
+        <div style="align-self: stretch; flex-direction: column; justify-content: flex-start; align-items: flex-start; gap: 14px; display: flex">
+          <div style="align-self: stretch; color: black; font-size: 15px; font-family: Pretendard; font-weight: 400; line-height: 22px">저희 숙자네 반찬가게는 할머니, 엄마의 마음을 담아 정성스럽게 만드는 반찬가게입니다~^^<br/><br/>매 2주마다 원하는 반찬과 국거리를 2가지 선택하여 가져가실 수 있으며 첫 달 구독하시는 분께 반찬 1가지를 써비스로 드리고 있습니다. <br/><br/>숙자네는 한식조리사 자격증을 가지고 있는 70세 할머니가 정성을 담아 매일 새로운 종류들로 반찬을 만들고 있으며, 건강하고 싱싱한 제철 식재료를 사용하고 있습니다^^ 또 철저한 위생으로... </div>
+          <div style="width: 380px; height: 23px; position: relative">
+            <div style="width: 380px; height: 1px; left: 0px; top: 12px; position: absolute; background: #DBDBDB"></div>
+            <div style="width: 68.80px; height: 23px; padding-left: 4px; left: 155.60px; top: 0px; position: absolute; background: #F7F8FA; justify-content: center; align-items: center; display: inline-flex">
+              <div style="color: #DBDBDB; font-size: 15px; font-family: Pretendard; font-weight: 400; word-wrap: break-word">더보기</div>
+              <svg width="23" height="23" viewBox="0 0 23 23" style="fill: #DBDBDB"><use href="#chev"/></svg>
+            </div>
+          </div>
+        </div>
+        <div style="flex-direction: column; justify-content: flex-start; align-items: flex-start; gap: 12px; display: flex">
+          <div style="width: 380px; position: relative">
+            <div style="width: 380px; padding-top: 22px; padding-bottom: 14px; padding-left: 20px; padding-right: 20px; margin-top: 10px; background: white; border-radius: 12px; outline: 1px #71D369 solid; outline-offset: -1px; flex-direction: column; justify-content: flex-start; align-items: flex-start; gap: 15px; display: flex">
+              <div style="align-self: stretch; flex-direction: column; justify-content: flex-start; align-items: flex-start; gap: 6px; display: flex">
+                <div style="align-self: stretch; color: black; font-size: 20px; font-family: Pretendard; font-weight: 700">정기 반찬 구독권</div>
+                <div style="align-self: stretch; color: #7F7F7F; font-size: 12px; font-family: Pretendard; font-weight: 400; line-height: 16.80px">매 2주마다 원하는 반찬 2가지 택하여 가져갈 수 있습니다^^<br/>첫 달 구독자에게 반찬 1가지를 써비스로 드립니다~</div>
+              </div>
+              <div style="justify-content: flex-start; align-items: center; gap: 8px; display: inline-flex">
+                <div style="color: #499963; font-size: 20px; font-family: Pretendard; font-weight: 700">월 35,000원 </div>
+                <div style="color: #B2B6C5; font-size: 12px; font-family: Pretendard; font-weight: 400">(월 1회 정기 결제)</div>
+              </div>
+            </div>
+            <div style="padding-left: 12px; padding-right: 12px; padding-top: 4px; padding-bottom: 4px; left: 27px; top: 0px; position: absolute; background: #71D369; border-radius: 11px; justify-content: center; align-items: center; display: inline-flex">
+              <div style="color: white; font-size: 12px; font-family: Pretendard; font-weight: 400">인기 상품</div>
+            </div>
+          </div>
+          <div style="width: 380px; position: relative">
+            <div style="width: 380px; padding-top: 22px; padding-bottom: 14px; padding-left: 20px; padding-right: 20px; margin-top: 10px; background: white; border-radius: 12px; outline: 1px #71D369 solid; outline-offset: -1px; flex-direction: column; justify-content: flex-start; align-items: flex-start; gap: 15px; display: flex">
+              <div style="align-self: stretch; flex-direction: column; justify-content: flex-start; align-items: flex-start; gap: 6px; display: flex">
+                <div style="align-self: stretch; color: black; font-size: 20px; font-family: Pretendard; font-weight: 700">정기 반찬 구독권 연간</div>
+                <div style="align-self: stretch; color: #7F7F7F; font-size: 12px; font-family: Pretendard; font-weight: 400; line-height: 16.80px">매 2주마다 원하는 반찬 2가지 택하여 가져갈 수 있습니다^^<br/>연간 첫 구독자에게 반찬 3가지를 써비스로 드립니다~</div>
+              </div>
+              <div style="flex-direction: column; justify-content: center; align-items: flex-start; display: flex">
+                <div style="color: #B2B6C5; font-size: 15px; font-family: Pretendard; font-weight: 500; text-decoration: line-through">연 420,000원</div>
+                <div style="justify-content: flex-start; align-items: center; gap: 8px; display: inline-flex">
+                  <div style="color: #499963; font-size: 20px; font-family: Pretendard; font-weight: 700">연 380,000원</div>
+                  <div style="color: #B2B6C5; font-size: 12px; font-family: Pretendard; font-weight: 400">(연 1회 정기 결제 / 월 31,600원)</div>
+                </div>
+              </div>
+            </div>
+            <div style="padding-left: 12px; padding-right: 12px; padding-top: 4px; padding-bottom: 4px; left: 27px; top: 0px; position: absolute; background: #499963; border-radius: 11px; justify-content: center; align-items: center; display: inline-flex">
+              <div style="color: white; font-size: 12px; font-family: Pretendard; font-weight: 400">특가 할인</div>
+            </div>
+          </div>
+          <div style="width: 380px; position: relative">
+            <div style="width: 380px; padding-top: 22px; padding-bottom: 14px; padding-left: 20px; padding-right: 20px; margin-top: 10px; background: white; border-radius: 12px; outline: 1px #FF9696 solid; outline-offset: -1px; flex-direction: column; justify-content: flex-start; align-items: flex-start; gap: 15px; display: flex">
+              <div style="align-self: stretch; flex-direction: column; justify-content: flex-start; align-items: flex-start; gap: 6px; display: flex">
+                <div style="align-self: stretch; color: black; font-size: 20px; font-family: Pretendard; font-weight: 700">정기 반찬 단체 구독권 (2인 기준)</div>
+                <div style="color: #7F7F7F; font-size: 12px; font-family: Pretendard; font-weight: 400; line-height: 16.80px">인원에 맞춰 매 2주마다 원하는 반찬을 택하여 가져갈 수 있습니다^^<br/>연간 첫 구독자에게 반찬 3가지를 써비스로 드립니다~</div>
+              </div>
+              <div style="flex-direction: column; justify-content: center; align-items: flex-start; display: flex">
+                <div style="color: #B2B6C5; font-size: 15px; font-family: Pretendard; font-weight: 500; text-decoration: line-through">월 80,000원</div>
+                <div style="justify-content: flex-start; align-items: center; gap: 8px; display: inline-flex">
+                  <div style="color: #E84646; font-size: 20px; font-family: Pretendard; font-weight: 700">연 65,000원</div>
+                  <div style="color: #B2B6C5; font-size: 12px; font-family: Pretendard; font-weight: 400">(연 1회 정기 결제 / 월 31,600원)</div>
+                </div>
+              </div>
+            </div>
+            <div style="padding-left: 12px; padding-right: 12px; padding-top: 4px; padding-bottom: 4px; left: 27px; top: 0px; position: absolute; background: #FF9696; border-radius: 11px; justify-content: center; align-items: center; display: inline-flex">
+              <div style="color: white; font-size: 12px; font-family: Pretendard; font-weight: 400">단체 할인</div>
+            </div>
+          </div>
+        </div>
+        <div style="width: 380px; height: 1px; background: #DBDBDB"></div>
+        <div style="align-self: stretch; flex-direction: column; justify-content: flex-start; align-items: flex-start; gap: 32px; display: flex">
+          <div style="align-self: stretch; flex-direction: column; justify-content: flex-start; align-items: flex-start; gap: 12px; display: flex">
+            <div style="align-self: stretch; justify-content: space-between; align-items: flex-start; display: inline-flex">
+              <div style="justify-content: flex-start; align-items: center; gap: 4px; display: flex">
+                <div style="color: black; font-size: 20px; font-family: Pretendard; font-weight: 700">4.5</div>
+                <div style="justify-content: flex-start; align-items: center; gap: 4px; display: flex">
+                  <svg width="19" height="18" viewBox="0 0 19 18" style="fill: #E84646; flex: 0 0 auto"><use href="#star"/></svg>
+                  <svg width="19" height="18" viewBox="0 0 19 18" style="fill: #E84646; flex: 0 0 auto"><use href="#star"/></svg>
+                  <svg width="19" height="18" viewBox="0 0 19 18" style="fill: #E84646; flex: 0 0 auto"><use href="#star"/></svg>
+                  <svg width="19" height="18" viewBox="0 0 19 18" style="fill: #E84646; flex: 0 0 auto"><use href="#star"/></svg>
+                  <svg width="19" height="18" viewBox="0 0 19 18" style="fill: #DBDBDB; flex: 0 0 auto"><use href="#star"/></svg>
+                </div>
+                <div style="color: #7F7F7F; font-size: 12px; font-family: Pretendard; font-weight: 400">(38)</div>
+              </div>
+              <div style="padding-left: 7px; padding-right: 7px; justify-content: flex-start; align-items: center; gap: 10px; display: flex">
+                <div style="color: #7F7F7F; font-size: 15px; font-family: Pretendard; font-weight: 400; line-height: 22px">후기 38</div>
+                <svg width="8" height="15" viewBox="0 0 8 15" fill="none" style="flex: 0 0 auto"><path d="M0.5 0.5L6.77983 5.99485C7.69048 6.79167 7.69048 8.20833 6.77982 9.00515L0.5 14.5" stroke="#7F7F7F" stroke-linecap="round"/></svg>
+              </div>
+            </div>
+            <div class="photo-strip" style="align-self: stretch; justify-content: flex-start; align-items: center; gap: 15px; display: flex">
+              <img style="width: 209px; height: 209px; border-radius: 12px; object-fit: cover" src="images/review-banchan-yu.jpg" />
+              <img style="width: 209px; height: 209px; border-radius: 12px; object-fit: cover" src="images/review-banchan-baek.jpg" />
+            </div>
+          </div>
+          <div style="align-self: stretch; flex-direction: column; justify-content: flex-start; align-items: flex-start; display: flex">
+            <div style="align-self: stretch; flex-direction: column; justify-content: flex-start; align-items: flex-start; display: flex">
+              <div style="width: 380px; padding-top: 14px; padding-bottom: 14px; border-bottom: 1px #DBDBDB solid; flex-direction: column; justify-content: flex-start; align-items: flex-start; display: flex">
+                <div style="align-self: stretch; justify-content: space-between; align-items: flex-start; display: inline-flex">
+                  <div style="flex-direction: column; justify-content: center; align-items: flex-start; gap: 14px; display: inline-flex">
+                    <div style="justify-content: flex-start; align-items: center; gap: 10px; display: inline-flex">
+                      <img style="width: 36px; height: 36px; box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.05); border-radius: 9999px; border: 2px white solid; object-fit: cover" src="images/yu-yehyeon.png" />
+                      <div><span style="color: black; font-size: 15px; font-family: Pretendard; font-weight: 700; line-height: 22px">유예현</span><span style="color: #7F7F7F; font-size: 15px; font-family: Pretendard; font-weight: 400; line-height: 22px">・정기 반찬 구독권 연간</span></div>
+                    </div>
+                    <div style="justify-content: flex-start; align-items: center; gap: 4px; display: inline-flex">
+                      <div style="justify-content: flex-start; align-items: center; gap: 4px; display: flex">
+                        <svg width="14" height="14" viewBox="0 0 19 18" style="fill: #E84646; flex: 0 0 auto"><use href="#star"/></svg>
+                        <svg width="14" height="14" viewBox="0 0 19 18" style="fill: #E84646; flex: 0 0 auto"><use href="#star"/></svg>
+                        <svg width="14" height="14" viewBox="0 0 19 18" style="fill: #E84646; flex: 0 0 auto"><use href="#star"/></svg>
+                        <svg width="14" height="14" viewBox="0 0 19 18" style="fill: #E84646; flex: 0 0 auto"><use href="#star"/></svg>
+                        <svg width="14" height="14" viewBox="0 0 19 18" style="fill: #E84646; flex: 0 0 auto"><use href="#star"/></svg>
+                      </div>
+                      <div style="color: #7F7F7F; font-size: 12px; font-family: Pretendard; font-weight: 400">2026.03.17</div>
+                    </div>
+                  </div>
+                  <div style="width: 30px; height: 30px; position: relative">
+                    <div style="width: 4px; height: 4px; left: 13px; top: 6px; position: absolute; background: #7F7F7F; border-radius: 9999px"></div>
+                    <div style="width: 4px; height: 4px; left: 13px; top: 13px; position: absolute; background: #7F7F7F; border-radius: 9999px"></div>
+                    <div style="width: 4px; height: 4px; left: 13px; top: 20px; position: absolute; background: #7F7F7F; border-radius: 9999px"></div>
+                  </div>
+                </div>
+                <div style="align-self: stretch; justify-content: space-between; align-items: center; display: inline-flex">
+                  <div style="width: 260px; max-width: 260px; color: black; font-size: 15px; font-family: Pretendard; font-weight: 400; line-height: 22px">메이트들이랑 같이 n빵해서 연간으로 구독했는데 훨씬 저렴하고 집밥 너무 맛있게 잘 먹고 있어요!! 강추합니다!!</div>
+                  <img style="width: 109px; height: 109px; border-radius: 12px; object-fit: cover" src="images/review-banchan-yu.jpg" />
+                </div>
+              </div>
+              <div style="width: 380px; padding-top: 14px; padding-bottom: 14px; border-bottom: 1px #DBDBDB solid; flex-direction: column; justify-content: flex-start; align-items: flex-start; display: flex">
+                <div style="align-self: stretch; justify-content: space-between; align-items: center; display: inline-flex">
+                  <div style="flex-direction: column; justify-content: center; align-items: flex-start; gap: 14px; display: inline-flex">
+                    <div style="justify-content: flex-start; align-items: center; gap: 10px; display: inline-flex">
+                      <img style="width: 36px; height: 36px; box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.05); border-radius: 9999px; border: 2px white solid; object-fit: cover" src="images/baek-aeyoung.png" />
+                      <div><span style="color: black; font-size: 15px; font-family: Pretendard; font-weight: 700; line-height: 22px">백애영</span><span style="color: #7F7F7F; font-size: 15px; font-family: Pretendard; font-weight: 400; line-height: 22px">・정기 반찬 구독권</span></div>
+                    </div>
+                    <div style="justify-content: flex-start; align-items: center; gap: 4px; display: inline-flex">
+                      <div style="justify-content: flex-start; align-items: center; gap: 4px; display: flex">
+                        <svg width="14" height="14" viewBox="0 0 19 18" style="fill: #E84646; flex: 0 0 auto"><use href="#star"/></svg>
+                        <svg width="14" height="14" viewBox="0 0 19 18" style="fill: #E84646; flex: 0 0 auto"><use href="#star"/></svg>
+                        <svg width="14" height="14" viewBox="0 0 19 18" style="fill: #E84646; flex: 0 0 auto"><use href="#star"/></svg>
+                        <svg width="14" height="14" viewBox="0 0 19 18" style="fill: #E84646; flex: 0 0 auto"><use href="#star"/></svg>
+                        <svg width="14" height="14" viewBox="0 0 19 18" style="fill: #E84646; flex: 0 0 auto"><use href="#star"/></svg>
+                      </div>
+                      <div style="color: #7F7F7F; font-size: 12px; font-family: Pretendard; font-weight: 400">2026.03.02</div>
+                    </div>
+                  </div>
+                  <div style="width: 30px; height: 30px; position: relative">
+                    <div style="width: 4px; height: 4px; left: 13px; top: 6px; position: absolute; background: #7F7F7F; border-radius: 9999px"></div>
+                    <div style="width: 4px; height: 4px; left: 13px; top: 13px; position: absolute; background: #7F7F7F; border-radius: 9999px"></div>
+                    <div style="width: 4px; height: 4px; left: 13px; top: 20px; position: absolute; background: #7F7F7F; border-radius: 9999px"></div>
+                  </div>
+                </div>
+                <div style="align-self: stretch; justify-content: space-between; align-items: center; display: inline-flex">
+                  <div style="width: 260px; max-width: 260px; color: black; font-size: 15px; font-family: Pretendard; font-weight: 400; line-height: 22px">이번 달 처음으로 구독해서 먹었는데 너무 맛있어요 집밥 생각나는 맛이예요 다음 달엔 연간으로 하려구요</div>
+                  <img style="width: 109px; height: 109px; border-radius: 12px; object-fit: cover" src="images/review-banchan-baek.jpg" />
+                </div>
+              </div>
+              <div style="align-self: stretch; padding-top: 14px; padding-bottom: 14px; flex-direction: column; justify-content: flex-start; align-items: flex-start; gap: 12px; display: flex">
+                <div style="align-self: stretch; justify-content: space-between; align-items: center; display: inline-flex">
+                  <div style="flex-direction: column; justify-content: center; align-items: flex-start; gap: 14px; display: inline-flex">
+                    <div style="justify-content: flex-start; align-items: center; gap: 10px; display: inline-flex">
+                      <img style="width: 36px; height: 36px; box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.05); border-radius: 9999px; border: 2px white solid; object-fit: cover" src="images/shin-haeryang.png" />
+                      <div><span style="color: black; font-size: 15px; font-family: Pretendard; font-weight: 700; line-height: 22px">신해량</span><span style="color: #7F7F7F; font-size: 15px; font-family: Pretendard; font-weight: 400; line-height: 22px">・정기 반찬 구독권</span></div>
+                    </div>
+                    <div style="justify-content: flex-start; align-items: center; gap: 4px; display: inline-flex">
+                      <div style="justify-content: flex-start; align-items: center; gap: 4px; display: flex">
+                        <svg width="14" height="14" viewBox="0 0 19 18" style="fill: #E84646; flex: 0 0 auto"><use href="#star"/></svg>
+                        <svg width="14" height="14" viewBox="0 0 19 18" style="fill: #E84646; flex: 0 0 auto"><use href="#star"/></svg>
+                        <svg width="14" height="14" viewBox="0 0 19 18" style="fill: #E84646; flex: 0 0 auto"><use href="#star"/></svg>
+                        <svg width="14" height="14" viewBox="0 0 19 18" style="fill: #E84646; flex: 0 0 auto"><use href="#star"/></svg>
+                        <svg width="14" height="14" viewBox="0 0 19 18" style="fill: #DBDBDB; flex: 0 0 auto"><use href="#star"/></svg>
+                      </div>
+                      <div style="color: #7F7F7F; font-size: 12px; font-family: Pretendard; font-weight: 400">2026.02.13</div>
+                    </div>
+                  </div>
+                  <div style="width: 30px; height: 30px; position: relative">
+                    <div style="width: 4px; height: 4px; left: 13px; top: 6px; position: absolute; background: #7F7F7F; border-radius: 9999px"></div>
+                    <div style="width: 4px; height: 4px; left: 13px; top: 13px; position: absolute; background: #7F7F7F; border-radius: 9999px"></div>
+                    <div style="width: 4px; height: 4px; left: 13px; top: 20px; position: absolute; background: #7F7F7F; border-radius: 9999px"></div>
+                  </div>
+                </div>
+                <div style="align-self: stretch; color: black; font-size: 15px; font-family: Pretendard; font-weight: 400; line-height: 22px">반찬과 국 종류가 다양해서 선택지가 많습니다. 짜지도, 싱겁지 않아서 까다로운 입맛을 가지신 분도 맛있게 드실 수 있습니다.</div>
+              </div>
+            </div>
+            <div style="width: 380px; height: 23px; position: relative">
+              <div style="width: 380px; height: 1px; left: 0px; top: 12px; position: absolute; background: #DBDBDB"></div>
+              <div style="width: 68.80px; height: 23px; padding-left: 4px; left: 155.60px; top: 0px; position: absolute; background: #F7F8FA; justify-content: center; align-items: center; display: inline-flex">
+                <div style="color: #DBDBDB; font-size: 15px; font-family: Pretendard; font-weight: 400; word-wrap: break-word">더보기</div>
+                <svg width="23" height="23" viewBox="0 0 23 23" style="fill: #DBDBDB"><use href="#chev"/></svg>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Detail Header -->
+    <div style="position: absolute; left: 0; top: 0; width: 412px; height: 106px; background: rgba(247, 248, 250, 0.80); backdrop-filter: blur(6px); z-index: 1; pointer-events: auto">
+      <div style="left: 16px; top: 57px; position: absolute; justify-content: flex-start; align-items: center; gap: 16px; display: inline-flex">
+        <div onclick="closeDetail()" style="cursor: pointer; justify-content: center; align-items: center; display: flex">
+          <svg width="29" height="29" viewBox="0 0 29 29" fill="none"><path d="M20 5L10.7526 12.9864C9.82896 13.7841 9.82896 15.2159 10.7526 16.0136L20 24" stroke="#BABFCF" stroke-width="2" stroke-linecap="round"/></svg>
+        </div>
+        <div style="color: black; font-size: 24px; font-family: 'NationalPension', 'Pretendard', sans-serif; font-weight: 700">골목 생활</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Detail View: 세탁소 (방방 세탁소) -->
+  <div id="detailLaundry" class="detail-view" style="position: absolute; inset: 0; z-index: 11; display: none; pointer-events: none">
+    <!-- Detail Sheet -->
+    <div class="hide-scrollbar" style="position: absolute; left: 0; top: 510px; bottom: 0; width: 412px; z-index: 0; background: #F7F8FA; border-top-left-radius: 12px; border-top-right-radius: 12px; overflow-y: auto; overflow-x: hidden; pointer-events: auto; box-shadow: 0 -6px 20px rgba(0,0,0,0.06); transition: top 0.3s cubic-bezier(0.2,0.8,0.2,1)">
+      <div class="detailHandle" style="position: sticky; top: 0; z-index: 2; width: 412px; height: 30px; background: #F7F8FA; border-top-left-radius: 12px; border-top-right-radius: 12px; cursor: grab; touch-action: none">
+        <div style="width: 55px; height: 3px; left: 178.50px; top: 12px; position: absolute; background: #DADDE9; border-radius: 2px"></div>
+      </div>
+      <div style="width: 380px; margin: 23px 16px 40px 16px; flex-direction: column; justify-content: flex-start; align-items: flex-start; gap: 40px; display: flex">
+        <div style="align-self: stretch; flex-direction: column; justify-content: flex-start; align-items: flex-start; gap: 13px; display: flex">
+          <div style="align-self: stretch; flex-direction: column; justify-content: flex-start; align-items: flex-start; gap: 8px; display: flex">
+            <div style="align-self: stretch; flex-direction: column; justify-content: flex-start; align-items: flex-start; gap: 4px; display: flex">
+              <div style="align-self: stretch; color: black; font-size: 12px; font-family: Pretendard; font-weight: 400">방방 세탁소</div>
+              <div style="align-self: stretch; color: black; font-size: 20px; font-family: Pretendard; font-weight: 700; white-space: nowrap">생활빨래 정기권・월 19,900원</div>
+            </div>
+            <div style="flex-direction: column; justify-content: flex-start; align-items: flex-start; gap: 4px; display: flex">
+              <div style="justify-content: flex-start; align-items: center; gap: 4px; display: inline-flex">
+                <div style="color: #E84646; font-size: 12px; font-family: Pretendard; font-weight: 400">4.7</div>
+                <div style="justify-content: flex-start; align-items: center; gap: 4px; display: flex">
+                  <svg width="14" height="14" style="fill: #E84646"><use href="#star14"/></svg>
+                  <svg width="14" height="14" style="fill: #E84646"><use href="#star14"/></svg>
+                  <svg width="14" height="14" style="fill: #E84646"><use href="#star14"/></svg>
+                  <svg width="14" height="14" style="fill: #E84646"><use href="#star14"/></svg>
+                  <svg width="14" height="14" style="fill: #DBDBDB"><use href="#star14"/></svg>
+                </div>
+                <div style="color: #7F7F7F; font-size: 12px; font-family: Pretendard; font-weight: 400">(52)</div>
+              </div>
+              <div data-peek-anchor style="color: #7F7F7F; font-size: 12px; font-family: Pretendard; font-weight: 400">480m・서울 성동구 행복로 3길 22 (행복동)</div>
+            </div>
+          </div>
+          <div class="photo-strip" style="align-self: stretch; justify-content: flex-start; align-items: center; gap: 18px; display: flex">
+            <img style="width: 359px; height: 209px; border-radius: 12px" src="images/laundry-shop-0.jpg" />
+            <img style="width: 359px; height: 209px; border-radius: 12px" src="images/laundry-shop-1.jpg" />
+          </div>
+        </div>
+        <div style="align-self: stretch; flex-direction: column; justify-content: flex-start; align-items: flex-start; gap: 14px; display: flex">
+          <div style="align-self: stretch; color: black; font-size: 15px; font-family: Pretendard; font-weight: 400; line-height: 22px">밤늦게 돌아와 빨래하기 힘든 날, 문 앞에 내놓기만 하세요. 수거부터 세탁·건조·배송까지 대신해 드립니다.<br/><br/>오전에 수거한 빨래는 다음 날 저녁 문 앞으로 배송해 드립니다. 수건과 셔츠, 속옷은 종류별로 나눠 세탁합니다.<br/><br/>정기권을 구독하시면 매달 정해진 무게만큼 할인된 가격에 맡기실 수 있습니다. 바쁜 일상 속 빨래 걱정은 방방에 맡겨주세요^^</div>
+          <div style="width: 380px; height: 23px; position: relative">
+            <div style="width: 380px; height: 1px; left: 0px; top: 12px; position: absolute; background: #DBDBDB"></div>
+            <div style="width: 68.80px; height: 23px; padding-left: 4px; left: 155.60px; top: 0px; position: absolute; background: #F7F8FA; justify-content: center; align-items: center; display: inline-flex">
+              <div style="color: #DBDBDB; font-size: 15px; font-family: Pretendard; font-weight: 400; word-wrap: break-word">더보기</div>
+              <svg width="23" height="23" viewBox="0 0 23 23" style="fill: #DBDBDB"><use href="#chev"/></svg>
+            </div>
+          </div>
+        </div>
+        <div style="flex-direction: column; justify-content: flex-start; align-items: flex-start; gap: 12px; display: flex">
+          <div style="width: 380px; position: relative">
+            <div style="width: 380px; padding-top: 22px; padding-bottom: 14px; padding-left: 20px; padding-right: 20px; margin-top: 10px; background: white; border-radius: 12px; outline: 1px #71D369 solid; outline-offset: -1px; flex-direction: column; justify-content: flex-start; align-items: flex-start; gap: 15px; display: flex">
+              <div style="align-self: stretch; flex-direction: column; justify-content: flex-start; align-items: flex-start; gap: 6px; display: flex">
+                <div style="align-self: stretch; color: black; font-size: 20px; font-family: Pretendard; font-weight: 700">생활빨래 정기권</div>
+                <div style="align-self: stretch; color: #7F7F7F; font-size: 12px; font-family: Pretendard; font-weight: 400; line-height: 16.80px">월 최대 8kg까지 세탁·건조해 문 앞까지 배송해 드립니다.<br/>기본 제공량 초과 시 1kg당 3,000원이 추가됩니다.</div>
+              </div>
+              <div style="justify-content: flex-start; align-items: center; gap: 8px; display: inline-flex">
+                <div style="color: #499963; font-size: 20px; font-family: Pretendard; font-weight: 700">월 19,900원 </div>
+                <div style="color: #B2B6C5; font-size: 12px; font-family: Pretendard; font-weight: 400">(월 1회 정기 결제)</div>
+              </div>
+            </div>
+            <div style="padding-left: 12px; padding-right: 12px; padding-top: 4px; padding-bottom: 4px; left: 27px; top: 0px; position: absolute; background: #71D369; border-radius: 11px; justify-content: center; align-items: center; display: inline-flex">
+              <div style="color: white; font-size: 12px; font-family: Pretendard; font-weight: 400">인기 상품</div>
+            </div>
+          </div>
+          <div style="width: 380px; position: relative">
+            <div style="width: 380px; padding-top: 22px; padding-bottom: 14px; padding-left: 20px; padding-right: 20px; margin-top: 10px; background: white; border-radius: 12px; outline: 1px #71D369 solid; outline-offset: -1px; flex-direction: column; justify-content: flex-start; align-items: flex-start; gap: 15px; display: flex">
+              <div style="align-self: stretch; flex-direction: column; justify-content: flex-start; align-items: flex-start; gap: 6px; display: flex">
+                <div style="align-self: stretch; color: black; font-size: 20px; font-family: Pretendard; font-weight: 700">생활빨래 스탠다드 정기권</div>
+                <div style="align-self: stretch; color: #7F7F7F; font-size: 12px; font-family: Pretendard; font-weight: 400; line-height: 16.80px">월 최대 16kg까지 세탁·건조해 문 앞까지 배송해 드립니다.<br/>기본 제공량 초과 시 1kg당 3,000원이 추가됩니다.</div>
+              </div>
+              <div style="flex-direction: column; justify-content: center; align-items: flex-start; display: flex">
+                <div style="color: #B2B6C5; font-size: 15px; font-family: Pretendard; font-weight: 500; text-decoration: line-through">월 40,000원</div>
+                <div style="justify-content: flex-start; align-items: center; gap: 8px; display: inline-flex">
+                  <div style="color: #499963; font-size: 20px; font-family: Pretendard; font-weight: 700">월 35,000원</div>
+                  <div style="color: #B2B6C5; font-size: 12px; font-family: Pretendard; font-weight: 400">(월 1회 정기 결제)</div>
+                </div>
+              </div>
+            </div>
+            <div style="padding-left: 12px; padding-right: 12px; padding-top: 4px; padding-bottom: 4px; left: 27px; top: 0px; position: absolute; background: #499963; border-radius: 11px; justify-content: center; align-items: center; display: inline-flex">
+              <div style="color: white; font-size: 12px; font-family: Pretendard; font-weight: 400">특가 할인</div>
+            </div>
+          </div>
+          <div style="width: 380px; position: relative">
+            <div style="width: 380px; padding-top: 22px; padding-bottom: 14px; padding-left: 20px; padding-right: 20px; margin-top: 10px; background: white; border-radius: 12px; outline: 1px #FF9696 solid; outline-offset: -1px; flex-direction: column; justify-content: flex-start; align-items: flex-start; gap: 15px; display: flex">
+              <div style="align-self: stretch; flex-direction: column; justify-content: flex-start; align-items: flex-start; gap: 6px; display: flex">
+                <div style="align-self: stretch; color: black; font-size: 20px; font-family: Pretendard; font-weight: 700">생활빨래 단체권</div>
+                <div style="color: #7F7F7F; font-size: 12px; font-family: Pretendard; font-weight: 400; line-height: 16.80px">월 최대 30kg까지 세탁·건조해 문 앞까지 배송해 드립니다.<br/>기본 제공량 초과 시 1kg당 3,000원이 추가됩니다.</div>
+              </div>
+              <div style="flex-direction: column; justify-content: center; align-items: flex-start; display: flex">
+                <div style="color: #B2B6C5; font-size: 15px; font-family: Pretendard; font-weight: 500; text-decoration: line-through">월 60,000원</div>
+                <div style="justify-content: flex-start; align-items: center; gap: 8px; display: inline-flex">
+                  <div style="color: #E84646; font-size: 20px; font-family: Pretendard; font-weight: 700">월 54,000원</div>
+                  <div style="color: #B2B6C5; font-size: 12px; font-family: Pretendard; font-weight: 400">(월 1회 정기 결제)</div>
+                </div>
+              </div>
+            </div>
+            <div style="padding-left: 12px; padding-right: 12px; padding-top: 4px; padding-bottom: 4px; left: 27px; top: 0px; position: absolute; background: #FF9696; border-radius: 11px; justify-content: center; align-items: center; display: inline-flex">
+              <div style="color: white; font-size: 12px; font-family: Pretendard; font-weight: 400">단체 할인</div>
+            </div>
+          </div>
+        </div>
+        <div style="width: 380px; height: 1px; background: #DBDBDB"></div>
+        <div style="align-self: stretch; flex-direction: column; justify-content: flex-start; align-items: flex-start; gap: 32px; display: flex">
+          <div style="align-self: stretch; flex-direction: column; justify-content: flex-start; align-items: flex-start; gap: 12px; display: flex">
+            <div style="align-self: stretch; justify-content: space-between; align-items: flex-start; display: inline-flex">
+              <div style="justify-content: flex-start; align-items: center; gap: 4px; display: flex">
+                <div style="color: black; font-size: 20px; font-family: Pretendard; font-weight: 700">4.7</div>
+                <div style="justify-content: flex-start; align-items: center; gap: 4px; display: flex">
+                  <svg width="19" height="18" viewBox="0 0 19 18" style="fill: #E84646; flex: 0 0 auto"><use href="#star"/></svg>
+                  <svg width="19" height="18" viewBox="0 0 19 18" style="fill: #E84646; flex: 0 0 auto"><use href="#star"/></svg>
+                  <svg width="19" height="18" viewBox="0 0 19 18" style="fill: #E84646; flex: 0 0 auto"><use href="#star"/></svg>
+                  <svg width="19" height="18" viewBox="0 0 19 18" style="fill: #E84646; flex: 0 0 auto"><use href="#star"/></svg>
+                  <svg width="19" height="18" viewBox="0 0 19 18" style="fill: #DBDBDB; flex: 0 0 auto"><use href="#star"/></svg>
+                </div>
+                <div style="color: #7F7F7F; font-size: 12px; font-family: Pretendard; font-weight: 400">(52)</div>
+              </div>
+              <div style="padding-left: 7px; padding-right: 7px; justify-content: flex-start; align-items: center; gap: 10px; display: flex">
+                <div style="color: #7F7F7F; font-size: 15px; font-family: Pretendard; font-weight: 400; line-height: 22px">후기 52</div>
+                <svg width="8" height="15" viewBox="0 0 8 15" fill="none" style="flex: 0 0 auto"><path d="M0.5 0.5L6.77983 5.99485C7.69048 6.79167 7.69048 8.20833 6.77982 9.00515L0.5 14.5" stroke="#7F7F7F" stroke-linecap="round"/></svg>
+              </div>
+            </div>
+            <div class="photo-strip" style="align-self: stretch; justify-content: flex-start; align-items: center; gap: 15px; display: flex">
+              <img style="width: 209px; height: 209px; border-radius: 12px; object-fit: cover" src="images/review-laundry-kim.jpg" />
+              <img style="width: 209px; height: 209px; border-radius: 12px; object-fit: cover" src="images/review-laundry-lee.jpg" />
+            </div>
+          </div>
+          <div style="align-self: stretch; flex-direction: column; justify-content: flex-start; align-items: flex-start; display: flex">
+            <div style="align-self: stretch; flex-direction: column; justify-content: flex-start; align-items: flex-start; display: flex">
+              <div style="width: 380px; padding-top: 14px; padding-bottom: 14px; border-bottom: 1px #DBDBDB solid; flex-direction: column; justify-content: flex-start; align-items: flex-start; display: flex">
+                <div style="align-self: stretch; justify-content: space-between; align-items: flex-start; display: inline-flex">
+                  <div style="flex-direction: column; justify-content: center; align-items: flex-start; gap: 14px; display: inline-flex">
+                    <div style="justify-content: flex-start; align-items: center; gap: 10px; display: inline-flex">
+                      <img style="width: 36px; height: 36px; box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.05); border-radius: 9999px; border: 2px white solid; object-fit: cover" src="images/kim-doyun.png" />
+                      <div><span style="color: black; font-size: 15px; font-family: Pretendard; font-weight: 700; line-height: 22px">김도윤</span><span style="color: #7F7F7F; font-size: 15px; font-family: Pretendard; font-weight: 400; line-height: 22px">・생활빨래 스탠다드 정기권</span></div>
+                    </div>
+                    <div style="justify-content: flex-start; align-items: center; gap: 4px; display: inline-flex">
+                      <div style="justify-content: flex-start; align-items: center; gap: 4px; display: flex">
+                        <svg width="14" height="14" viewBox="0 0 19 18" style="fill: #E84646; flex: 0 0 auto"><use href="#star"/></svg>
+                        <svg width="14" height="14" viewBox="0 0 19 18" style="fill: #E84646; flex: 0 0 auto"><use href="#star"/></svg>
+                        <svg width="14" height="14" viewBox="0 0 19 18" style="fill: #E84646; flex: 0 0 auto"><use href="#star"/></svg>
+                        <svg width="14" height="14" viewBox="0 0 19 18" style="fill: #E84646; flex: 0 0 auto"><use href="#star"/></svg>
+                        <svg width="14" height="14" viewBox="0 0 19 18" style="fill: #E84646; flex: 0 0 auto"><use href="#star"/></svg>
+                      </div>
+                      <div style="color: #7F7F7F; font-size: 12px; font-family: Pretendard; font-weight: 400">2026.03.20</div>
+                    </div>
+                  </div>
+                  <div style="width: 30px; height: 30px; position: relative">
+                    <div style="width: 4px; height: 4px; left: 13px; top: 6px; position: absolute; background: #7F7F7F; border-radius: 9999px"></div>
+                    <div style="width: 4px; height: 4px; left: 13px; top: 13px; position: absolute; background: #7F7F7F; border-radius: 9999px"></div>
+                    <div style="width: 4px; height: 4px; left: 13px; top: 20px; position: absolute; background: #7F7F7F; border-radius: 9999px"></div>
+                  </div>
+                </div>
+                <div style="align-self: stretch; justify-content: space-between; align-items: center; display: inline-flex">
+                  <div style="width: 260px; max-width: 260px; color: black; font-size: 15px; font-family: Pretendard; font-weight: 400; line-height: 22px">빨래 모아서 문 앞에 내놓기만 하면 끝이에요. 다음 날 저녁에 잘 개어진 채로 와서 너무 편합니다!</div>
+                  <img style="width: 109px; height: 109px; border-radius: 12px; object-fit: cover" src="images/review-laundry-kim.jpg" />
+                </div>
+              </div>
+              <div style="width: 380px; padding-top: 14px; padding-bottom: 14px; border-bottom: 1px #DBDBDB solid; flex-direction: column; justify-content: flex-start; align-items: flex-start; display: flex">
+                <div style="align-self: stretch; justify-content: space-between; align-items: center; display: inline-flex">
+                  <div style="flex-direction: column; justify-content: center; align-items: flex-start; gap: 14px; display: inline-flex">
+                    <div style="justify-content: flex-start; align-items: center; gap: 10px; display: inline-flex">
+                      <img style="width: 36px; height: 36px; box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.05); border-radius: 9999px; border: 2px white solid; object-fit: cover" src="images/lee-seoyun.png" />
+                      <div><span style="color: black; font-size: 15px; font-family: Pretendard; font-weight: 700; line-height: 22px">이서윤</span><span style="color: #7F7F7F; font-size: 15px; font-family: Pretendard; font-weight: 400; line-height: 22px">・생활빨래 정기권</span></div>
+                    </div>
+                    <div style="justify-content: flex-start; align-items: center; gap: 4px; display: inline-flex">
+                      <div style="justify-content: flex-start; align-items: center; gap: 4px; display: flex">
+                        <svg width="14" height="14" viewBox="0 0 19 18" style="fill: #E84646; flex: 0 0 auto"><use href="#star"/></svg>
+                        <svg width="14" height="14" viewBox="0 0 19 18" style="fill: #E84646; flex: 0 0 auto"><use href="#star"/></svg>
+                        <svg width="14" height="14" viewBox="0 0 19 18" style="fill: #E84646; flex: 0 0 auto"><use href="#star"/></svg>
+                        <svg width="14" height="14" viewBox="0 0 19 18" style="fill: #E84646; flex: 0 0 auto"><use href="#star"/></svg>
+                        <svg width="14" height="14" viewBox="0 0 19 18" style="fill: #DBDBDB; flex: 0 0 auto"><use href="#star"/></svg>
+                      </div>
+                      <div style="color: #7F7F7F; font-size: 12px; font-family: Pretendard; font-weight: 400">2026.03.05</div>
+                    </div>
+                  </div>
+                  <div style="width: 30px; height: 30px; position: relative">
+                    <div style="width: 4px; height: 4px; left: 13px; top: 6px; position: absolute; background: #7F7F7F; border-radius: 9999px"></div>
+                    <div style="width: 4px; height: 4px; left: 13px; top: 13px; position: absolute; background: #7F7F7F; border-radius: 9999px"></div>
+                    <div style="width: 4px; height: 4px; left: 13px; top: 20px; position: absolute; background: #7F7F7F; border-radius: 9999px"></div>
+                  </div>
+                </div>
+                <div style="align-self: stretch; justify-content: space-between; align-items: center; display: inline-flex">
+                  <div style="width: 260px; max-width: 260px; color: black; font-size: 15px; font-family: Pretendard; font-weight: 400; line-height: 22px">퇴근이 늦어도 알아서 수거해 가니까 빨래가 밀릴 일이 없어요. 수건이랑 셔츠를 따로 세탁해 주는 것도 좋습니다.</div>
+                  <img style="width: 109px; height: 109px; border-radius: 12px; object-fit: cover" src="images/review-laundry-lee.jpg" />
+                </div>
+              </div>
+              <div style="align-self: stretch; padding-top: 14px; padding-bottom: 14px; flex-direction: column; justify-content: flex-start; align-items: flex-start; gap: 12px; display: flex">
+                <div style="align-self: stretch; justify-content: space-between; align-items: center; display: inline-flex">
+                  <div style="flex-direction: column; justify-content: center; align-items: flex-start; gap: 14px; display: inline-flex">
+                    <div style="justify-content: flex-start; align-items: center; gap: 10px; display: inline-flex">
+                      <img style="width: 36px; height: 36px; box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.05); border-radius: 9999px; border: 2px white solid; object-fit: cover" src="images/shin-haeryang.png" />
+                      <div><span style="color: black; font-size: 15px; font-family: Pretendard; font-weight: 700; line-height: 22px">신해량</span><span style="color: #7F7F7F; font-size: 15px; font-family: Pretendard; font-weight: 400; line-height: 22px">・생활빨래 단체권</span></div>
+                    </div>
+                    <div style="justify-content: flex-start; align-items: center; gap: 4px; display: inline-flex">
+                      <div style="justify-content: flex-start; align-items: center; gap: 4px; display: flex">
+                                      <svg width="14" height="14" viewBox="0 0 19 18" style="fill: #E84646; flex: 0 0 auto"><use href="#star"/></svg>
+                                      <svg width="14" height="14" viewBox="0 0 19 18" style="fill: #E84646; flex: 0 0 auto"><use href="#star"/></svg>
+                                      <svg width="14" height="14" viewBox="0 0 19 18" style="fill: #E84646; flex: 0 0 auto"><use href="#star"/></svg>
+                                      <svg width="14" height="14" viewBox="0 0 19 18" style="fill: #E84646; flex: 0 0 auto"><use href="#star"/></svg>
+                                      <svg width="14" height="14" viewBox="0 0 19 18" style="fill: #E84646; flex: 0 0 auto"><use href="#star"/></svg>
+                      </div>
+                      <div style="color: #7F7F7F; font-size: 12px; font-family: Pretendard; font-weight: 400">2026.02.21</div>
+                    </div>
+                  </div>
+                  <div style="width: 30px; height: 30px; position: relative">
+                    <div style="width: 4px; height: 4px; left: 13px; top: 6px; position: absolute; background: #7F7F7F; border-radius: 9999px"></div>
+                    <div style="width: 4px; height: 4px; left: 13px; top: 13px; position: absolute; background: #7F7F7F; border-radius: 9999px"></div>
+                    <div style="width: 4px; height: 4px; left: 13px; top: 20px; position: absolute; background: #7F7F7F; border-radius: 9999px"></div>
+                  </div>
+                </div>
+                <div style="align-self: stretch; color: black; font-size: 15px; font-family: Pretendard; font-weight: 400; line-height: 22px">룸메이트랑 같이 단체권을 쓰는데 각자 세탁기를 돌릴 필요가 없어서 편합니다. 수거 시간도 정확하게 지켜 주십니다.</div>
+              </div>
+            </div>
+            <div style="width: 380px; height: 23px; position: relative">
+              <div style="width: 380px; height: 1px; left: 0px; top: 12px; position: absolute; background: #DBDBDB"></div>
+              <div style="width: 68.80px; height: 23px; padding-left: 4px; left: 155.60px; top: 0px; position: absolute; background: #F7F8FA; justify-content: center; align-items: center; display: inline-flex">
+                <div style="color: #DBDBDB; font-size: 15px; font-family: Pretendard; font-weight: 400; word-wrap: break-word">더보기</div>
+                <svg width="23" height="23" viewBox="0 0 23 23" style="fill: #DBDBDB"><use href="#chev"/></svg>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Detail Header -->
+    <div style="position: absolute; left: 0; top: 0; width: 412px; height: 106px; background: rgba(247, 248, 250, 0.80); backdrop-filter: blur(6px); z-index: 1; pointer-events: auto">
+      <div style="left: 16px; top: 57px; position: absolute; justify-content: flex-start; align-items: center; gap: 16px; display: inline-flex">
+        <div onclick="closeDetail()" style="cursor: pointer; justify-content: center; align-items: center; display: flex">
+          <svg width="29" height="29" viewBox="0 0 29 29" fill="none"><path d="M20 5L10.7526 12.9864C9.82896 13.7841 9.82896 15.2159 10.7526 16.0136L20 24" stroke="#BABFCF" stroke-width="2" stroke-linecap="round"/></svg>
+        </div>
+        <div style="color: black; font-size: 24px; font-family: 'NationalPension', 'Pretendard', sans-serif; font-weight: 700">골목 생활</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const mapContainer = document.getElementById("mapContainer");
+  const mapContent = document.getElementById("mapContent");
+  const resetLocationBtn = document.getElementById("resetLocationBtn");
+
+  let scale = 3, pointX = -412, pointY = -626.5;
+  let start = { x: 0, y: 0 }, isPanning = false, clickStart = {x:0,y:0}, dragDistance = 0;
+  let initialDistance = 0, initialScale = 1;
+
+  const clamp = (v, min, max) => min > max ? min : Math.min(Math.max(v, min), max);
+
+  function setTransform() {
+    const rect = mapContainer.getBoundingClientRect();
+    if (scale < 1) scale = 1;
+    // 게임 폰 안에서 앱이 숨겨진 채(크기 0) 처음 불리면 위치가 0,0(지도 왼쪽 위)으로 깎여 '내 위치'를 잃었다 → 크기 0이면 깎지 않는다
+    if (rect.width && rect.height) {
+      pointX = clamp(pointX, rect.width - rect.width * scale, 0);
+      pointY = clamp(pointY, rect.height - rect.height * scale, 0);
+    }
+    mapContent.style.transform = `translate(${pointX}px, ${pointY}px) scale(${scale})`;
+  }
+  setTransform();
+
+  // Store markers
+  const stores = [
+    {id:1,x:180,y:270,cat:"restaurant"},{id:2,x:250,y:400,cat:"laundry"},{id:3,x:100,y:250,cat:"restaurant"},{id:4,x:300,y:300,cat:"laundry"},
+    {id:5,x:350,y:150,cat:"laundry"},{id:6,x:120,y:500,cat:"restaurant"},{id:7,x:50,y:80,cat:"restaurant"},{id:8,x:200,y:100,cat:"restaurant"},
+    {id:9,x:300,y:50,cat:"laundry"},{id:10,x:80,y:350,cat:"laundry"},{id:11,x:380,y:450,cat:"restaurant"},{id:12,x:220,y:550,cat:"restaurant"},
+    {id:13,x:60,y:650,cat:"laundry"},{id:14,x:280,y:700,cat:"laundry"},{id:15,x:150,y:800,cat:"restaurant"},{id:16,x:350,y:820,cat:"restaurant"},
+    {id:17,x:190,y:200,cat:"restaurant"},{id:18,x:260,y:240,cat:"laundry"},{id:19,x:320,y:380,cat:"laundry"},{id:20,x:90,y:450,cat:"restaurant"}
+  ];
+  const normalSVG = `<svg width="23" height="30" viewBox="0 0 23 30" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" d="M12.6477 28.9558C14.5451 26.4322 18.4035 21.2408 20.0262 18.6229C21.3245 16.5306 22.5 14.2662 22.5 11.6055C22.5 5.47139 17.5744 0.5 11.4991 0.5C5.42557 0.5 0.5 5.47139 0.5 11.6055C0.5 14.2903 1.65529 16.5917 3.01229 18.671C4.66287 21.2045 8.55667 26.4214 10.4643 28.9555C11.0105 29.6812 12.1018 29.6817 12.6477 28.9558ZM11.5 15.4502C13.778 15.4502 15.625 13.6231 15.625 11.3737C15.625 9.12259 13.778 7.29553 11.5 7.29553C9.22204 7.29553 7.375 9.12259 7.375 11.3737C7.375 13.6231 9.22204 15.4502 11.5 15.4502Z" fill="#FF9696" stroke="white"/></svg>`;
+  const selectedFoodSVG = `<svg width="43" height="56" viewBox="0 0 43 56" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" d="M23.691 54.4678C27.3133 49.6818 34.6794 39.8361 37.7773 34.871C40.2559 30.903 42.5 26.6083 42.5 21.5622C42.5 9.9285 33.0966 0.5 21.4983 0.5C9.90335 0.5 0.5 9.9285 0.5 21.5622C0.5 26.654 2.70555 31.0188 5.2962 34.9623C8.44729 39.7671 15.8809 49.6612 19.5227 54.4673C20.5655 55.8436 22.6489 55.8447 23.691 54.4678Z" fill="#FF9696" stroke="white"/><path d="M14 30.5C13.3125 30.5 12.7242 30.254 12.235 29.7621C11.745 29.2693 11.5 28.6771 11.5 27.9857V16.6714C11.5 16.2733 11.5887 15.8962 11.7662 15.54C11.9429 15.1838 12.1875 14.8905 12.5 14.66L20 9.00286C20.4375 8.66762 20.9375 8.5 21.5 8.5C22.0625 8.5 22.5625 8.66762 23 9.00286L30.5 14.66C30.8125 14.8905 31.0575 15.1838 31.235 15.54C31.4117 15.8962 31.5 16.2733 31.5 16.6714V27.9857C31.5 28.6771 31.2554 29.2693 30.7663 29.7621C30.2763 30.254 29.6875 30.5 29 30.5H14ZM19 21.7V26.1C19 26.2676 19.0625 26.4143 19.1875 26.54C19.3125 26.6657 19.4583 26.7286 19.625 26.7286C19.7917 26.7286 19.9375 26.6657 20.0625 26.54C20.1875 26.4143 20.25 26.2676 20.25 26.1V21.7C20.7708 21.7 21.2133 21.5165 21.5775 21.1494C21.9425 20.7831 22.125 20.3381 22.125 19.8143V16.6714C22.125 16.5038 22.0625 16.3571 21.9375 16.2314C21.8125 16.1057 21.6667 16.0429 21.5 16.0429C21.3333 16.0429 21.1875 16.1057 21.0625 16.2314C20.9375 16.3571 20.875 16.5038 20.875 16.6714V19.8143H20.25V16.6714C20.25 16.5038 20.1875 16.3571 20.0625 16.2314C19.9375 16.1057 19.7917 16.0429 19.625 16.0429C19.4583 16.0429 19.3125 16.1057 19.1875 16.2314C19.0625 16.3571 19 16.5038 19 16.6714V19.8143H18.375V16.6714C18.375 16.5038 18.3125 16.3571 18.1875 16.2314C18.0625 16.1057 17.9167 16.0429 17.75 16.0429C17.5833 16.0429 17.4375 16.1057 17.3125 16.2314C17.1875 16.3571 17.125 16.5038 17.125 16.6714V19.8143C17.125 20.3381 17.3075 20.7831 17.6725 21.1494C18.0367 21.5165 18.4792 21.7 19 21.7ZM24.625 26.7286C24.7917 26.7286 24.9375 26.6657 25.0625 26.54C25.1875 26.4143 25.25 26.2676 25.25 26.1V16.7971C25.25 16.6295 25.1875 16.4829 25.0625 16.3571C24.9375 16.2314 24.7917 16.1686 24.625 16.1686C24.0417 16.1686 23.5833 16.4095 23.25 16.8914C22.9167 17.3733 22.75 17.9286 22.75 18.5571V21.7C22.75 21.8676 22.8125 22.0143 22.9375 22.14C23.0625 22.2657 23.2083 22.3286 23.375 22.3286H24V26.1C24 26.2676 24.0625 26.4143 24.1875 26.54C24.3125 26.6657 24.4583 26.7286 24.625 26.7286Z" fill="white"/></svg>`;
+  const selectedLaundrySVG = `<svg width="43" height="56" viewBox="0 0 43 56" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" d="M23.691 54.4678C27.3133 49.6818 34.6794 39.8361 37.7773 34.871C40.2559 30.903 42.5 26.6083 42.5 21.5622C42.5 9.9285 33.0967 0.5 21.4983 0.5C9.90335 0.5 0.5 9.9285 0.5 21.5622C0.5 26.654 2.70555 31.0188 5.2962 34.9623C8.44729 39.7671 15.8809 49.6612 19.5227 54.4673C20.5655 55.8436 22.6489 55.8447 23.691 54.4678Z" fill="#FF9696" stroke="white"/><path d="M21.5 8.5C22.0625 8.5 22.5625 8.66769 23 9.00293L30.5 14.6602C30.8125 14.8906 31.0579 15.1839 31.2354 15.54C31.412 15.8962 31.5 16.2738 31.5 16.6719V27.9854C31.5 28.6766 31.2555 29.269 30.7666 29.7617C30.2766 30.2537 29.6875 30.5 29 30.5H14C13.3125 30.5 12.7245 30.2537 12.2354 29.7617C11.7454 29.2689 11.5 28.6768 11.5 27.9854V16.6719C11.5 16.2738 11.5891 15.8962 11.7666 15.54C11.9432 15.1839 12.1876 14.8906 12.5 14.6602L20 9.00293C20.4375 8.66769 20.9375 8.5 21.5 8.5ZM17 26.3213C17 26.9722 17.5037 27.5 18.125 27.5H24.875C25.4963 27.5 26 26.9722 26 26.3213V19.4316H17V26.3213ZM21.5 20.3438C22.9943 20.3438 24.2061 21.6133 24.2061 23.1787C24.206 24.744 22.9942 26.0127 21.5 26.0127C20.0058 26.0127 18.794 24.744 18.7939 23.1787C18.7939 23.0221 18.8066 22.868 18.8301 22.7178C18.8312 22.71 18.8326 22.702 18.834 22.6943C18.86 22.5362 18.8982 22.3818 18.9482 22.2334C19.3195 21.1334 20.3212 20.3438 21.5 20.3438ZM19.9961 22.6152C19.8131 22.6155 19.6572 22.7543 19.627 22.9434C19.6096 23.0519 19.6006 23.1632 19.6006 23.2764C19.6006 24.3816 20.4557 25.2773 21.5107 25.2773C22.4576 25.2773 23.2429 24.5561 23.3945 23.6094C23.4128 23.4954 23.3818 23.3792 23.3105 23.291C23.2393 23.2028 23.1347 23.1514 23.0244 23.1514H22.6523C22.0873 23.1514 21.8013 23.0357 21.5186 22.9131L21.4736 22.8936C21.1714 22.7618 20.835 22.6152 20.2617 22.6152H19.9961ZM18.125 16.5C17.5037 16.5 17 17.0278 17 17.6787V18.4492H26V17.6787C26 17.0278 25.4963 16.5 24.875 16.5H18.125Z" fill="white"/></svg>`;
+
+  window.markerElements = [];
+  const markerElements = window.markerElements;
+  stores.forEach(store => {
+    const marker = document.createElement("div");
+    marker.className = "store-marker";
+    Object.assign(marker.style, { position:"absolute", left:store.x+"px", top:store.y+"px", width:"0px", height:"0px", transform:"scale(0.333333)", transition:"opacity 0.4s ease-out", cursor:"pointer", pointerEvents:"auto", zIndex:100 });
+
+    const normalDiv = document.createElement("div");
+    Object.assign(normalDiv.style, { position:"absolute", left:"-11.5px", top:"-30px", width:"23px", height:"30px", transition:"all 0.4s cubic-bezier(0.2,0.8,0.2,1)", transformOrigin:"bottom center" });
+    normalDiv.innerHTML = normalSVG;
+
+    const selectedDiv = document.createElement("div");
+    Object.assign(selectedDiv.style, { position:"absolute", left:"-21.5px", top:"-56px", width:"43px", height:"56px", transition:"all 0.4s cubic-bezier(0.2,0.8,0.2,1)", transformOrigin:"bottom center", opacity:"0", transform:"scale(0.5)", pointerEvents:"none" });
+    selectedDiv.innerHTML = store.cat === "laundry" ? selectedLaundrySVG : selectedFoodSVG;
+
+    marker.appendChild(normalDiv);
+    marker.appendChild(selectedDiv);
+
+    marker.resetFn = () => {
+      normalDiv.style.opacity = "1"; normalDiv.style.transform = "scale(1)";
+      selectedDiv.style.opacity = "0"; selectedDiv.style.transform = "scale(0.5)";
+      marker.style.opacity = "1"; marker.style.pointerEvents = "auto"; marker.dataset.selected = "false";
+    };
+    marker.resetFn();
+
+    const clickHandler = (e) => {
+      e.stopPropagation(); e.preventDefault();
+      if (marker.dataset.selected === "true") return;
+      markerElements.forEach(m => {
+        if (m !== marker) { m.style.opacity = "0"; m.style.pointerEvents = "none"; if (m.dataset.selected === "true") m.resetFn(); }
+      });
+      normalDiv.style.opacity = "0"; normalDiv.style.transform = "scale(1.5)";
+      selectedDiv.style.opacity = "1"; selectedDiv.style.transform = "scale(1)";
+      marker.dataset.selected = "true";
+
+      mapContent.style.transition = 'transform 0.4s cubic-bezier(0.2,0.8,0.2,1)';
+      scale = 3; pointX = 206 - store.x * 3; pointY = 308 - store.y * 3;
+      setTransform();
+      setTimeout(() => { mapContent.style.transition = 'none'; }, 400);
+
+      // Open the matching detail page for stores that have one
+      if (store.cat === "restaurant" || store.cat === "laundry") openDetail(store.cat);
+    };
+    marker.addEventListener("click", clickHandler);
+    marker.addEventListener("touchstart", clickHandler, {passive:false});
+    markerElements.push(marker);
+    mapContent.appendChild(marker);
+  });
+
+  // Reset location button
+  if (resetLocationBtn) {
+    const resetToInitial = () => {
+      resetLocationBtn.style.transform = 'scale(0.9)';
+      setTimeout(() => { resetLocationBtn.style.transform = 'scale(1)'; }, 150);
+      // 상세가 열려 있으면 선택된 핀은 그대로 두고 지도만 내 위치로 되돌린다
+      if (!activeDetail) markerElements.forEach(m => m.resetFn());
+      mapContent.style.transition = 'transform 0.4s cubic-bezier(0.2,0.8,0.2,1)';
+      scale = 3; pointX = -412; pointY = -626.5; setTransform();
+      setTimeout(() => { mapContent.style.transition = 'none'; }, 400);
+    };
+    resetLocationBtn.addEventListener("click", resetToInitial);
+    resetLocationBtn.addEventListener("touchstart", (e) => { e.preventDefault(); resetToInitial(); });
+  }
+
+  const getRelativePoint = (cx, cy) => { const r = mapContainer.getBoundingClientRect(); return { x: cx - r.left, y: cy - r.top }; };
+
+  // Mouse
+  mapContainer.addEventListener("mousedown", (e) => {
+    e.preventDefault();
+    clickStart = { x: e.clientX, y: e.clientY }; dragDistance = 0;
+    const pt = getRelativePoint(e.clientX, e.clientY);
+    start = { x: pt.x - pointX, y: pt.y - pointY };
+    isPanning = true; mapContainer.style.cursor = "grabbing";
+  });
+  mapContainer.addEventListener("mousemove", (e) => {
+    if (!isPanning) return; e.preventDefault();
+    dragDistance += Math.hypot(e.clientX - clickStart.x, e.clientY - clickStart.y);
+    clickStart = { x: e.clientX, y: e.clientY };
+    const pt = getRelativePoint(e.clientX, e.clientY);
+    pointX = pt.x - start.x; pointY = pt.y - start.y; setTransform();
+  });
+  mapContainer.addEventListener("mouseup", (e) => {
+    isPanning = false; mapContainer.style.cursor = "grab";
+    if (dragDistance < 5 && !e.target.closest('.store-marker')) {
+      if (window.handleMapTap && window.handleMapTap()) return;
+      markerElements.forEach(m => m.resetFn());
+    }
+  });
+  mapContainer.addEventListener("mouseleave", () => { isPanning = false; mapContainer.style.cursor = "grab"; });
+  mapContainer.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    const pt = getRelativePoint(e.clientX, e.clientY);
+    const xs = (pt.x - pointX) / scale, ys = (pt.y - pointY) / scale;
+    const delta = e.wheelDelta ? e.wheelDelta : -e.deltaY;
+    delta > 0 ? (scale *= 1.2) : (scale /= 1.2);
+    scale = Math.min(Math.max(1, scale), 15);
+    pointX = pt.x - xs * scale; pointY = pt.y - ys * scale; setTransform();
+  });
+
+  // Touch
+  mapContainer.addEventListener("touchstart", (e) => {
+    if (e.touches.length === 1) {
+      clickStart = { x: e.touches[0].clientX, y: e.touches[0].clientY }; dragDistance = 0;
+      const pt = getRelativePoint(e.touches[0].clientX, e.touches[0].clientY);
+      start = { x: pt.x - pointX, y: pt.y - pointY }; isPanning = true;
+    } else if (e.touches.length === 2) {
+      isPanning = false; dragDistance = Infinity;   // 핀치는 탭이 아니다
+      initialDistance = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+      initialScale = scale;
+    }
+  }, { passive: false });
+  mapContainer.addEventListener("touchmove", (e) => {
+    if (e.touches.length === 1 && isPanning) {
+      e.preventDefault();
+      dragDistance += Math.hypot(e.touches[0].clientX - clickStart.x, e.touches[0].clientY - clickStart.y);
+      clickStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      const pt = getRelativePoint(e.touches[0].clientX, e.touches[0].clientY);
+      pointX = pt.x - start.x; pointY = pt.y - start.y; setTransform();
+    } else if (e.touches.length === 2) {
+      e.preventDefault();
+      const cur = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+      const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2, cy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+      const pt = getRelativePoint(cx, cy);
+      const xs = (pt.x - pointX) / scale, ys = (pt.y - pointY) / scale;
+      scale = Math.min(Math.max(1, initialScale * (cur / initialDistance)), 15);
+      pointX = pt.x - xs * scale; pointY = pt.y - ys * scale; setTransform();
+    }
+  }, { passive: false });
+  mapContainer.addEventListener("touchend", (e) => {
+    if (e.cancelable) e.preventDefault();   // 뒤따르는 가짜 mouse 이벤트 차단 — 없으면 한 번 탭이 두 번 처리된다
+    if (dragDistance < 5 && !e.target.closest('.store-marker')) {
+      if (!(window.handleMapTap && window.handleMapTap())) markerElements.forEach(m => m.resetFn());
+    }
+    if (e.touches.length < 2) initialDistance = 0;
+    if (e.touches.length === 1) {
+      const pt = getRelativePoint(e.touches[0].clientX, e.touches[0].clientY);
+      start = { x: pt.x - pointX, y: pt.y - pointY }; isPanning = true;
+    } else isPanning = false;
+  });
+});
+</script>
+
+<script>
+// Draggable bottom sheet: drag handle up to cover map, down to restore
+document.addEventListener("DOMContentLoaded", () => {
+  const sheet = document.getElementById("bottomSheet");
+  const handle = document.getElementById("sheetHandle");
+  const MIN_TOP = 114, MAX_TOP = 510, THRESHOLD = (MIN_TOP + MAX_TOP) / 2;
+  let dragging = false, moved = false, startY = 0, startTop = MAX_TOP, currentTop = MAX_TOP;
+
+  const getY = e => e.touches ? e.touches[0].clientY : e.clientY;
+
+  function onStart(e) {
+    dragging = true;
+    moved = false;
+    sheet.style.transition = "none";
+    startY = getY(e);
+    startTop = parseFloat(sheet.style.top) || MAX_TOP;
+    currentTop = startTop;
+  }
+  function onMove(e) {
+    if (!dragging) return;
+    if (Math.abs(getY(e) - startY) > 3) moved = true;
+    if (e.cancelable) e.preventDefault();
+    currentTop = Math.min(Math.max(startTop + (getY(e) - startY), MIN_TOP), MAX_TOP);
+    sheet.style.top = currentTop + "px";
+  }
+  function onEnd(e) {
+    if (!dragging) return;
+    if (e && e.type === "touchend" && e.cancelable) e.preventDefault();   // 가짜 mouse 이벤트로 한 번 더 토글되는 것 차단
+    dragging = false;
+    sheet.style.transition = "top 0.3s cubic-bezier(0.2,0.8,0.2,1)";
+    // Tap (no drag) toggles; drag snaps to nearest
+    if (!moved) currentTop = startTop > MIN_TOP ? MIN_TOP : MAX_TOP;
+    else currentTop = currentTop < THRESHOLD ? MIN_TOP : MAX_TOP;
+    sheet.style.top = currentTop + "px";
+  }
+
+  handle.addEventListener("mousedown", onStart);
+  window.addEventListener("mousemove", onMove);
+  window.addEventListener("mouseup", onEnd);
+  handle.addEventListener("touchstart", onStart, { passive: false });
+  window.addEventListener("touchmove", onMove, { passive: false });
+  window.addEventListener("touchend", onEnd);
+});
+</script>
+
+<script>
+// Marker -> category detail page + map-tap collapse/close
+let detailState = "closed"; // closed | expanded | peek
+let activeDetail = null;    // id of the open detail view
+const SHEET_EXPANDED = 510, FAB_OFFSET = 75, PEEK_GAP = 17;
+
+// Peek must always show name..rating..address. Measure where the address line actually
+// ends instead of hard-coding a top: a fallback font (webfont blocked or offline) makes
+// that block ~14px taller and a fixed value would push the address off screen.
+function peekTop() {
+  const sheet = detailSheetEl();
+  const addr = sheet && sheet.querySelector("[data-peek-anchor]");
+  const wrap = document.querySelector(".app-wrapper");
+  if (!addr || !wrap) return 740;
+  const need = addr.getBoundingClientRect().bottom - sheet.getBoundingClientRect().top + sheet.scrollTop;
+  return Math.max(SHEET_EXPANDED, Math.round(wrap.clientHeight - need - PEEK_GAP));
+}
+
+const detailSheetEl = () => activeDetail && document.querySelector("#" + activeDetail + " .hide-scrollbar");
+
+function openDetail(cat) {
+  activeDetail = cat === "laundry" ? "detailLaundry" : "detailRestaurant";
+  document.getElementById(activeDetail).style.display = "block";
+  document.getElementById("listHeader").style.display = "none";
+  document.getElementById("bottomSheet").style.display = "none";
+  document.getElementById("bottomNav").style.display = "none";
+  detailState = "expanded";
+  setSheet(SHEET_EXPANDED);
+  const sheet = detailSheetEl();
+  if (sheet) sheet.scrollTop = 0;
+}
+function closeDetail() {
+  if (activeDetail) document.getElementById(activeDetail).style.display = "none";
+  activeDetail = null;
+  document.getElementById("listHeader").style.display = "";
+  document.getElementById("bottomSheet").style.display = "";
+  document.getElementById("bottomNav").style.display = "";
+  detailState = "closed";
+  const fab = document.getElementById("resetLocationBtn");
+  if (fab) { fab.style.top = (SHEET_EXPANDED - FAB_OFFSET) + "px"; fab.click(); } // reset to my location
+}
+function setSheet(top) {
+  const sheet = detailSheetEl();
+  if (sheet) sheet.style.top = top + "px";
+  const fab = document.getElementById("resetLocationBtn");
+  if (fab) fab.style.top = (top - FAB_OFFSET) + "px";
+}
+// Tapping the map in detail: 1st tap collapses to a peek showing name..rating..address, 2nd returns home
+window.handleMapTap = function () {
+  if (detailState === "expanded" || detailState === "raised") {
+    const sheet = detailSheetEl();
+    if (sheet) sheet.scrollTop = 0;          // peek shows the top of the sheet, not wherever it was scrolled
+    setSheet(peekTop()); detailState = "peek"; return true;
+  }
+  if (detailState === "peek") { closeDetail(); return true; }
+  return false;
+};
+
+// Detail sheet handle: tap toggles / drag snaps between full height (114) and default (510) — same as main sheet
+document.addEventListener("DOMContentLoaded", () => {
+  const MIN_TOP = 114, MAX_TOP = SHEET_EXPANDED, THRESHOLD = (MIN_TOP + MAX_TOP) / 2;
+  const getY = e => e.touches ? e.touches[0].clientY : e.clientY;
+  document.querySelectorAll(".detailHandle").forEach(handle => {
+    const sheet = handle.parentElement;
+    let dragging = false, moved = false, startY = 0, startTop = MAX_TOP, currentTop = MAX_TOP;
+    function onStart(e) {
+      dragging = true; moved = false;
+      sheet.style.transition = "none";
+      startY = getY(e);
+      startTop = parseFloat(sheet.style.top) || MAX_TOP;
+      currentTop = startTop;
+    }
+    function onMove(e) {
+      if (!dragging) return;
+      if (Math.abs(getY(e) - startY) > 3) moved = true;
+      if (e.cancelable) e.preventDefault();
+      currentTop = Math.min(Math.max(startTop + (getY(e) - startY), MIN_TOP), MAX_TOP);
+      setSheet(currentTop);
+    }
+    function onEnd(e) {
+      if (!dragging) return;
+      if (e && e.type === "touchend" && e.cancelable) e.preventDefault();   // 가짜 mouse 이벤트로 한 번 더 토글되는 것 차단
+      dragging = false;
+      sheet.style.transition = "top 0.3s cubic-bezier(0.2,0.8,0.2,1)";
+      if (!moved) currentTop = startTop > MIN_TOP ? MIN_TOP : MAX_TOP;
+      else currentTop = currentTop < THRESHOLD ? MIN_TOP : MAX_TOP;
+      setSheet(currentTop);
+      detailState = currentTop <= MIN_TOP ? "raised" : "expanded";
+    }
+    handle.addEventListener("mousedown", onStart);
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onEnd);
+    handle.addEventListener("touchstart", onStart, { passive: false });
+    window.addEventListener("touchmove", onMove, { passive: false });
+    window.addEventListener("touchend", onEnd);
+  });
+});
+</script>
+<script>
+// Drag the photo strips sideways with the mouse; touch uses native scrolling.
+document.querySelectorAll(".photo-strip").forEach(el => {
+  let startX = 0, startLeft = 0, down = false;
+  el.addEventListener("pointerdown", e => {
+    if (e.pointerType !== "mouse") return;
+    down = true; startX = e.clientX; startLeft = el.scrollLeft;
+    el.classList.add("dragging");
+    try { el.setPointerCapture(e.pointerId); } catch (_) {}
+  });
+  el.addEventListener("pointermove", e => { if (down) el.scrollLeft = startLeft - (e.clientX - startX); });
+  const end = () => { if (down) { down = false; el.classList.remove("dragging"); } };
+  el.addEventListener("pointerup", end);
+  el.addEventListener("pointercancel", end);
+});
+</script>
+<script>
+// 카테고리 칩: 목록 카드를 data-cat으로 거른다
+const catChips = document.getElementById("catChips");
+catChips.onclick = e => {
+  const chip = e.target.closest(".cat-chip"); if (!chip) return;
+  catChips.querySelectorAll(".cat-chip").forEach(c => c.classList.toggle("on", c === chip));
+  const cat = chip.textContent === "전체" ? "" : chip.textContent;
+  let shown = 0;
+  document.querySelectorAll("#catList > [data-cat]").forEach(card => {
+    card.hidden = !!cat && card.dataset.cat !== cat;
+    if (!card.hidden) shown++;
+  });
+  document.getElementById("catEmpty").hidden = shown > 0;
+  document.getElementById("sheetScroll").scrollTop = 0;
+};
+</script>
+<script>
+// 게임(index.html)과 미션 연결 - 부모 쪽 'teum-app1' 메시지 리스너가 받는다.
+// detail-opened(카드 상세 열림) / group-subscribe·laundry-group-subscribe(단체권 누름) / rect-report(안내 강조할 버튼 위치)
+(function(){
+  function notifyParent(type, extra){
+    if (window.parent === window) return;
+    window.parent.postMessage(Object.assign({ source: "teum-app1", type: type }, extra || {}), "*");
+  }
+  // 단체권 카드: 제목 글자로 찾아 카드 전체(380px 상자)를 잡는다
+  function cardByTitle(title){
+    const t = [...document.querySelectorAll(".detail-view div")].find(d => d.children.length === 0 && d.textContent.trim() === title);
+    return t && t.closest('[style*="width: 380px; position: relative"]');
+  }
+  const GROUP = { restaurant: cardByTitle("정기 반찬 단체 구독권 (2인 기준)"), laundry: cardByTitle("생활빨래 단체권") };
+  if (GROUP.restaurant) { GROUP.restaurant.style.cursor = "pointer"; GROUP.restaurant.addEventListener("click", () => notifyParent("group-subscribe")); }
+  if (GROUP.laundry) { GROUP.laundry.style.cursor = "pointer"; GROUP.laundry.addEventListener("click", () => notifyParent("laundry-group-subscribe")); }
+
+  // 진행 중인 미션 - 게임이 syncHouseOnly에서 보내준다 (fridge | laundry | null)
+  let mission = null;
+  // 상세 화면 단계: 'show' = 구독권 목록을 점선으로 보여주는 중(단체권 아직 못 누름, 게임의 [다음]으로 넘김) / 'click' = 단체권 누르기
+  let phase = "click", target = null;   // target = 지금 단계 대상 이름 (게임의 ALLEY_GUIDE 대본과 같은 이름)
+  const ticketList = g => g && g.parentElement; // 단체권 카드를 담은 구독권 목록(정기권·연간/스탠다드·단체권)
+  let animUntil = 0;   // 시트 올리기·자동 스크롤 애니메이션이 끝나는 시각 - 그 뒤에 단계 대상을 화면 안으로 스크롤한다
+  const mapArea = document.createElement("div"); mapArea.id = "missionMapArea";
+  document.getElementById("mapContainer").after(mapArea);
+  const DETAIL = { fridge: document.getElementById("detailRestaurant"), laundry: document.getElementById("detailLaundry") };
+  // 단계 대상 → 요소 목록 (테두리는 각각, 말풍선 위치는 합친 범위)
+  const MISSION_TARGETS = {
+    map: () => { mapArea.style.height = Math.max(60, MAIN_SHEET.offsetTop - 28) + "px"; return [mapArea]; },
+    chips: () => [document.getElementById("catChips")],
+    list: () => [...document.querySelectorAll("#catList > [data-cat]:not([hidden])")].slice(0, 3),   // 목록 전체는 화면 아래로 넘쳐서 - 보이는 카드 3장만
+    card: () => [PULSE[mission] && PULSE[mission].card],
+    tickets: () => { const g = PULSE[mission] && PULSE[mission].group, l = ticketList(g); return l ? [...l.children].filter(c => c !== g) : []; },
+    group: () => [PULSE[mission] && PULSE[mission].group],
+    reviews: () => {   // '후기 NN' 글자가 있는 별점 줄 + 후기 사진 묶음
+      const d = DETAIL[mission], t = d && [...d.querySelectorAll("div")].find(x => x.children.length === 0 && /^후기 \d+$/.test(x.textContent.trim()));
+      return [t && t.parentElement.parentElement.parentElement];
+    }
+  };
+  const targetEls = name => ((MISSION_TARGETS[name] || (() => []))() || []).filter(Boolean);
+  const unionRect = els => els.map(e => e.getBoundingClientRect()).reduce((u, r) => !u ? { top: r.top, left: r.left, right: r.right, bottom: r.bottom } :
+    { top: Math.min(u.top, r.top), left: Math.min(u.left, r.left), right: Math.max(u.right, r.right), bottom: Math.max(u.bottom, r.bottom) }, null);
+  // 대상이 목록/상세 시트 밖에 있으면 천천히(0.6초) 가운데로 스크롤 - 이미 다 보이면 그대로 둔다
+  function scrollToTarget(){
+    const els = targetEls(target), u = els.length && unionRect(els), sc = els[0] && els[0].closest("#sheetScroll, .hide-scrollbar");
+    if (!u || !sc) return;
+    const b = sc.getBoundingClientRect(), M = 30, h = u.bottom - u.top;
+    if (u.top >= b.top + M && u.bottom <= b.bottom - M) return;
+    const from = sc.scrollTop, to = from + (u.top - b.top) - (h > sc.clientHeight - M * 2 ? M : (sc.clientHeight - h) / 2), t0 = performance.now();
+    (function step(now){
+      const t = Math.min(1, (now - t0) / 600), k = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+      sc.scrollTop = from + (to - from) * k;
+      if (t < 1) requestAnimationFrame(step);
+    })(t0);
+  }
+  // 세탁물 미션: 목록('전체')에서 세탁소 카드는 하단 메뉴 뒤에 가려 있어서, 목록 바텀 시트를 천천히 위로 올려 보이게 한다
+  // (다른 카드도 그대로 보이고, 누를 수 있는 건 세탁소 카드뿐)
+  const MAIN_SHEET = document.getElementById("bottomSheet");
+  function moveMainSheet(top, ms){
+    MAIN_SHEET.style.transition = "top " + ms + "ms cubic-bezier(0.45,0,0.25,1)";
+    MAIN_SHEET.style.top = top + "px";
+  }
+  window.addEventListener("message", e => {
+    if (!e.data || e.data.source !== "teum-parent" || e.data.type !== "mission") return;
+    mission = e.data.mission;
+    if (!mission) phase = "click";
+    if (mission === "laundry" && !activeDetail) { setTimeout(() => moveMainSheet(114, 800), 900); animUntil = Date.now() + 1750; }
+    updatePulse();
+  });
+
+  // 미션 중 지금 눌러야 할 버튼이 합의서 버튼처럼 숨쉬듯 빛난다
+  // 냉장고: 지도의 반찬가게 핀 → 정기 반찬 단체 구독권 / 세탁물: 목록의 세탁소 카드 → 생활빨래 단체권
+  // (반찬가게 핀 = markerElements[0] - 목록 반찬가게 카드가 누르는 그 핀. 처음 지도 화면 왼쪽 위에 보인다. 테두리는 핀 그림(23x30)에)
+  const PULSE = {
+    fridge: { get card(){ const m = (window.markerElements || [])[0]; return m && m.firstElementChild; }, detail: "detailRestaurant", group: GROUP.restaurant },
+    laundry: { card: document.querySelector('#catList > [data-cat="세탁소"][onclick]'), detail: "detailLaundry", group: GROUP.laundry }
+  };
+  function updatePulse(){
+    document.querySelectorAll(".mission-pulse, .mission-show").forEach(el => el.classList.remove("mission-pulse", "mission-show"));
+    const m = PULSE[mission]; if (!m) return;
+    if (phase === "show") { targetEls(target).forEach(el => el.classList.add("mission-show")); return; }
+    const el = activeDetail === m.detail ? m.group && m.group.firstElementChild : m.card;
+    if (el) el.classList.add("mission-pulse");
+  }
+
+  // 가이드 테두리: 이름표(.mission-pulse 실선·숨쉬기 / .mission-show 점선)가 붙은 대상들을 감싸는 상자를 매 프레임 따라간다.
+  // 규칙형 테두리(app-guide-bridge.js)와 같은 규칙: 대상보다 8px 바깥, 화면 가장자리에서 13px 안쪽까지만(빛까지 화면 안)
+  const ring = document.createElement("div"); ring.id = "missionRing"; document.body.appendChild(ring);
+  (function followRing(){
+    const els = [...document.querySelectorAll(".mission-pulse, .mission-show")].filter(e => e.getClientRects().length);
+    if (!els.length) { ring.classList.remove("show"); document.documentElement.classList.remove("teum-hand"); }
+    else {
+      const rs = els.map(e => e.getBoundingClientRect()), P = 8, E = 13;
+      const L = Math.max(E, Math.min(...rs.map(r => r.left)) - P), T = Math.max(E, Math.min(...rs.map(r => r.top)) - P);
+      const R = Math.min(innerWidth - E, Math.max(...rs.map(r => r.right)) + P), B = Math.min(innerHeight - E, Math.max(...rs.map(r => r.bottom)) + P);
+      Object.assign(ring.style, { left: L + "px", top: T + "px", width: Math.max(0, R - L) + "px", height: Math.max(0, B - T) + "px" });
+      ring.classList.toggle("show-mode", !els.some(e => e.classList.contains("mission-pulse")));
+      ring.classList.add("show");
+    }
+    // 미션 중에만 매 프레임 따라간다 - 미션이 없을 땐 화면 전체를 매 프레임 뒤질 필요가 없어 0.25초마다만 (메시지가 오면 바로 다음 확인에서 붙는다)
+    if (mission) requestAnimationFrame(followRing); else setTimeout(followRing, 250);
+  })();
+
+  const _openDetail = window.openDetail;
+  window.openDetail = function(cat){
+    _openDetail(cat); notifyParent("detail-opened", { cat: cat }); updatePulse();
+    // 미션 중 상세가 열리면: 잠깐(0.9초) 상세를 보여준 뒤 바텀 시트를 0.8초에 걸쳐 위로 끝까지 올리고,
+    // 이어서 빛나는 단체권 카드가 시트 가운데 오도록 1.2초에 걸쳐 천천히 내린다 (시간은 아래 숫자만 바꾸면 됨)
+    const RAISE_DELAY = 900, RAISE_MS = 800, SCROLL_MS = 1200;
+    const card = ((mission === "fridge" && cat === "restaurant") || (mission === "laundry" && cat === "laundry")) && ticketList(GROUP[cat]), sc = card && card.closest(".hide-scrollbar");
+    if (sc) animUntil = Date.now() + RAISE_DELAY + RAISE_MS + 150 + SCROLL_MS + 50;
+    if (sc) setTimeout(() => {
+      sc.style.transition = "top " + RAISE_MS + "ms cubic-bezier(0.45,0,0.25,1)";
+      const fab = document.getElementById("resetLocationBtn"); // 현위치 버튼은 시트 위에 붙어 같이 움직여야 해서 같은 시간·곡선으로
+      if (fab) fab.style.transition = "transform 0.15s, top " + RAISE_MS + "ms cubic-bezier(0.45,0,0.25,1)";
+      setSheet(114); detailState = "raised";
+      if (fab) setTimeout(() => { fab.style.transition = "transform 0.15s, top 0.3s cubic-bezier(0.2,0.8,0.2,1)"; }, RAISE_MS + 50);
+      setTimeout(() => {
+        const a = card.getBoundingClientRect(), b = sc.getBoundingClientRect();
+        const from = sc.scrollTop, to = from + (a.top - b.top) - (sc.clientHeight - a.height) / 2, t0 = performance.now();
+        (function step(now){ // 브라우저 기본 smooth 스크롤은 너무 빨라서 직접 천천히 (ease-in-out)
+          const t = Math.min(1, (now - t0) / SCROLL_MS), k = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+          sc.scrollTop = from + (to - from) * k;
+          if (t < 1) requestAnimationFrame(step);
+        })(t0);
+      }, RAISE_MS + 150);
+    }, RAISE_DELAY);
+  };
+  const _closeDetail = window.closeDetail;
+  window.closeDetail = function(){ _closeDetail(); updatePulse(); };
+
+  // 게임 폰 안에서는 미션에 쓰는 버튼만 동작: 목록의 반찬가게·세탁소 카드, 상세의 단체권 카드 2개.
+  // 바텀 시트 손잡이(목록·상세) 끌어올리기도 허용. 나머지(지도·마커·칩·하단 메뉴·뒤로가기 등) 클릭/드래그는 막는다.
+  // 목록·상세 스크롤(휠)은 지도 위가 아니면 허용. 손 떼기(mouseup 등)는 막지 않는다 - 막으면 시트 끌기가 안 끝남.
+  // 카드가 내부에서 마커를 대신 눌러주는 클릭(isTrusted=false)은 통과시킨다.
+  if (document.documentElement.classList.contains("embedded")) {
+    // 진행 중인 미션의 카드만: 냉장고(fridge) = 반찬가게, 세탁물(laundry) = 세탁소, 미션 없으면 둘 다
+    const cards = () => mission === "fridge" ? '#catList > [data-cat="__none"]' : mission === "laundry" ? '#catList > [data-cat="세탁소"][onclick]' : '#catList > [onclick][data-cat="반찬가게"], #catList > [onclick][data-cat="세탁소"]';
+    const allowed = t => (phase !== "show" && t.closest(cards())) || (phase !== "show" && mission === "fridge" && t.closest(".store-marker") === (window.markerElements || [])[0]) || t.closest('#sheetHandle, .detailHandle') || (phase !== "show" && [GROUP.restaurant, GROUP.laundry].some(c => c && c.contains(t)));
+    // 테두리(#missionRing) 안 어디를 눌러도: 보여주기 단계면 [다음], 누르기 단계면 그 버튼을 누른 것과 같다 (버튼만 누르기엔 범위가 좁았다)
+    const inRing = e => { if (!ring.classList.contains("show")) return false; const r = ring.getBoundingClientRect(); return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom; };
+    // 테두리 안에 마우스가 있으면 손가락 (누르면 넘어가는 곳)
+    document.addEventListener("mousemove", e => document.documentElement.classList.toggle("teum-hand", !!mission && inRing(e)), true);
+    const block = e => {
+      if (e.isTrusted && mission && inRing(e)) {
+        if (phase === "show") { if (e.type === "click" || e.type === "mousedown" || e.type === "pointerdown" || e.type === "touchstart") { e.preventDefault(); e.stopImmediatePropagation(); } if (e.type === "click") notifyParent("show-next"); return; }
+        const p = document.querySelector(".mission-pulse");
+        if (p && !p.contains(e.target) && e.type !== "wheel") { e.preventDefault(); e.stopImmediatePropagation(); if (e.type === "click") p.click(); return; }
+      }
+      if (!e.isTrusted || allowed(e.target)) return;
+      if (e.type === "wheel" && !e.target.closest("#mapContainer")) return;
+      e.preventDefault(); e.stopImmediatePropagation();
+    };
+    ["click", "mousedown", "pointerdown", "touchstart", "wheel", "dblclick"].forEach(t =>
+      document.addEventListener(t, block, { capture: true, passive: false }));
+  }
+
+  // 게임이 상세 화면 단계를 알려준다: show(목록 보여주기) → click(단체권 누르기)
+  window.addEventListener("message", e => {
+    const d = e.data;
+    if (!d || d.source !== "teum-parent" || d.type !== "guide-phase") return;
+    phase = d.phase === "show" ? "show" : "click";
+    target = d.target || null;
+    updatePulse();
+    setTimeout(scrollToTarget, Math.max(0, animUntil - Date.now()));
+  });
+
+  // 부모가 Enter·말풍선 클릭을 받으면 누르기 단계의 빛나는 버튼을 누른다 (보여주기 단계 [다음]은 부모가 직접)
+  window.addEventListener("message", e => {
+    const d = e.data;
+    if (!d || d.source !== "teum-parent" || d.type !== "press-guide") return;
+    const p = phase !== "show" && document.querySelector(".mission-pulse");
+    if (p) p.click();
+  });
+  // 미션 중 앱 안에서 Enter = 게임 화면에서 Enter와 같다
+  document.addEventListener("keydown", e => {
+    if (!mission || e.key !== "Enter" || e.isComposing || e.repeat) return;
+    e.preventDefault(); notifyParent("guide-enter");
+  }, true);
+
+  // 게임이 미션 시작 때 보내는 reset-view: 상세 닫고 목록을 '전체'·맨 위로
+  window.addEventListener("message", e => {
+    const d = e.data;
+    if (!d || d.source !== "teum-parent" || d.type !== "reset-view") return;
+    phase = "click"; target = null;
+    if (activeDetail) closeDetail();
+    const all = document.querySelector("#catChips .cat-chip"); if (all) all.click();
+    moveMainSheet(510, 0);
+  });
+
+  // 게임이 지금 단계 대상(target)의 위치를 물으면 답한다 - 말풍선 높이를 거기에 맞춘다
+  window.addEventListener("message", e => {
+    const d = e.data;
+    if (!d || d.source !== "teum-parent" || d.type !== "request-rect") return;
+    const els = targetEls(d.target);
+    if (!els.length) return;
+    requestAnimationFrame(() => {
+      const u = unionRect(els);
+      notifyParent("rect-report", { step: d.step, mission: d.mission, rect: { top: u.top, left: u.left, width: u.right - u.left, height: u.bottom - u.top } });
+    });
+  });
+})();
+</script>
+</body>
+</html>
