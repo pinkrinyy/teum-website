@@ -5,7 +5,8 @@
 (function(){
   var code = (new URLSearchParams(location.search).get('code') || '').replace(/\D/g, '');
   if (code.length !== 4) return;
-  addEventListener('load', function(){
+  // 그림을 다 받을(load) 때까지 기다리면 그동안 빈 화면이라 화면 구조가 준비되면 바로 넣는다
+  addEventListener('DOMContentLoaded', function(){
     for (var i = 0; i < 4; i++) { var b = document.getElementById('otp' + i); if (b) b.value = code[i]; }
     var f = document.getElementById('otpForm');
     if (f) f.requestSubmit ? f.requestSubmit() : f.dispatchEvent(new Event('submit', {cancelable: true}));

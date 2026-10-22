@@ -136,6 +136,8 @@
   });
   // ESC: 이 페이지에 포커스가 있을 때는 직접, 게임 안을 누른 뒤에는 게임(url-code.js)이 사이트를 거쳐 보내 준다
   addEventListener('keydown', function(e){ if (e.key === 'Escape' && document.body.classList.contains('full')) setFull(false); });
+  // 게임 엔딩의 [처음으로 돌아가기] → 유형 테스트 다시하기와 같다
+  addEventListener('message', function(e){ if ((e.data || {}).teum === 'typeRetry' && document.body.classList.contains('playing')) { setFull(false); document.getElementById('retryBtn').click(); } });
   addEventListener('message', function(e){ if ((e.data || {}).teum === 'gameEsc' && document.body.classList.contains('full')) setFull(false); });
   var tt;
   // 전체 화면이 되면 처음에 ESC 안내를 잠깐 보여 준다

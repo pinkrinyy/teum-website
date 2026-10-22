@@ -347,16 +347,14 @@
   }
 
   endingRestartBtn.addEventListener('click', function(){
-    gameEndingOverlay.classList.remove('show');
-    var resetBtn = document.getElementById('cohabitResetBtn');
-    if(resetBtn) resetBtn.click();
+    // 유형 테스트로 돌아간다: 게임을 감싼 페이지들(teum_game/index.html → game/index.html)에 모두 알리면 game/index.html이 받아 테스트를 다시 연다
+    if(window.top === window){ location.href = '../index.html'; return; } // 게임만 따로 열었을 때
+    for(var w = window; w !== w.top; ){ w = w.parent; try { w.postMessage({teum: 'typeRetry'}, '*'); } catch(e){} }
   });
 
   // 엔딩까지 마친 유형: 다른 유형을 하다가 그 유형으로 돌아오면 새로 시작하지 않고 엔딩 장면을 그대로 보여 준다.
   // [처음으로]를 누르면 새 관람객이므로 지운다. ponytail: 이 페이지를 연 동안만 기억 (새로고침하면 처음부터)
   var clearedTypes = {}; // { S:{ submitted:bool }, A:{...} }
-  document.getElementById('cohabitResetBtn').addEventListener('click', function(){ clearedTypes = {}; progressByType = {}; });
-  document.getElementById('resetLink').addEventListener('click', function(){ clearedTypes = {}; });
   // 유형 탭(다른 유형 버튼)으로 들어오면 환영 대화 없이 kitchen:game-start가 바로 온다 - 다른 시작 처리(핀·말풍선 등)보다 먼저 받아서
   // 이미 엔딩까지 마친 유형이면 시작을 막고 엔딩 장면으로 둔다 (이 리스너가 다른 game-start 리스너보다 먼저 등록돼 있어야 함)
   window.addEventListener('kitchen:game-start', function(e){
@@ -827,8 +825,6 @@
   // 한 관람객에게 한 번만 - 끝까지 본 뒤엔 다시하기·다른 유형에서도 건너뛰고 바로 환영 인사. '다른 코드 입력'(새 관람객)이면 다시 보여 준다
   var startCoachSeen = false;
   var welcomeSeen = {}; // 유형별 환영 인사를 봤는지 (S/A/H) - 시작 안내와 같이 새 관람객이면 초기화
-  document.getElementById('cohabitResetBtn').addEventListener('click', function(){ startCoachSeen = false; welcomeSeen = {}; });
-  document.getElementById('resetLink').addEventListener('click', function(){ startCoachSeen = false; welcomeSeen = {}; });
   function showStartCoach(onDone){
     if(startCoachSeen){ if(onDone) onDone(); return; }
     if(coachEl) return;

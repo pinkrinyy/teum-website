@@ -2027,7 +2027,6 @@ window.teumBalance = function(root){
   function resetAll(){
     boxes.forEach(function(b){ b.value = ''; });
     errorMsg.classList.remove('show');
-    codePanel.classList.remove('hide');
     genderNamePanel.classList.remove('show');
     clearTimeout(matchingTimer);
     revealPanel.classList.remove('show', 'loading', 'agreeing', 'agree-prep');
@@ -2115,8 +2114,6 @@ window.teumBalance = function(root){
     });
   }
 
-  document.getElementById('resetLink').addEventListener('click', resetAll);
-  document.getElementById('cohabitResetBtn').addEventListener('click', resetAll); // [다른 코드 입력]: 코드 입력 화면으로
   // [다시하기]: 이름·성별·합의는 그대로, 모든 유형의 진행도를 지우고 지금 유형을 환영 대화부터 처음부터 다시
   // 처음 게임에 들어올 때처럼: 지금 화면을 서서히 감추고(0.6초) → 안 보이는 동안 처음 상태로 되돌린 뒤 → 게임을 서서히 띄운다(1.2초, cohabitFadeIn).
   // 예전엔 화면이 보이는 채로 방·캐릭터·핀이 한꺼번에 제자리로 튀어서 깜빡이는 것처럼 보였다
