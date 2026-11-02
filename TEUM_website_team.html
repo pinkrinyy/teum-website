@@ -179,26 +179,19 @@ function build(img){var w=document.createElement('div');w.className='teum-ds teu
  layout(shown);pct(shown);paint();
  var io=new IntersectionObserver(function(es){var on=es.some(function(e){return e.isIntersecting});if(on&&!run){run=1;cycle()}else if(!on&&run){run=0;clearAll();vals=FINAL.slice();shown=FINAL.slice();active=-1;layout(shown);pct(shown);paint()}},{threshold:.4});io.observe(w)}
 function look(){var l=document.querySelectorAll('img.teum-ds');for(var i=0;i<l.length;i++){if(/design_graph\.svg/.test(l[i].getAttribute('src')||''))build(l[i])}}
-new MutationObserver(look).observe(document.documentElement,{childList:true,subtree:true});look()})();</script><script>/* teum-match-badge: service Authentication Service 오른쪽 그림의 방(주방 사진) 카드 — '주거지 인증 완료' 뱃지 옆에 '90% 매치' 뱃지가 빠져 있어 추가. 같은 그림의 서은민 카드에 있는 '90% 매치' 뱃지(알약+테두리+글자 그림 3장)를 그대로 가져와 주거지 뱃지 오른쪽(간격 8)에 같은 높이로 놓음.
- 주거지 뱃지는 뒤에 반투명 판(흰 바탕 + 사진 + 어두운 그라데이션을 뱃지 모양으로 오려 낸 3겹)이 깔려 있어서, 그 3겹을 그대로 복사해 매치 뱃지 모양(뱃지보다 사방 6씩 큰 알약)으로 다시 오려 뱃지 뒤에 깖. */
-(function(){var H={pill:'049535f80c115c089bfa90fd0a98eecf1c54315d',halo:'9c977eeb',p2:'0ba06a75d74e6920d0487eb2370682c8a9cdb7c8',s2:'c3dbf59a912daf4655d7dd9e2e05ce1d46f2a472',t2:'8d7d814be32eaa3a7a2534dcb761c5e7b6075ff2',txt:'8ad4e6fb1eb3d8de185d5632b0a62da5831f047f'};
-function key(p){var k=Object.keys(window.__P.a);for(var i=0;i<k.length;i++)if(k[i].indexOf(p)===0)return k[i]}
-function img(h){var a=window.__asset;if(!a)return null;var u=a(h.length>12?h+'.svg':key(h)),l=document.querySelectorAll('#container img');for(var i=0;i<l.length;i++)if(l[i].src===u)return l[i]}
-function maskCss(w,h,x,y){var u='url("data:image/svg+xml;utf8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="'+w+'" height="'+h+'"><rect width="'+w+'" height="'+h+'" rx="17.4" fill="black"/></svg>')+'")';return '-webkit-mask-image:'+u+';mask-image:'+u+';-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;-webkit-mask-size:'+w+'px '+h+'px;mask-size:'+w+'px '+h+'px;-webkit-mask-position:'+x+'px '+y+'px;mask-position:'+x+'px '+y+'px'}
-function run(){var a=window.__asset;if(!a||!window.__P)return;var pi=img(H.pill),ti=img(H.txt),hi=img(H.halo);if(!pi||!ti||!hi)return;var pw=pi.parentElement,tw=ti.parentElement,hw=hi.parentElement,host=pw.parentElement;if(!host||host.querySelector('.teum-mb'))return;
+new MutationObserver(look).observe(document.documentElement,{childList:true,subtree:true});look()})();</script><script>/* teum-match-badge: service Authentication Service 오른쪽 그림의 방(주방 사진) 카드 — '주거지 인증 완료' 뱃지 옆에 '90% 매치' 뱃지 추가. 같은 그림의 서은민 카드에 있는 '90% 매치' 뱃지(알약+테두리+글자, 벡터라 확대해도 선명)를 그대로 가져와
+ 주거지 뱃지 오른쪽(간격 8)에 같은 높이로 놓고, 그 위에 뱃지 모양 그대로 검정 40% 불투명도 덮개를 얹음(뒤 판·바깥 테두리는 없음). */
+(function(){var H={pill:'049535f80c115c089bfa90fd0a98eecf1c54315d',p2:'0ba06a75d74e6920d0487eb2370682c8a9cdb7c8',s2:'c3dbf59a912daf4655d7dd9e2e05ce1d46f2a472',t2:'8d7d814be32eaa3a7a2534dcb761c5e7b6075ff2',txt:'8ad4e6fb1eb3d8de185d5632b0a62da5831f047f'};
+function img(h){var a=window.__asset;if(!a)return null;var u=a(h+'.svg'),l=document.querySelectorAll('#container img');for(var i=0;i<l.length;i++)if(l[i].src===u)return l[i]}
+function run(){var a=window.__asset;if(!a||!window.__P)return;var pi=img(H.pill),ti=img(H.txt);if(!pi||!ti)return;var pw=pi.parentElement,tw=ti.parentElement,host=pw.parentElement;if(!host||host.querySelector('.teum-mb'))return;
  var pl=pw.offsetLeft+pw.offsetWidth+8,pt=pw.offsetTop;
- /* 뒤 판 3겹: 흰 바탕(hw) · 사진(다음 칸) · 그라데이션(그 다음 칸) */
- var hl=pl-(pw.offsetLeft-hw.offsetLeft),ht=pt-(pw.offsetTop-hw.offsetTop),W=92,Hh=41;
- var photo=hw.nextElementSibling,grad=photo&&photo.nextElementSibling;
- var h2=hw.cloneNode(true);h2.classList.add('teum-mb');h2.style.cssText='left:'+hl+'px;top:'+ht+'px;width:'+W+'px;height:'+Hh+'px;'+maskCss(W,Hh,0,0);
- var first=null;host.appendChild(h2);
- [photo,grad].forEach(function(src){if(!src)return;var c=src.cloneNode(true);c.classList.add('teum-mb');c.style.cssText=maskCss(W,Hh,hl-src.offsetLeft,ht-src.offsetTop);host.appendChild(c)});
  var p=pw.cloneNode(true);p.classList.add('teum-mb');var im=p.querySelectorAll('img');
- p.style.cssText='left:'+pl+'px;top:'+pt+'px;width:80.1033px;height:29.0516px';
+ p.style.cssText='left:'+pl+'px;top:'+pt+'px;width:80.1033px;height:29.0516px;-webkit-mask:none;mask:none';
  im[0].src=a(H.p2+'.svg');im[0].style.cssText='width:100%;height:100%';
  var sw=im[1]&&im[1].parentElement;if(sw){sw.style.cssText='left:0;top:1px;width:79.0156px;height:27.964px';im[1].src=a(H.s2+'.svg');im[1].style.cssText='width:100%;height:100%'}
  host.appendChild(p);
- var t=tw.cloneNode(true);t.classList.add('teum-mb');t.style.cssText='left:'+(pl+13)+'px;top:'+(pt+9)+'px;width:51.5691px;height:11.42px';var ti2=t.querySelector('img');ti2.src=a(H.t2+'.svg');ti2.style.cssText='width:100%;height:100%';tw.parentElement.appendChild(t)}
+ var t=tw.cloneNode(true);t.classList.add('teum-mb');t.style.cssText='left:'+(pl+13)+'px;top:'+(pt+9)+'px;width:51.5691px;height:11.42px;-webkit-mask:none;mask:none';var ti2=t.querySelector('img');ti2.src=a(H.t2+'.svg');ti2.style.cssText='width:100%;height:100%';host.appendChild(t);
+ var o=document.createElement('div');o.className='teum-mb';o.style.cssText='position:absolute;left:'+pl+'px;top:'+pt+'px;width:80.1033px;height:29.0516px;border-radius:14.6px;background:rgba(0,0,0,.4);pointer-events:none';host.appendChild(o)}
 new MutationObserver(run).observe(document.documentElement,{childList:true,subtree:true});run()})();</script>
 <script>
 (function(){
