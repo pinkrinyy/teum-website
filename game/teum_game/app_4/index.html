@@ -1225,6 +1225,11 @@
   let chatShown = 0;   // CHAT 중 채팅방에 올라온 줄 수
   chats.querySelector('#chatMate time').textContent = hhmm(new Date());
   const chatRow = (who, t) => {
+    // 같은 사람이 이어서 보낸 말풍선은 맨 마지막 것에만 시간을 보인다 - 새 줄이 붙으면 바로 앞 줄(같은 사람)의 시간을 뗀다
+    const prev = chatMsgs.lastElementChild;
+    if (prev && prev.classList.contains('cm') && prev.classList.contains('me') === (who === 'me')) {
+      const pt = prev.querySelector('time'); if (pt) pt.remove();
+    }
     const row = chatMsgs.appendChild(document.createElement('div'));
     row.className = 'cm' + (who === 'me' ? ' me' : '');
     const b = row.appendChild(document.createElement('div')); b.className = 'b';
