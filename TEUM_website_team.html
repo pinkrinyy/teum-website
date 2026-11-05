@@ -303,5 +303,6 @@ const {SitesRuntime}=await import(url);
         </form>
       </main>
     </noscript>
-  </body>
+  <script>/* teum-footer-gap: 모든 페이지 Footer 위 간격을 300px로 통일 */(function(){function run(){[].forEach.call(document.querySelectorAll("#container p"),function(p){if(!/Ready_Set\. All Rights/.test(p.textContent||""))return;var f=p.parentElement;while(f&&!(Math.abs(f.offsetWidth-1920)<=2&&f.offsetHeight>340&&f.offsetHeight<460))f=f.parentElement;if(!f||f.__teumGap)return;f.__teumGap=1;var c=f,rg=0;while(c.parentElement&&c.parentElement!==document.body){var g=parseFloat(getComputedStyle(c.parentElement).rowGap);if(g>=0){rg=g;break}c=c.parentElement}if(rg>300)c.style.setProperty("margin-top",(300-rg)+"px","important");setTimeout(function(){var z=parseFloat(getComputedStyle(document.getElementById("container")).zoom)||1,fb=f.getBoundingClientRect().bottom+scrollY,e=f.parentElement;while(e&&e!==document.body){var r=e.getBoundingClientRect(),ex=(r.bottom+scrollY-fb)/z;if(ex>2)e.style.setProperty("height",(r.height/z-ex)+"px","important");e=e.parentElement}},300)})}new MutationObserver(run).observe(document.documentElement,{childList:true,subtree:true});run()})();</script>
+</body>
 </html>
