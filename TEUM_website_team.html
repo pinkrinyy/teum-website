@@ -25,7 +25,7 @@ function run(){var A=window.__asset;if(!A)return;var src=A("2defc74e60b98ba2dac6
 #teum-game{position:fixed;left:0;width:100vw;top:0;bottom:0;box-sizing:border-box;z-index:2147483000;background:#eef0f2;display:none}#teum-game iframe{width:100%;height:100%;border:0;display:block}
 html.teum-game-on,html.teum-game-on body{overflow:hidden!important}
 /* 뒤 페이지 스크롤은 막되 스크롤바 자리는 남긴다 — 안 그러면 화면이 넓어져 오른쪽 정렬 헤더 메뉴가 스크롤바 폭만큼 밀린다 */html.teum-game-on{scrollbar-gutter:stable}
-/* GAME 화면은 맨 위부터 깔고(내용은 헤더 아래부터) 헤더를 그 위로 올린다 → 헤더가 다른 페이지와 같은 반투명 흰색·그림자 그대로 보임 */.teum-game-on .teum-gnb{z-index:2147483001!important}html.teum-game-on.teum-game-full .teum-gnb{z-index:1!important}</style>
+/* GAME 화면은 맨 위부터 깔고(내용은 헤더 아래부터) 헤더를 그 위로 올린다 → 헤더가 다른 페이지와 같은 반투명 흰색·그림자 그대로 보임 */.teum-game-on .teum-gnb{z-index:2147483001!important}/* teum-gnb-hover: 모든 메뉴(PLANNING·Design System·Service·Preview)에 마우스를 올리면 같은 초록색으로 0.3초에 걸쳐 바뀜 */.teum-gnb [role=link] p{transition:color .3s ease-out,-webkit-text-fill-color .3s ease-out}.teum-gnb [role=link]:hover p{color:rgb(73,153,99)!important;-webkit-text-fill-color:rgb(73,153,99)!important}html.teum-game-on.teum-game-full .teum-gnb{z-index:1!important}</style>
 <script>/* teum-game: 헤더(GNB)에 GAME 메뉴 추가. 누르면 헤더는 그대로 두고 그 아래 전체에 유형 테스트 화면(game/index.html = 테스트 폰 + 안내 문구 + 결과 후 게임 시작 버튼)을 띄움.
  다른 메뉴·뒤로 가기로 닫힘. 주소 #/game 으로 바로 열 수도 있음. 메뉴 간격은 기존(3개일 때) 간격을 유지하도록 메뉴 줄을 왼쪽으로 넓힘 */
 (function(){var box,frame;
